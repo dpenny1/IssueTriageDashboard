@@ -11,7 +11,7 @@ p{line-height:1.6}
 a{color:#185FA5;text-decoration:none}
 a:hover{text-decoration:underline}
 input,select{font-family:inherit;font-size:13px;padding:7px 10px;border:0.5px solid #ccc;border-radius:8px;width:100%;outline:none;background:#fff;color:#1a1a18;margin-bottom:8px}
-input:focus,select:focus{border-color:#185FA5;box-shadow:0 0 0 3px rgba(24,95,165,0.12)}
+input:focus,select:focus{border-color:#185FA5;box-shadow:0 0 0 3px rgba(24,95,165,0.08)}
 button{font-family:inherit;cursor:pointer;border-radius:8px;font-size:13px;transition:opacity 0.15s}
 button:disabled{opacity:0.5;cursor:not-allowed}
 .btn{padding:6px 14px;border:0.5px solid #ccc;background:transparent;color:#1a1a18}
@@ -34,7 +34,8 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 .hrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
 .hacts{display:flex;gap:8px;flex-wrap:wrap}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px}
-.stat{background:#fff;border:0.5px solid #e0e0dc;border-radius:10px;padding:12px 14px}
+.stat{background:#fff;border:0.5px solid #e0e0dc;border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s}
+.stat:hover{border-color:#185FA5;box-shadow:0 0 0 3px rgba(24,95,165,0.08)}
 .stat-num{font-size:26px;font-weight:500;margin-bottom:2px}
 .stat-lbl{font-size:12px;color:#888}
 .issue-row{display:flex;align-items:flex-start;gap:10px}
@@ -50,15 +51,29 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 .progress-wrap{margin-top:10px}
 .progress-label{display:flex;justify-content:space-between;font-size:12px;color:#888;margin-bottom:4px}
 .progress-bar{height:6px;background:#e0e0dc;border-radius:4px;overflow:hidden}
-.progress-fill{height:100%;border-radius:4px;background:#185FA5;transition:width 0.3s}
-.checklist-section{margin-top:10px;padding:10px 12px;background:#f9f9f7;border:0.5px solid #e0e0dc;border-radius:8px}
+.progress-fill{height:100%;border-radius:4px;background:#185FA5}
+.checklist-section{margin-top:8px;padding:10px 12px;background:#f9f9f7;border:0.5px solid #e0e0dc;border-radius:8px}
 .checklist-section-title{font-size:12px;font-weight:500;color:#666;margin-bottom:6px}
 .checklist-item{font-size:12px;padding:3px 0;display:flex;align-items:flex-start;gap:6px;line-height:1.5}
-.checklist-item.done{color:#888;text-decoration:line-through}
+.checklist-item.done-pr{color:#3B6D11}
+.checklist-item.done-manual{color:#854F0B}
+.checklist-item.open-issue{color:#1a1a18}
 .checklist-item.future{color:#aaa;font-style:italic}
-.action-box{margin-top:10px;padding:10px 12px;background:#f0f6ff;border:0.5px solid #b5d4f4;border-radius:8px;font-size:13px}
-.action-label{font-size:11px;font-weight:500;color:#185FA5;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.04em}
-.section-header{font-size:13px;font-weight:500;color:#888;margin:20px 0 10px;text-transform:uppercase;letter-spacing:0.05em}
+.checklist-item.done-pr span.item-text{text-decoration:line-through;color:#888}
+.checklist-item.done-manual span.item-text{text-decoration:line-through;color:#888}
+.cl-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;margin-top:8px;margin-bottom:4px}
+.cl-legend span{display:flex;align-items:center;gap:4px}
+.report-table{width:100%;border-collapse:collapse;font-size:13px}
+.report-table th{text-align:left;padding:8px 12px;border-bottom:1px solid #e0e0dc;font-weight:500;color:#666;font-size:12px;white-space:nowrap}
+.report-table td{padding:8px 12px;border-bottom:0.5px solid #f0f0ee;vertical-align:middle}
+.report-table tr:last-child td{border-bottom:none}
+.report-table tr:hover td{background:#f9f9f7}
+.report-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.pos{color:#3B6D11}
+.neg{color:#A32D2D}
+.report-actions{display:flex;gap:8px;margin-bottom:16px;align-items:center}
+.qa-section{margin-bottom:20px}
+.qa-header{font-size:14px;font-weight:500;margin-bottom:10px;padding-bottom:6px;border-bottom:0.5px solid #e0e0dc}
 #setup{display:block}
 #dash{display:none}
 </style>
@@ -74,7 +89,6 @@ button:disabled{opacity:0.5;cursor:not-allowed}
   <div class="card">
     <span class="lbl">GitHub personal access token (classic, repo scope)</span>
     <input type="password" id="ghToken" placeholder="ghp_..."/>
-
     <span class="lbl">ZenHub API token (optional)</span>
     <input type="password" id="zhToken" placeholder="ZenHub token..."/>
     <span class="lbl">ZenHub workspace ID (optional)</span>
@@ -109,46 +123,69 @@ button:disabled{opacity:0.5;cursor:not-allowed}
     <button class="tab" id="tabItems" onclick="switchTab('items')">CS Items</button>
     <button class="tab" id="tabInbox" onclick="switchTab('inbox')">Inbox</button>
     <button class="tab" id="tabIgnored" onclick="switchTab('ignored')">Ignored <span id="ignoredCount"></span></button>
+    <button class="tab" id="tabReport" onclick="switchTab('report')">Weekly Report</button>
+    <button class="tab" id="tabQa" onclick="switchTab('qa')">QA Tracking</button>
   </div>
 
   <div id="dashErr" style="display:none"></div>
   <div id="issueList"></div>
+  <div id="reportView" style="display:none"></div>
+  <div id="qaView" style="display:none"></div>
 </div>
 
 </div>
 <script>
 var S = {
-  ghToken:'', anthroKey:'', zhToken:'', workspaceId:'',
-  repos:[], issues:[], ignored:[], issueAI:{}, activeTab:'tracking',
-  expanded:{}
+  ghToken:'', zhToken:'', workspaceId:'',
+  repos:[], issues:[], ignored:[], activeTab:'tracking', expanded:{}
 };
 
-var CS_LABELS = ['cs tracking','uat patch','production patch','cs in testing','cs item'];
+var STORAGE_KEY = 'cs_triage_report_v2';
+var IGNORED_KEY = 'cs_triage_ignored_v2';
+var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+var CS_LABELS = ['cs tracking','uat patch','production patch','cs in testing','cs item'];
 var LABEL_META = {
-  'cs tracking':     {bg:'#E6F1FB', tx:'#0C447C', short:'CS Tracking'},
-  'uat patch':       {bg:'#FAEEDA', tx:'#633806', short:'UAT Patch'},
-  'production patch':{bg:'#FCEBEB', tx:'#A32D2D', short:'Prod Patch'},
-  'cs in testing':   {bg:'#EEEDFE', tx:'#3C3489', short:'CS In Testing'},
-  'cs item':         {bg:'#EAF3DE', tx:'#27500A', short:'CS Item'}
+  'cs tracking':     {bg:'#E6F1FB',tx:'#0C447C',short:'CS Tracking'},
+  'uat patch':       {bg:'#FAEEDA',tx:'#633806',short:'UAT Patch'},
+  'production patch':{bg:'#FCEBEB',tx:'#A32D2D',short:'Prod Patch'},
+  'cs in testing':   {bg:'#EEEDFE',tx:'#3C3489',short:'CS In Testing'},
+  'cs item':         {bg:'#EAF3DE',tx:'#27500A',short:'CS Item'}
 };
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function mkBadge(bg,tx,label){return '<span class="badge" style="background:'+bg+';color:'+tx+'">'+esc(label)+'</span>';}
-
 function ageInDays(d){return Math.floor((Date.now()-new Date(d).getTime())/86400000);}
 function ageLabel(days){
   if(days<3) return {text:days+'d',cls:'age-ok'};
   if(days<7) return {text:days+'d',cls:'age-warn'};
   return {text:days+'d',cls:'age-old'};
 }
-
-function getCSLabels(issue){
-  return issue.labels.filter(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});
+function todayStr(){
+  var d=new Date();
+  return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();
 }
 
+// Title classification
+function isReportTracking(title){
+  var t=title.toLowerCase();
+  return t.indexOf('cs ')===0 && t.indexOf('research')===-1 && !isQATracking(title);
+}
+function isQATracking(title){
+  var t=title.toLowerCase();
+  // matches "cs features - month yyyy"
+  if(t.indexOf('cs features')===0){
+    var now=new Date();
+    var thisMonth=MONTHS[now.getMonth()].toLowerCase();
+    var lastMonth=MONTHS[(now.getMonth()+11)%12].toLowerCase();
+    return t.indexOf(thisMonth)!==-1||t.indexOf(lastMonth)!==-1;
+  }
+  return false;
+}
+
+// Checklist parsing — detects PR-linked vs manual checks
 function parseChecklists(body){
-  var sections=[], currentSection=null;
+  var sections=[],currentSection=null;
   var lines=(body||'').split('\n');
   for(var i=0;i<lines.length;i++){
     var line=lines[i];
@@ -164,10 +201,14 @@ function parseChecklists(body){
       if(!currentSection) currentSection={title:'General',items:[]};
       var text=(checkedMatch||uncheckedMatch)[1].trim();
       var hasIssue=/#\d+/.test(text);
+      // PR detection: references a PR number or common bot keywords
+      var hasPR=!!text.match(/\bpr\b|\bpull request\b|merged|closes|closed via/i)||
+                (hasIssue&&!!text.match(/pr\s*#\d+|#\d+.*pr/i));
       currentSection.items.push({
         text:text,
         checked:!!checkedMatch,
-        hasIssue:hasIssue
+        hasIssue:hasIssue,
+        hasPR:hasPR
       });
     }
   }
@@ -176,45 +217,51 @@ function parseChecklists(body){
 }
 
 function checklistStats(sections){
-  var total=0,checked=0,withIssue=0,future=0;
+  var total=0,checkedPR=0,checkedManual=0,withIssue=0,future=0;
   sections.forEach(function(s){
-    s.items.forEach(function(i){
+    s.items.forEach(function(item){
       total++;
-      if(i.checked) checked++;
-      if(i.hasIssue) withIssue++;
-      if(!i.hasIssue&&!i.checked) future++;
+      if(item.checked){
+        if(item.hasPR) checkedPR++;
+        else checkedManual++;
+      }
+      if(item.hasIssue) withIssue++;
+      if(!item.hasIssue&&!item.checked) future++;
     });
   });
-  return {total:total,checked:checked,withIssue:withIssue,future:future,open:total-checked};
+  var checked=checkedPR+checkedManual;
+  return {total:total,checked:checked,checkedPR:checkedPR,checkedManual:checkedManual,withIssue:withIssue,future:future,open:total-checked};
 }
 
-function showSetup(){
-  document.getElementById('setup').style.display='block';
-  document.getElementById('dash').style.display='none';
-}
-function showDash(){
-  document.getElementById('setup').style.display='none';
-  document.getElementById('dash').style.display='block';
-}
-function showErr(elId,msg){
-  var el=document.getElementById(elId);
-  el.className='err-box'; el.textContent=msg; el.style.display='block';
-}
+function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return [];}}
+function saveIgnored(){try{localStorage.setItem(IGNORED_KEY,JSON.stringify(S.ignored));}catch(e){}}
+function loadHistory(){try{var v=localStorage.getItem(STORAGE_KEY);return v?JSON.parse(v):[];}catch(e){return [];}}
+function saveHistory(h){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(h));}catch(e){}}
+
+function getCSLabels(issue){return issue.labels.filter(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});}
+function hasCSLabel(issue){return issue.labels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});}
+
+function showSetup(){document.getElementById('setup').style.display='block';document.getElementById('dash').style.display='none';}
+function showDash(){document.getElementById('setup').style.display='none';document.getElementById('dash').style.display='block';}
+function showErr(elId,msg){var el=document.getElementById(elId);el.className='err-box';el.textContent=msg;el.style.display='block';}
 function hideErr(elId){document.getElementById(elId).style.display='none';}
 
 function switchTab(name){
   S.activeTab=name;
-  ['tracking','patches','testing','items','inbox','ignored'].forEach(function(t){
+  ['tracking','patches','testing','items','inbox','ignored','report','qa'].forEach(function(t){
     var el=document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1));
     if(el) el.className='tab'+(t===name?' active':'');
   });
-  renderIssues();
+  document.getElementById('issueList').style.display=(name==='report'||name==='qa')?'none':'block';
+  document.getElementById('reportView').style.display=name==='report'?'block':'none';
+  document.getElementById('qaView').style.display=name==='qa'?'block':'none';
+  if(name==='report') renderReport();
+  else if(name==='qa') renderQA();
+  else renderIssues();
 }
 
 async function ghFetch(path){
-  var r=await fetch('https://api.github.com'+path,{
-    headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json'}
-  });
+  var r=await fetch('https://api.github.com'+path,{headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json'}});
   if(!r.ok){
     if(r.status===401) throw new Error('401 Unauthorized - check your GitHub token');
     if(r.status===403) throw new Error('403 Forbidden - token lacks repo permission');
@@ -224,27 +271,6 @@ async function ghFetch(path){
   return r.json();
 }
 
-async function callClaude(system,userMsg,maxTokens){
-  var r=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-api-key':S.anthroKey,
-      'anthropic-version':'2023-06-01',
-      'anthropic-dangerous-direct-browser-access':'true'
-    },
-    body:JSON.stringify({
-      model:'claude-sonnet-4-20250514',
-      max_tokens:maxTokens||400,
-      system:system,
-      messages:[{role:'user',content:userMsg}]
-    })
-  });
-  var d=await r.json();
-  var text=(d.content||[]).map(function(c){return c.text||'';}).join('');
-  return JSON.parse(text.replace(/```json|```/g,'').trim());
-}
-
 async function connect(){
   var gh=document.getElementById('ghToken').value.trim();
   var zh=document.getElementById('zhToken').value.trim();
@@ -252,11 +278,12 @@ async function connect(){
   var rp=document.getElementById('reposInput').value.trim();
   hideErr('setupErr');
   if(!gh||!rp){showErr('setupErr','GitHub token and at least one repo are required.');return;}
-  S.ghToken=gh; S.anthroKey=''; S.zhToken=zh; S.workspaceId=ws;
+  S.ghToken=gh; S.zhToken=zh; S.workspaceId=ws;
   S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
+  S.ignored=loadIgnored();
   var btn=document.getElementById('connectBtn');
   btn.disabled=true; btn.innerHTML='<span class="spin"></span>Fetching...';
-  try{await loadIssues(); showDash();}
+  try{await loadIssues();showDash();}
   catch(e){showErr('setupErr',e.message);}
   btn.disabled=false; btn.textContent='Connect and fetch issues';
 }
@@ -269,21 +296,19 @@ async function loadIssues(){
     for(var ii=0;ii<data.length;ii++){
       var i=data[ii];
       if(i.pull_request) continue;
-      all.push({
-        id:i.number, repo:repo, title:i.title, body:i.body||'',
+      all.push({id:i.number,repo:repo,title:i.title,body:i.body||'',
         labels:i.labels.map(function(l){return l.name;}),
         assignees:i.assignees.map(function(a){return a.login;}),
-        createdAt:i.created_at, url:i.html_url
-      });
+        createdAt:i.created_at,url:i.html_url});
     }
   }
   S.issues=all;
-  S.issueAI={};
+  captureWeeklySnapshot();
   renderStats();
   renderIssues();
   updateIgnoredCount();
   document.getElementById('dashMeta').textContent=
-    all.length+' open issues across '+S.repos.length+' repo'+(S.repos.length!==1?'s':'');
+    all.length+' open issues across '+S.repos.length+' repo'+(S.repos.length!==1?'s':'')+' — loaded '+todayStr();
 }
 
 async function doRefresh(){
@@ -293,8 +318,37 @@ async function doRefresh(){
   btn.disabled=false; btn.textContent='Refresh';
 }
 
-function hasCSLabel(issue){
-  return issue.labels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});
+function getReportTrackingIssues(){
+  return S.issues.filter(function(i){
+    return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';}) && isReportTracking(i.title);
+  });
+}
+
+function captureWeeklySnapshot(){
+  var tracking=getReportTrackingIssues();
+  if(!tracking.length) return;
+  var totalTasks=0,checkedPR=0,checkedManual=0,future=0;
+  var issueNums=[];
+  tracking.forEach(function(issue){
+    issueNums.push(issue.id);
+    var sections=parseChecklists(issue.body);
+    var stats=checklistStats(sections);
+    totalTasks+=stats.total;
+    checkedPR+=stats.checkedPR;
+    checkedManual+=stats.checkedManual;
+    future+=stats.future;
+  });
+  var checked=checkedPR+checkedManual;
+  var open=totalTasks-checked;
+  var history=loadHistory();
+  var today=todayStr();
+  var row={date:today,tracking:issueNums.join('/'),total:totalTasks,closed:checked,closedPR:checkedPR,closedManual:checkedManual,noIssue:future,open:open};
+  if(history.length>0&&history[history.length-1].date===today){
+    history[history.length-1]=row;
+  } else {
+    history.push(row);
+  }
+  saveHistory(history);
 }
 
 function getTabIssues(){
@@ -317,16 +371,16 @@ function renderStats(){
   var items=all.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs item';});});
   var inbox=all.filter(function(i){return !hasCSLabel(i);});
   var html='';
-  html+=stat(tracking.length,'CS Tracking','#0C447C');
-  html+=stat(patches.length,'Patches','#A32D2D');
-  html+=stat(testing.length,'CS In Testing','#3C3489');
-  html+=stat(items.length,'CS Items','#27500A');
-  html+=stat(inbox.length,'Inbox','#888');
+  html+=stat(tracking.length,'CS Tracking','#0C447C','tracking');
+  html+=stat(patches.length,'Patches','#A32D2D','patches');
+  html+=stat(testing.length,'CS In Testing','#3C3489','testing');
+  html+=stat(items.length,'CS Items','#27500A','items');
+  html+=stat(inbox.length,'Inbox','#888','inbox');
   document.getElementById('statGrid').innerHTML=html;
 }
 
-function stat(num,label,color){
-  return '<div class="stat"><div class="stat-num" style="color:'+color+'">'+num+'</div><div class="stat-lbl">'+esc(label)+'</div></div>';
+function stat(num,label,color,tab){
+  return '<div class="stat" onclick="switchTab(\''+tab+'\')" title="View '+esc(label)+' issues"><div class="stat-num" style="color:'+color+'">'+num+'</div><div class="stat-lbl">'+esc(label)+'</div></div>';
 }
 
 function updateIgnoredCount(){
@@ -336,29 +390,56 @@ function updateIgnoredCount(){
 
 function ignoreIssue(tkey){
   if(S.ignored.indexOf(tkey)===-1) S.ignored.push(tkey);
-  renderStats();
-  renderIssues();
-  updateIgnoredCount();
+  saveIgnored(); renderStats(); renderIssues(); updateIgnoredCount();
 }
-
 function unignoreIssue(tkey){
   S.ignored=S.ignored.filter(function(k){return k!==tkey;});
-  renderStats();
-  renderIssues();
-  updateIgnoredCount();
+  saveIgnored(); renderStats(); renderIssues(); updateIgnoredCount();
 }
-
 function toggleExpand(tkey){
   S.expanded[tkey]=!S.expanded[tkey];
   renderIssues();
+}
+
+function renderChecklist(issue,tkey){
+  var sections=parseChecklists(issue.body);
+  var stats=checklistStats(sections);
+  if(stats.total===0) return '';
+  var pct=Math.round(((stats.checkedPR+stats.checkedManual)/stats.total)*100);
+  var html='<div class="progress-wrap">';
+  html+='<div class="progress-label"><span>'+(stats.checkedPR+stats.checkedManual)+'/'+stats.total+' items complete</span><span>'+pct+'%</span></div>';
+  html+='<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
+  html+='<div style="font-size:11px;color:#888;margin-top:5px;display:flex;gap:12px;flex-wrap:wrap">';
+  html+='<span style="color:#3B6D11">&#10003; '+stats.checkedPR+' closed via PR</span>';
+  html+='<span style="color:#854F0B">&#10003; '+stats.checkedManual+' manually approved</span>';
+  html+='<span>'+stats.withIssue+' open with issue</span>';
+  html+='<span style="color:#aaa">'+stats.future+' future consideration'+(stats.future!==1?'s':'')+'</span>';
+  html+='</div></div>';
+  if(sections.length>0){
+    html+='<div style="margin-top:8px"><button class="btn-sm" onclick="toggleExpand(\''+tkey+'\')">'+(S.expanded[tkey]?'Hide checklist':'Show checklist')+'</button></div>';
+    if(S.expanded[tkey]){
+      sections.forEach(function(sec){
+        html+='<div class="checklist-section"><div class="checklist-section-title">'+esc(sec.title)+'</div>';
+        sec.items.forEach(function(item){
+          var cls,icon,tag='';
+          if(item.checked&&item.hasPR){cls='done-pr';icon='&#10003;';tag='<span class="badge" style="background:#EAF3DE;color:#27500A;margin-left:4px">PR</span>';}
+          else if(item.checked&&!item.hasPR){cls='done-manual';icon='&#10003;';tag='<span class="badge" style="background:#FAEEDA;color:#633806;margin-left:4px">manual</span>';}
+          else if(!item.checked&&!item.hasIssue){cls='future';icon='&#9675;';}
+          else{cls='open-issue';icon='&#9679;';}
+          html+='<div class="checklist-item '+cls+'"><span>'+icon+'</span><span class="item-text">'+esc(item.text)+'</span>'+tag+'</div>';
+        });
+        html+='</div>';
+      });
+    }
+  }
+  return html;
 }
 
 function renderIssues(){
   var list=getTabIssues();
   var html='';
   if(!list.length){
-    html='<div class="card" style="text-align:center;padding:2rem;color:#888">No issues here.</div>';
-    document.getElementById('issueList').innerHTML=html;
+    document.getElementById('issueList').innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#888">No issues here.</div>';
     return;
   }
   list.sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
@@ -368,18 +449,19 @@ function renderIssues(){
     var tkey=issue.id+'_'+issue.repo.replace(/\//g,'__');
     var isIgnored=S.ignored.indexOf(issue.id+'_'+issue.repo)!==-1;
     var isTracking=issue.labels.some(function(l){return l.toLowerCase()==='cs tracking';});
-    var tr=S.issueAI[tkey];
-    var expanded=S.expanded[tkey];
     var csLabels=getCSLabels(issue);
+    var isReport=isTracking&&isReportTracking(issue.title);
+    var isQA=isTracking&&isQATracking(issue.title);
 
     html+='<div class="card issue-row">';
     html+='<div class="issue-body">';
-
-    html+='<div class="issue-title"><a href="'+esc(issue.url)+'" target="_blank">#'+issue.id+' '+esc(issue.title)+'</a></div>';
+    html+='<div class="issue-title"><a href="'+esc(issue.url)+'" target="_blank">#'+issue.id+' '+esc(issue.title)+'</a>';
+    if(isReport) html+=' <span class="badge" style="background:#E6F1FB;color:#0C447C">in report</span>';
+    if(isQA) html+=' <span class="badge" style="background:#EEEDFE;color:#3C3489">QA tracking</span>';
+    html+='</div>';
     html+='<div class="issue-meta">'+esc(issue.repo)+' &middot; <span class="'+age.cls+'">'+age.text+' old</span>';
     if(issue.assignees.length) html+=' &middot; '+esc(issue.assignees.join(', '));
     html+='</div>';
-
     html+='<div class="tags">';
     csLabels.forEach(function(l){
       var m=LABEL_META[l.toLowerCase()]||{bg:'#E6F1FB',tx:'#0C447C',short:l};
@@ -389,41 +471,8 @@ function renderIssues(){
       html+=mkBadge('#F1EFE8','#444441',l);
     });
     html+='</div>';
-
-    if(isTracking){
-      var sections=parseChecklists(issue.body);
-      var stats=checklistStats(sections);
-      if(stats.total>0){
-        var pct=Math.round((stats.checked/stats.total)*100);
-        html+='<div class="progress-wrap">';
-        html+='<div class="progress-label"><span>'+stats.checked+'/'+stats.total+' items complete</span><span>'+pct+'%</span></div>';
-        html+='<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
-        html+='<div style="font-size:11px;color:#888;margin-top:4px">';
-        html+=stats.withIssue+' linked to issues &middot; '+stats.future+' future consideration'+(stats.future!==1?'s':'');
-        html+='</div>';
-        html+='</div>';
-        if(sections.length>0){
-          html+='<div style="margin-top:8px">';
-          html+='<button class="btn-sm" onclick="toggleExpand(\''+tkey+'\')">'+(expanded?'Hide checklist':'Show checklist')+'</button>';
-          html+='</div>';
-          if(expanded){
-            sections.forEach(function(sec){
-              html+='<div class="checklist-section">';
-              html+='<div class="checklist-section-title">'+esc(sec.title)+'</div>';
-              sec.items.forEach(function(item){
-                var cls=item.checked?'done':(item.hasIssue?'':'future');
-                var icon=item.checked?'&#10003;':(item.hasIssue?'&#9679;':'&#9675;');
-                html+='<div class="checklist-item '+cls+'"><span>'+icon+'</span><span>'+esc(item.text)+'</span></div>';
-              });
-              html+='</div>';
-            });
-          }
-        }
-      }
-    }
-
+    if(isTracking) html+=renderChecklist(issue,tkey);
     html+='</div>';
-
     html+='<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">';
     if(!isIgnored){
       html+='<button class="btn-ignore" onclick="ignoreIssue(\''+issue.id+'_'+issue.repo+'\')">Ignore</button>';
@@ -431,33 +480,107 @@ function renderIssues(){
       html+='<button class="btn-sm" onclick="unignoreIssue(\''+issue.id+'_'+issue.repo+'\')">Restore</button>';
     }
     html+='</div>';
-
     html+='</div>';
   });
   document.getElementById('issueList').innerHTML=html;
 }
 
-async function suggestAction(tkey){
-  var parts=tkey.split('_');
-  var id=parseInt(parts[0]);
-  var repo=parts.slice(1).join('_').replace(/__/g,'/');
-  var issue=null;
-  for(var i=0;i<S.issues.length;i++){
-    if(S.issues[i].id===id&&S.issues[i].repo===repo){issue=S.issues[i];break;}
+function renderReport(){
+  var history=loadHistory();
+  var el=document.getElementById('reportView');
+  if(!history.length){
+    el.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#888">No history yet. Data is captured automatically each time you load the dashboard.</div>';
+    return;
   }
-  if(!issue) return;
-  S.issueAI[tkey]='loading';
-  renderIssues();
-  try{
-    var days=ageInDays(issue.createdAt);
-    var sys='You are a customer service manager reviewing software issues. Respond ONLY with valid JSON (no markdown, no backticks): {"next_action":"specific practical next action for the CS team (1-2 sentences)","urgency":"immediate or soon or routine","reason":"brief reason"}';
-    var msg='Labels: '+issue.labels.join(', ')+'\nTitle: '+issue.title+'\nBody: '+issue.body.slice(0,400)+'\nAge: '+days+' days old';
-    var parsed=await callClaude(sys,msg,400);
-    S.issueAI[tkey]=parsed;
-  }catch(e){
-    S.issueAI[tkey]={error:e.message};
+  var html='<div class="report-actions">';
+  html+='<button class="btn-sm" onclick="exportCSV()">Export CSV</button>';
+  html+='<button class="btn-sm" onclick="clearHistory()" style="color:#A32D2D;border-color:#E24B4A">Clear history</button>';
+  html+='</div>';
+  html+='<div class="card" style="overflow-x:auto">';
+  html+='<table class="report-table"><thead><tr>';
+  html+='<th>Date</th><th>Tracking issues</th><th class="num"># Total tasks</th><th class="num">Net change</th><th class="num"># Closed</th><th class="num">Closed via PR</th><th class="num">Manually approved</th><th class="num"># No issue raised</th><th class="num"># Open</th>';
+  html+='</tr></thead><tbody>';
+  for(var i=0;i<history.length;i++){
+    var row=history[i];
+    var prev=i>0?history[i-1]:null;
+    var net=prev!==null?row.total-prev.total:null;
+    var netStr=net===null?'&mdash;':(net>0?'<span class="pos">+'+net+'</span>':(net<0?'<span class="neg">'+net+'</span>':'0'));
+    html+='<tr>';
+    html+='<td>'+esc(row.date)+'</td>';
+    html+='<td style="font-size:12px;color:#666">'+esc(row.tracking)+'</td>';
+    html+='<td class="num">'+row.total+'</td>';
+    html+='<td class="num">'+netStr+'</td>';
+    html+='<td class="num">'+row.closed+'</td>';
+    html+='<td class="num" style="color:#3B6D11">'+(row.closedPR||0)+'</td>';
+    html+='<td class="num" style="color:#854F0B">'+(row.closedManual||0)+'</td>';
+    html+='<td class="num">'+row.noIssue+'</td>';
+    html+='<td class="num">'+row.open+'</td>';
+    html+='</tr>';
   }
-  renderIssues();
+  html+='</tbody></table></div>';
+  el.innerHTML=html;
+}
+
+function renderQA(){
+  var el=document.getElementById('qaView');
+  var qaIssues=S.issues.filter(function(i){
+    return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';}) && isQATracking(i.title);
+  });
+  if(!qaIssues.length){
+    el.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#888">No QA tracking issues found for this month or last month.</div>';
+    return;
+  }
+  var html='';
+  qaIssues.forEach(function(issue){
+    var tkey=issue.id+'_'+issue.repo.replace(/\//g,'__');
+    var sections=parseChecklists(issue.body);
+    var stats=checklistStats(sections);
+    var pct=stats.total>0?Math.round(((stats.checkedPR+stats.checkedManual)/stats.total)*100):0;
+    html+='<div class="card">';
+    html+='<div class="qa-header"><a href="'+esc(issue.url)+'" target="_blank">#'+issue.id+' '+esc(issue.title)+'</a></div>';
+    if(stats.total>0){
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:12px">';
+      html+=miniStat(stats.total,'Total items','#185FA5');
+      html+=miniStat(stats.checkedPR+stats.checkedManual,'Closed','#3B6D11');
+      html+=miniStat(stats.checkedPR,'Closed via PR','#27500A');
+      html+=miniStat(stats.checkedManual,'Manually approved','#854F0B');
+      html+=miniStat(stats.open,'Open','#A32D2D');
+      html+=miniStat(stats.future,'Future considerations','#888');
+      html+='</div>';
+      html+='<div class="progress-bar" style="margin-bottom:12px"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
+      html+=renderChecklist(issue,tkey);
+    } else {
+      html+='<p style="color:#888;font-size:13px">No checklist items found.</p>';
+    }
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+
+function miniStat(num,label,color){
+  return '<div style="background:#f9f9f7;border:0.5px solid #e0e0dc;border-radius:8px;padding:8px 10px"><div style="font-size:20px;font-weight:500;color:'+color+'">'+num+'</div><div style="font-size:11px;color:#888">'+esc(label)+'</div></div>';
+}
+
+function exportCSV(){
+  var history=loadHistory();
+  var rows=['Date,Tracking Issues,# Total Tasks,Net Change,# Closed,Closed via PR,Manually Approved,# No Issue Raised,# Open'];
+  for(var i=0;i<history.length;i++){
+    var row=history[i];
+    var prev=i>0?history[i-1]:null;
+    var net=prev!==null?row.total-prev.total:'';
+    rows.push([row.date,row.tracking,row.total,net,row.closed,row.closedPR||0,row.closedManual||0,row.noIssue,row.open].join(','));
+  }
+  var blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='cs_tracking_report.csv';
+  a.click();
+}
+
+function clearHistory(){
+  if(!confirm('Clear all report history? This cannot be undone.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  renderReport();
 }
 </script>
 </body>
