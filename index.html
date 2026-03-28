@@ -74,8 +74,7 @@ button:disabled{opacity:0.5;cursor:not-allowed}
   <div class="card">
     <span class="lbl">GitHub personal access token (classic, repo scope)</span>
     <input type="password" id="ghToken" placeholder="ghp_..."/>
-    <span class="lbl">Anthropic API key</span>
-    <input type="password" id="anthroKey" placeholder="sk-ant-..."/>
+
     <span class="lbl">ZenHub API token (optional)</span>
     <input type="password" id="zhToken" placeholder="ZenHub token..."/>
     <span class="lbl">ZenHub workspace ID (optional)</span>
@@ -254,8 +253,7 @@ async function connect(){
   var rp=document.getElementById('reposInput').value.trim();
   hideErr('setupErr');
   if(!gh||!rp){showErr('setupErr','GitHub token and at least one repo are required.');return;}
-  if(!ak){showErr('setupErr','Anthropic API key is required for AI features.');return;}
-  S.ghToken=gh; S.anthroKey=ak; S.zhToken=zh; S.workspaceId=ws;
+  S.ghToken=gh; S.anthroKey=''; S.zhToken=zh; S.workspaceId=ws;
   S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
   var btn=document.getElementById('connectBtn');
   btn.disabled=true; btn.innerHTML='<span class="spin"></span>Fetching...';
@@ -425,28 +423,10 @@ function renderIssues(){
       }
     }
 
-    if(tr&&tr!=='loading'&&!tr.error){
-      html+='<div class="action-box">';
-      html+='<div class="action-label">Suggested next action</div>';
-      html+='<div style="color:#1a1a18;line-height:1.6;font-size:13px">'+esc(tr.next_action)+'</div>';
-      if(tr.urgency){
-        html+='<div style="margin-top:5px;font-size:12px;color:#666">Urgency: <strong>'+esc(tr.urgency)+'</strong>';
-        if(tr.reason) html+=' &mdash; '+esc(tr.reason);
-        html+='</div>';
-      }
-      html+='</div>';
-    }
-    if(tr&&tr.error){
-      html+='<div class="err-box" style="margin-top:8px">Error: '+esc(tr.error)+'</div>';
-    }
-
     html+='</div>';
 
     html+='<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">';
     if(!isIgnored){
-      html+='<button class="btn-sm" onclick="suggestAction(\''+tkey+'\')" '+(tr==='loading'?'disabled':'')+'>';
-      html+=tr==='loading'?'<span class="spin"></span>':'Suggest action';
-      html+='</button>';
       html+='<button class="btn-ignore" onclick="ignoreIssue(\''+issue.id+'_'+issue.repo+'\')">Ignore</button>';
     } else {
       html+='<button class="btn-sm" onclick="unignoreIssue(\''+issue.id+'_'+issue.repo+'\')">Restore</button>';
