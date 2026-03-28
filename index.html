@@ -19,8 +19,10 @@ a:hover{text-decoration:underline}
 .main{max-width:100%;padding:20px 24px 48px}
 
 .btn{border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
-.btn-white{background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3)}
-.btn-white:hover{background:rgba(255,255,255,0.25)}
+.btn-white{background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:9px 18px;font-size:14px;font-weight:700;border-radius:9px;letter-spacing:0.01em}
+.btn-white:hover{background:rgba(255,255,255,0.32);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+.header-btns{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.loaded-at{color:#c7d2fe;font-size:12px;margin-right:4px}
 .btn-sm{padding:6px 12px;font-size:12px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:7px;cursor:pointer;font-weight:600}
 .btn-sm:hover:not(:disabled){background:#f9fafb}
 .btn-primary{background:#4338ca;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer}
@@ -164,10 +166,10 @@ tr:hover td{background:#f9fafb}
     <div class="header-inner">
       <div><h1>&#x1F4CB; CS GitHub Issues Hub</h1><p id="dashMeta">Loading...</p></div>
       <div class="header-btns">
-        <span id="loadedAt" style="color:#c7d2fe;font-size:12px"></span>
+        <span id="loadedAt" class="loaded-at"></span>
         <button class="btn btn-white" onclick="showSetup()">&#x21BA; Reconnect</button>
         <button class="btn btn-white" id="refreshBtn" onclick="doRefresh()">&#x21BB; Refresh</button>
-        <button class="btn btn-white" onclick="toggleSettings()">&#x2699; ZenHub</button>
+        <button class="btn btn-white" onclick="toggleSettings()">&#x2699;&#xFE0F; ZenHub</button>
       </div>
     </div>
   </div>
@@ -190,7 +192,7 @@ tr:hover td{background:#f9fafb}
 <script>
 var S={
   ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],
-  activeTab:'prod',expanded:{},labelColors:{},
+  activeTab:'newitems',expanded:{},labelColors:{},
   zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},
   showSettings:false,activeProfile:null,
   sortState:{col:'age',dir:1}
@@ -203,16 +205,15 @@ var MONTHS=['January','February','March','April','May','June','July','August','S
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
 
 var TAB_DEFS=[
+  {id:'newitems', label:'New Issues',       color:'#0891b2'},
   {id:'prod',     label:'Production Patch', color:'#dc2626'},
   {id:'uat',      label:'UAT Patch',        color:'#d97706'},
   {id:'csitems',  label:'CS Items',         color:'#4338ca'},
   {id:'testing',  label:'CS In Testing',    color:'#7c3aed'},
-  {id:'taskitem', label:'CS Task Item',     color:'#059669'},
-  {id:'newitems', label:'New Issues',       color:'#0891b2'},
+  {id:'taskitem', label:'CS Task Items',    color:'#059669'},
   {id:'closed',   label:'Recently Closed',  color:'#374151'},
   {id:'ignored',  label:'Ignored',          color:'#6b7280'},
   {id:'report',   label:'Weekly Report',    color:'#1e1b4b'},
-  {id:'qa',       label:'QA Tracking',      color:'#7c3aed'}
 ];
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -393,9 +394,9 @@ function populateFilters(){
     if(i.pipeline)pipeSet[i.pipeline.pipelineName]=1;
   });
   var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');
-  fl.innerHTML='<option value="">All labels</option>';Object.keys(labelSet).sort().forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});
-  fr.innerHTML='<option value="">All repos</option>';Object.keys(repoSet).sort().forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});
-  fp.innerHTML='<option value="">All pipelines</option>';Object.keys(pipeSet).sort().forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});
+  fl.innerHTML='<option value="">All labels</option>';Object.keys(labelSet).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});
+  fr.innerHTML='<option value="">All repos</option>';Object.keys(repoSet).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});
+  fp.innerHTML='<option value="">All pipelines</option>';Object.keys(pipeSet).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});
 }
 
 function clearFilters(){document.getElementById('searchInput').value='';document.getElementById('filterLabel').value='';document.getElementById('filterRepo').value='';document.getElementById('filterPipeline').value='';renderMain();}
@@ -421,7 +422,7 @@ function getTabIssues(tab){
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
   if(t==='prod')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});});
   if(t==='uat')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});
-  if(t==='csitems')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs item';});});
+  if(t==='csitems')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs task item';});});
   if(t==='testing'){
     var openT=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
     var closedT=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
@@ -470,11 +471,12 @@ function renderStats(){
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
   var testingCount=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length+S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
   var stats=[
+    {n:base.filter(function(i){return !hasCSLabel(i);}).length,l:'New Issues',c:'#0891b2',tab:'newitems'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length,l:'Production Patch',c:'#dc2626',tab:'prod'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,l:'UAT Patch',c:'#d97706',tab:'uat'},
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs item';});}).length,l:'CS Items',c:'#4338ca',tab:'csitems'},
+    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs task item';});}).length,l:'CS Items',c:'#4338ca',tab:'csitems'},
     {n:testingCount,l:'CS In Testing',c:'#7c3aed',tab:'testing'},
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,l:'CS Task Item',c:'#059669',tab:'taskitem'},
+    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,l:'CS Task Items',c:'#059669',tab:'taskitem'},
     {n:base.filter(function(i){return !hasCSLabel(i);}).length,l:'New Issues',c:'#0891b2',tab:'newitems'},
     {n:S.closedIssues.length,l:'Recently Closed',c:'#374151',tab:'closed'}
   ];
@@ -600,7 +602,6 @@ function renderMain(){
   renderStats();buildTabs();hideErr('dashErr');
   var t=S.activeTab;
   if(t==='report'){renderReport();return;}
-  if(t==='qa'){renderQA();return;}
   var def=TAB_DEFS.find(function(d){return d.id===t;});
   var list=applyFilters(sortIssues(getTabIssues(t)));
   document.getElementById('mainContent').innerHTML=renderTable(list,t,def);
