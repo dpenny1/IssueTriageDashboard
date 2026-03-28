@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CIS CS Issue Hub</title>
+<title>CS GitHub Issues Hub</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f1f5f9;color:#1a1a1a;min-height:100vh;font-size:15px}
@@ -83,8 +83,7 @@ a:hover{text-decoration:underline}
 
 <div id="setup">
   <div class="header">
-    <h1>&#x1F4CB; CIS CS Issue Hub</h1>
-    <p>Connect GitHub to get started</p>
+    <h1>&#x1F4CB; CS GitHub Issues Hub</h1>
   </div>
   <div class="main">
     <div class="setup-card">
@@ -108,7 +107,7 @@ a:hover{text-decoration:underline}
 
 <div id="dash">
   <div class="header">
-    <h1>&#x1F4CB; CIS CS Issue Hub</h1>
+    <h1>&#x1F4CB; CS GitHub Issues Hub</h1>
     <p id="dashMeta">Loading...</p>
   </div>
   <div class="main">
@@ -269,10 +268,14 @@ function getTabIssues(){
   if(t==='ignored')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;});
   if(t==='closed')return S.closedIssues;
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
-  if(t==='tracking')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';});});
+  if(t==='tracking')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs item';});});
   if(t==='uat')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});
   if(t==='prod')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});});
-  if(t==='testing')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
+  if(t==='testing'){
+    var openTesting=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
+    var closedTesting=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
+    return openTesting.concat(closedTesting);
+  }
   if(t==='taskitem')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
   if(t==='newitems')return base.filter(function(i){return !hasCSLabel(i);});
   if(t==='qa')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';})&&isQATracking(i.title);});
@@ -284,14 +287,17 @@ function renderStats(){
   var stats=[
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length, l:'Production Patch', c:'#dc2626', tab:'prod'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,      l:'UAT Patch',        c:'#d97706', tab:'uat'},
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';});}).length, l:'CS Items',          c:'#4338ca', tab:'tracking'},
+    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs item';});}).length, l:'CS Items', c:'#4338ca', tab:'tracking'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length,  l:'CS In Testing',    c:'#7c3aed', tab:'testing'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length, l:'CS Task Item',     c:'#059669', tab:'taskitem'},
     {n:base.filter(function(i){return !hasCSLabel(i);}).length, l:'New Issues', c:'#0891b2', tab:'newitems'},
     {n:S.closedIssues.length, l:'Recently Closed', c:'#374151', tab:'closed'}
   ];
   var html='';
-  stats.forEach(function(s){html+='<div class="stat-card" style="border-top-color:'+s.c+'" onclick="switchTab(\''+s.tab+'\')" title="View '+esc(s.l)+'"><div class="stat-num" style="color:'+s.c+'">'+s.n+'</div><div class="stat-lbl">'+esc(s.l)+'</div></div>';});
+  stats.forEach(function(s){
+    if((s.tab==='prod'||s.tab==='uat')&&s.n===0)return;
+    html+='<div class="stat-card" style="border-top-color:'+s.c+'" onclick="switchTab(\''+s.tab+'\')" title="View '+esc(s.l)+'"><div class="stat-num" style="color:'+s.c+'">'+s.n+'</div><div class="stat-lbl">'+esc(s.l)+'</div></div>';
+  });
   document.getElementById('statGrid').innerHTML=html;
 }
 
@@ -352,9 +358,11 @@ function renderIssueCard(issue){
   var isClosed=issue.state==='closed';
   var days=isClosed?null:ageInDays(issue.createdAt);
   var age=days!==null?ageLabel(days):null;
-  var html='<div class="issue-card">';
+  var isOpenTesting=!isClosed&&issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';});
+  var html='<div class="issue-card'+(isOpenTesting?' no-parent':'')+'">';
   html+='<div class="issue-body">';
-  html+='<div class="issue-title"><a href="'+esc(issue.url)+'" target="_blank">#'+issue.id+' '+esc(issue.title)+'</a>';
+  html+='<div class="issue-title"><a href="'+esc(issue.url)+'" target="_blank">'+esc(issue.title)+' <span style="color:#9ca3af;font-weight:400">#'+issue.id+'</span></a>';
+  if(isOpenTesting)html+=' <span class="badge" style="background:#fee2e2;color:#991b1b">&#9888; Should be closed</span>';
   if(isReport)html+=' <span class="badge" style="background:#e0e7ff;color:#3730a3">in report</span>';
   if(isQA)html+=' <span class="badge" style="background:#ede9fe;color:#4c1d95">QA</span>';
   html+='</div>';
