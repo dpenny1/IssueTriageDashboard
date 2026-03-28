@@ -256,6 +256,10 @@ function todayStr(){var d=new Date();return(d.getMonth()+1)+'/'+d.getDate()+'/'+
 function hasCSLabel(i){return i.labels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});}
 function isReportTracking(t){var l=t.toLowerCase();return l.indexOf('cs ')===0&&l.indexOf('research')===-1&&!isQATracking(t);}
 function isQATracking(title){var t=title.toLowerCase();if(t.indexOf('cs features')!==0)return false;var now=new Date();return t.indexOf(MONTHS[now.getMonth()].toLowerCase())!==-1||t.indexOf(MONTHS[(now.getMonth()+11)%12].toLowerCase())!==-1;}
+function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+function saveIgnored(){try{localStorage.setItem(IGNORED_KEY,JSON.stringify(S.ignored));}catch(e){}}
+function loadHistory(){try{var v=localStorage.getItem(STORAGE_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+function saveHistory(h){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(h));}catch(e){}}
 function loadZHCreds(){try{var v=localStorage.getItem(ZH_STORAGE);if(v){var d=JSON.parse(v);S.zhToken=d.token||'';S.zhWorkspace=d.workspace||'';}}catch(e){}}
 function saveZHCreds(){try{localStorage.setItem(ZH_STORAGE,JSON.stringify({token:S.zhToken,workspace:S.zhWorkspace}));}catch(e){}}
 
