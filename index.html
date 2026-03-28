@@ -137,9 +137,9 @@ var IGNORED_KEY='cis_hub_ignored_v5';
 var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item'];
 var TABS=[
-  {id:'tracking', label:'CS Tracking',     color:'#4338ca'},
-  {id:'uat',      label:'UAT Patch',        color:'#d97706'},
   {id:'prod',     label:'Production Patch', color:'#dc2626'},
+  {id:'uat',      label:'UAT Patch',        color:'#d97706'},
+  {id:'tracking', label:'CS Items',         color:'#4338ca'},
   {id:'testing',  label:'CS In Testing',    color:'#7c3aed'},
   {id:'taskitem', label:'CS Task Item',     color:'#059669'},
   {id:'newitems', label:'New Issues',       color:'#0891b2'},
@@ -282,9 +282,9 @@ function getTabIssues(){
 function renderStats(){
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
   var stats=[
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';});}).length, l:'CS Tracking',     c:'#4338ca', tab:'tracking'},
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,      l:'UAT Patch',        c:'#d97706', tab:'uat'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length, l:'Production Patch', c:'#dc2626', tab:'prod'},
+    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,      l:'UAT Patch',        c:'#d97706', tab:'uat'},
+    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';});}).length, l:'CS Items',          c:'#4338ca', tab:'tracking'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length,  l:'CS In Testing',    c:'#7c3aed', tab:'testing'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length, l:'CS Task Item',     c:'#059669', tab:'taskitem'},
     {n:base.filter(function(i){return !hasCSLabel(i);}).length, l:'New Issues', c:'#0891b2', tab:'newitems'},
@@ -296,8 +296,11 @@ function renderStats(){
 }
 
 function buildTabs(){
+  var prodCount=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length;
+  var uatCount=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length;
   var html='';
   TABS.forEach(function(t){
+    if((t.id==='prod'&&prodCount===0)||(t.id==='uat'&&uatCount===0))return;
     var cnt=t.id==='ignored'?' ('+S.ignored.length+')':'';
     var active=S.activeTab===t.id;
     html+='<button class="tab'+(active?' active':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'background:'+t.color+';border-color:'+t.color:'')+'">'+esc(t.label)+cnt+'</button>';
