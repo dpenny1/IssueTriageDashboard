@@ -6,179 +6,187 @@
 <title>CIS CS Issue Hub</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);min-height:100vh;color:#1a1a18}
-p{line-height:1.6}
-a{color:#185FA5;text-decoration:none}
+body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f1f5f9;color:#1a1a1a;min-height:100vh;font-size:15px}
+a{color:#4338ca;text-decoration:none}
 a:hover{text-decoration:underline}
-input,select{font-family:inherit;font-size:13px;padding:7px 10px;border:0.5px solid #ccc;border-radius:8px;width:100%;outline:none;background:#fff;color:#1a1a18;margin-bottom:8px}
-input:focus,select:focus{border-color:#185FA5;box-shadow:0 0 0 3px rgba(24,95,165,0.08)}
-button{font-family:inherit;cursor:pointer;border-radius:8px;font-size:13px;transition:all 0.15s}
-button:disabled{opacity:0.5;cursor:not-allowed}
-.btn{padding:6px 14px;border:0.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:#fff}
-.btn:hover:not(:disabled){background:rgba(255,255,255,0.25)}
-.btn-plain{padding:6px 14px;border:0.5px solid #ccc;background:transparent;color:#1a1a18}
-.btn-plain:hover:not(:disabled){background:#f0f0ee}
-.btn-primary{padding:8px 18px;border:none;background:#185FA5;color:#fff;font-weight:500}
-.btn-primary:hover:not(:disabled){background:#0e4a87}
-.btn-sm{padding:4px 10px;font-size:12px;border:0.5px solid #ccc;background:transparent;color:#666}
-.btn-sm:hover:not(:disabled){background:#f0f0ee}
-.btn-ignore{padding:4px 10px;font-size:12px;border:0.5px solid #e0e0dc;background:transparent;color:#999}
-.btn-ignore:hover{background:#f5f5f3;color:#666}
-.wrap{max-width:1140px;margin:0 auto;padding:1.5rem 1rem}
-.page-header{background:linear-gradient(90deg,#185FA5,#7F77DD,#1D9E75);border-radius:14px;padding:1.25rem 1.5rem;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.page-header h1{color:#fff;font-size:22px;font-weight:500;letter-spacing:0.02em}
-.page-header p{color:rgba(255,255,255,0.75);font-size:12px;margin-top:2px}
-.card{background:#fff;border:none;border-radius:12px;padding:1rem 1.25rem;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.12)}
-.setup-card{background:#fff;border-radius:12px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
-.lbl{font-size:12px;color:#666;margin-bottom:2px;display:block;margin-top:10px}
-.lbl:first-child{margin-top:0}
-.badge{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500;display:inline-block}
-.err-box{background:#FCEBEB;border:0.5px solid #E24B4A;border-radius:8px;padding:10px 12px;margin-bottom:10px;color:#A32D2D;font-size:13px}
-.warn-inline{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:6px;background:#FAEEDA;color:#854F0B;font-weight:500}
-.missing-parent{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:6px;background:#FCEBEB;color:#A32D2D;font-weight:500}
-.parent-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:6px;background:#E6F1FB;color:#0C447C;font-weight:500}
-.tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-.tab{padding:7px 16px;border-radius:8px;border:none;background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.85);font-size:13px}
-.tab:hover{background:rgba(255,255,255,0.25);color:#fff}
-.tab.active{background:#fff;color:#185FA5;font-weight:500}
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px}
-.stat{background:#fff;border:none;border-radius:10px;padding:12px 14px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1);transition:transform 0.15s,box-shadow 0.15s}
-.stat:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.18)}
-.stat-num{font-size:26px;font-weight:500;margin-bottom:2px}
-.stat-lbl{font-size:12px;color:#888}
-.issue-row{display:flex;align-items:flex-start;gap:10px}
+
+.header{background:linear-gradient(135deg,#1e1b4b 0%,#4338ca 60%,#6366f1 100%);padding:40px 24px 56px;text-align:center}
+.header h1{color:#fff;font-size:1.9rem;font-weight:800;letter-spacing:-0.5px;margin-bottom:8px}
+.header p{color:#c7d2fe;font-size:0.95rem}
+
+.main{max-width:1140px;margin:-28px auto 0;padding:0 16px 48px}
+
+.token-bar{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:18px 22px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.token-bar label{font-size:14px;font-weight:600;color:#374151;display:block;margin-bottom:8px}
+.token-row{display:flex;gap:10px;flex-wrap:wrap}
+.token-row input{flex:1;min-width:200px;padding:10px 13px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:monospace;outline:none}
+.token-row input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
+.token-hint{font-size:12px;color:#9ca3af;margin-top:5px}
+.btn-primary{background:#4338ca;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn-primary:hover{background:#3730a3}
+.btn-primary:disabled{background:#a5b4fc;cursor:not-allowed}
+.btn-sm{padding:5px 12px;font-size:12px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:7px;cursor:pointer}
+.btn-sm:hover:not(:disabled){background:#f9fafb}
+.btn-danger-sm{padding:5px 12px;font-size:12px;border:1px solid #fca5a5;background:#fff;color:#dc2626;border-radius:7px;cursor:pointer}
+.btn-ignore{padding:4px 10px;font-size:12px;border:1px solid #e5e7eb;background:#fff;color:#9ca3af;border-radius:7px;cursor:pointer}
+.btn-ignore:hover{background:#f9fafb;color:#6b7280}
+
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.07);cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;border-top:3px solid transparent}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.12)}
+.stat-num{font-size:2rem;font-weight:800;margin-bottom:2px}
+.stat-lbl{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em}
+
+.tabs-wrap{background:#fff;border-radius:12px;padding:10px 14px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);display:flex;gap:6px;flex-wrap:wrap}
+.tab{padding:7px 14px;border-radius:8px;border:1px solid transparent;background:transparent;color:#6b7280;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s}
+.tab:hover{background:#f1f5f9;color:#374151}
+.tab.active{background:#4338ca;color:#fff;border-color:#4338ca}
+
+.issue-list{display:flex;flex-direction:column;gap:12px}
+.issue-card{background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 2px 8px rgba(0,0,0,0.07);display:flex;align-items:flex-start;gap:12px;transition:box-shadow 0.15s}
+.issue-card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.11)}
+.issue-card.missing-epic{border-left:3px solid #ef4444}
 .issue-body{flex:1;min-width:0}
-.issue-title{font-size:14px;font-weight:500;margin-bottom:4px}
-.issue-meta{font-size:12px;color:#888;margin-bottom:6px}
-.tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-.age-ok{color:#3B6D11;font-weight:500}
-.age-warn{color:#854F0B;font-weight:500}
-.age-old{color:#A32D2D;font-weight:500}
-.spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:sp 0.7s linear infinite;vertical-align:middle;margin-right:5px}
-.spin-dark{border:2px solid #ccc;border-top-color:#185FA5}
-@keyframes sp{to{transform:rotate(360deg)}}
+.issue-title{font-size:14px;font-weight:700;margin-bottom:5px;color:#1e1b4b}
+.issue-meta{font-size:12px;color:#9ca3af;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.badge{font-size:11px;padding:2px 9px;border-radius:999px;font-weight:600;display:inline-block}
+.epic-badge{font-size:11px;padding:3px 9px;border-radius:7px;background:#ede9fe;color:#4c1d95;font-weight:600;display:inline-flex;align-items:center;gap:4px}
+.no-epic-badge{font-size:11px;padding:3px 9px;border-radius:7px;background:#fee2e2;color:#991b1b;font-weight:600;display:inline-flex;align-items:center;gap:4px}
+.age-ok{color:#059669;font-weight:700}
+.age-warn{color:#d97706;font-weight:700}
+.age-old{color:#dc2626;font-weight:700}
+
 .progress-wrap{margin-top:10px}
-.progress-label{display:flex;justify-content:space-between;font-size:12px;color:#888;margin-bottom:4px}
-.progress-bar{height:6px;background:#e0e0dc;border-radius:4px;overflow:hidden}
-.progress-fill{height:100%;border-radius:4px;background:#185FA5}
-.checklist-section{margin-top:8px;padding:10px 12px;background:#f9f9f7;border:0.5px solid #e0e0dc;border-radius:8px}
-.checklist-section-title{font-size:12px;font-weight:500;color:#666;margin-bottom:6px}
-.checklist-item{font-size:12px;padding:3px 0;display:flex;align-items:flex-start;gap:6px;line-height:1.5}
-.checklist-item.done-pr span.item-text{text-decoration:line-through;color:#888}
-.checklist-item.done-manual span.item-text{text-decoration:line-through;color:#888}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:#9ca3af;margin-bottom:3px}
+.progress-bar{height:5px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+.progress-fill{height:100%;border-radius:999px;background:#4338ca}
+.checklist-meta{font-size:11px;color:#9ca3af;margin-top:5px;display:flex;gap:10px;flex-wrap:wrap}
+.checklist-meta .pr{color:#059669;font-weight:600}
+.checklist-meta .manual{color:#d97706;font-weight:600}
+
+.checklist-section{margin-top:8px;padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px}
+.checklist-section-title{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px}
+.checklist-item{font-size:12px;padding:3px 0;display:flex;align-items:flex-start;gap:6px;line-height:1.5;color:#374151}
+.checklist-item.done-pr .item-text,.checklist-item.done-manual .item-text{text-decoration:line-through;color:#9ca3af}
+.checklist-item.future{color:#9ca3af;font-style:italic}
+
 .report-table{width:100%;border-collapse:collapse;font-size:13px}
-.report-table th{text-align:left;padding:8px 12px;border-bottom:1px solid #e0e0dc;font-weight:500;color:#666;font-size:12px;white-space:nowrap}
-.report-table td{padding:8px 12px;border-bottom:0.5px solid #f0f0ee;vertical-align:middle}
+.report-table th{text-align:left;padding:10px 12px;border-bottom:2px solid #e5e7eb;font-weight:700;color:#374151;font-size:12px;white-space:nowrap;background:#f9fafb}
+.report-table td{padding:9px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
 .report-table tr:last-child td{border-bottom:none}
-.report-table tr:hover td{background:#f9f9f7}
-.report-table td.num{text-align:right;font-variant-numeric:tabular-nums}
-.pos{color:#3B6D11}
-.neg{color:#A32D2D}
-.report-actions{display:flex;gap:8px;margin-bottom:16px}
+.report-table tr:hover td{background:#f9fafb}
+.report-table td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.pos{color:#059669}
+.neg{color:#dc2626}
+
+.empty-state{background:#fff;border-radius:12px;padding:3rem;text-align:center;color:#9ca3af;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+
+.spin{display:inline-block;width:13px;height:13px;border:2px solid #e5e7eb;border-top-color:#6366f1;border-radius:50%;animation:sp 0.7s linear infinite;vertical-align:middle;margin-right:5px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.err-box{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;color:#991b1b;font-size:13px;margin-bottom:12px}
+
 #setup{display:block}
 #dash{display:none}
+
+@media(max-width:700px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
-<div class="wrap">
 
 <div id="setup">
-  <div style="margin-bottom:20px">
-    <div style="background:linear-gradient(90deg,#185FA5,#7F77DD,#1D9E75);border-radius:14px;padding:1.25rem 1.5rem;margin-bottom:20px">
-      <h1 style="color:#fff;font-size:22px;font-weight:500">CIS CS Issue Hub</h1>
-      <p style="color:rgba(255,255,255,0.75);font-size:13px;margin-top:4px">Connect your GitHub and ZenHub to get started.</p>
-    </div>
+  <div class="header">
+    <h1>&#x1F4CB; CIS CS Issue Hub</h1>
+    <p>Connect GitHub and ZenHub to track your CS issues</p>
   </div>
-  <div class="setup-card">
-    <span class="lbl">GitHub personal access token (classic, repo scope)</span>
-    <input type="password" id="ghToken" placeholder="ghp_..."/>
-    <span class="lbl">ZenHub API token (optional)</span>
-    <input type="password" id="zhToken" placeholder="ZenHub token..."/>
-    <span class="lbl">ZenHub workspace ID (optional)</span>
-    <input type="text" id="workspaceId" placeholder="e.g. 5e8f9c..."/>
-    <span class="lbl">Repos (comma-separated, owner/repo)</span>
-    <input type="text" id="reposInput" placeholder="e.g. myorg/api, myorg/frontend"/>
-    <div id="setupErr" style="display:none"></div>
-    <div style="margin-top:14px">
-      <button class="btn-primary" id="connectBtn" onclick="connect()">Connect and fetch issues</button>
+  <div class="main">
+    <div class="token-bar">
+      <label>GitHub Personal Access Token (classic, repo scope)</label>
+      <div class="token-row">
+        <input type="password" id="ghToken" placeholder="ghp_..." onkeydown="if(event.key==='Enter')connect()"/>
+        <button class="btn-primary" id="connectBtn" onclick="connect()">&#x25B6; Connect</button>
+      </div>
+      <p class="token-hint">ZenHub fields below are optional but enable epic/parent tracking.</p>
+    </div>
+    <div class="token-bar">
+      <label>ZenHub API Token (optional)</label>
+      <div class="token-row"><input type="password" id="zhToken" placeholder="ZenHub token..."/></div>
+      <label style="margin-top:12px">ZenHub Workspace ID (optional)</label>
+      <div class="token-row"><input type="text" id="workspaceId" placeholder="e.g. 5e8f9c..."/></div>
+      <label style="margin-top:12px">Repos (comma-separated, owner/repo)</label>
+      <div class="token-row"><input type="text" id="reposInput" placeholder="e.g. myorg/api, myorg/frontend"/></div>
+      <div id="setupErr" style="display:none;margin-top:10px"></div>
     </div>
   </div>
 </div>
 
 <div id="dash">
-  <div class="page-header">
-    <div>
-      <h1>CIS CS Issue Hub</h1>
-      <p id="dashMeta"></p>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn" onclick="showSetup()">Reconnect</button>
-      <button class="btn" id="refreshBtn" onclick="doRefresh()">Refresh</button>
-    </div>
+  <div class="header">
+    <h1>&#x1F4CB; CIS CS Issue Hub</h1>
+    <p id="dashMeta">Loading...</p>
   </div>
+  <div class="main">
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px">
+      <button class="btn-sm" onclick="showSetup()">&#x2699; Reconnect</button>
+      <button class="btn-sm" id="refreshBtn" onclick="doRefresh()">&#x21BB; Refresh</button>
+    </div>
 
-  <div class="stat-grid" id="statGrid"></div>
+    <div class="stat-grid" id="statGrid"></div>
 
-  <div class="tabs">
-    <button class="tab active" id="tabTracking" onclick="switchTab('tracking')">CS Tracking</button>
-    <button class="tab" id="tabPatches" onclick="switchTab('patches')">Patches</button>
-    <button class="tab" id="tabTesting" onclick="switchTab('testing')">CS In Testing</button>
-    <button class="tab" id="tabItems" onclick="switchTab('items')">CS Task Items</button>
-    <button class="tab" id="tabInbox" onclick="switchTab('inbox')">Inbox</button>
-    <button class="tab" id="tabIgnored" onclick="switchTab('ignored')">Ignored <span id="ignoredCount"></span></button>
-    <button class="tab" id="tabReport" onclick="switchTab('report')">Weekly Report</button>
-    <button class="tab" id="tabQa" onclick="switchTab('qa')">QA Tracking</button>
+    <div class="tabs-wrap" id="tabsWrap"></div>
+
+    <div id="dashErr" style="display:none;margin-bottom:12px"></div>
+    <div id="mainContent"></div>
   </div>
-
-  <div id="dashErr" style="display:none;margin-bottom:12px"></div>
-  <div id="issueList"></div>
-  <div id="reportView" style="display:none"></div>
-  <div id="qaView" style="display:none"></div>
 </div>
 
-</div>
 <script>
-var S = {
-  ghToken:'', zhToken:'', workspaceId:'',
-  repos:[], issues:[], ignored:[], activeTab:'tracking',
-  expanded:{}, labelColors:{}, epicCache:{}
+var S={
+  ghToken:'',zhToken:'',workspaceId:'',repos:[],
+  issues:[],closedIssues:[],ignored:[],
+  activeTab:'tracking',expanded:{},
+  labelColors:{},epicCache:{}
 };
+var STORAGE_KEY='cis_hub_report_v3';
+var IGNORED_KEY='cis_hub_ignored_v3';
+var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item'];
 
-var STORAGE_KEY = 'cis_cs_hub_report_v1';
-var IGNORED_KEY = 'cis_cs_hub_ignored_v1';
-var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-var CS_LABELS = ['cs tracking','uat patch','production patch','cs in testing','cs task item'];
+var TABS=[
+  {id:'tracking',  label:'CS Tracking',     color:'#4338ca'},
+  {id:'uat',       label:'UAT Patch',        color:'#d97706'},
+  {id:'prod',      label:'Production Patch', color:'#dc2626'},
+  {id:'testing',   label:'CS In Testing',    color:'#7c3aed'},
+  {id:'taskitem',  label:'CS Task Item',     color:'#059669'},
+  {id:'newitems',  label:'New Issues',       color:'#0891b2'},
+  {id:'closed',    label:'Recently Closed',  color:'#374151'},
+  {id:'ignored',   label:'Ignored',          color:'#9ca3af'},
+  {id:'report',    label:'Weekly Report',    color:'#1e1b4b'},
+  {id:'qa',        label:'QA Tracking',      color:'#7c3aed'}
+];
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 function luminance(hex){
-  hex=hex.replace('#','');
-  if(hex.length===3) hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
-  var r=parseInt(hex.substr(0,2),16)/255;
-  var g=parseInt(hex.substr(2,2),16)/255;
-  var b=parseInt(hex.substr(4,2),16)/255;
+  hex=(hex||'cccccc').replace('#','');
+  if(hex.length===3)hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+  var r=parseInt(hex.substr(0,2),16)/255,g=parseInt(hex.substr(2,2),16)/255,b=parseInt(hex.substr(4,2),16)/255;
   return 0.2126*r+0.7152*g+0.0722*b;
 }
-function textForBg(hex){return luminance(hex)>0.4?'#1a1a18':'#ffffff';}
-
-function mkBadge(bg,label){
-  var tx=textForBg(bg);
-  return '<span class="badge" style="background:#'+bg+';color:'+tx+'">'+esc(label)+'</span>';
-}
-
+function textForBg(hex){return luminance(hex)>0.45?'#1a1a1a':'#ffffff';}
 function labelBadge(name){
-  var key=name.toLowerCase();
-  var color=S.labelColors[key]||'cccccc';
-  return mkBadge(color,name);
+  var color=S.labelColors[name.toLowerCase()]||'e5e7eb';
+  var bg='#'+color,tx=textForBg(color);
+  return '<span class="badge" style="background:'+bg+';color:'+tx+'">'+esc(name)+'</span>';
 }
 
 function ageInDays(d){return Math.floor((Date.now()-new Date(d).getTime())/86400000);}
 function ageLabel(days){
-  if(days<3) return {text:days+'d',cls:'age-ok'};
-  if(days<7) return {text:days+'d',cls:'age-warn'};
-  return {text:days+'d',cls:'age-old'};
+  if(days<3)return{text:days+'d',cls:'age-ok'};
+  if(days<7)return{text:days+'d',cls:'age-warn'};
+  return{text:days+'d',cls:'age-old'};
 }
-function todayStr(){var d=new Date();return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
+function todayStr(){var d=new Date();return(d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
 
 function isReportTracking(title){
   var t=title.toLowerCase();
@@ -188,75 +196,70 @@ function isQATracking(title){
   var t=title.toLowerCase();
   if(t.indexOf('cs features')===0){
     var now=new Date();
-    var thisMonth=MONTHS[now.getMonth()].toLowerCase();
-    var lastMonth=MONTHS[(now.getMonth()+11)%12].toLowerCase();
-    return t.indexOf(thisMonth)!==-1||t.indexOf(lastMonth)!==-1;
+    var tm=MONTHS[now.getMonth()].toLowerCase();
+    var lm=MONTHS[(now.getMonth()+11)%12].toLowerCase();
+    return t.indexOf(tm)!==-1||t.indexOf(lm)!==-1;
   }
   return false;
 }
 
 function parseChecklists(body){
   var sections=[],cur=null;
-  var lines=(body||'').split('\n');
-  for(var i=0;i<lines.length;i++){
-    var line=lines[i];
+  (body||'').split('\n').forEach(function(line){
     var hm=line.match(/^#{1,3}\s+(.+)/);
-    if(hm){if(cur) sections.push(cur);cur={title:hm[1].trim(),items:[]};continue;}
-    var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
-    var unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);
+    if(hm){if(cur)sections.push(cur);cur={title:hm[1].trim(),items:[]};return;}
+    var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i),unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);
     if(chk||unk){
-      if(!cur) cur={title:'General',items:[]};
+      if(!cur)cur={title:'General',items:[]};
       var text=(chk||unk)[1].trim();
-      var hasIssue=/#\d+/.test(text);
-      var hasPR=!!text.match(/\bpr\b|\bpull request\b|merged|closes|closed via/i);
-      cur.items.push({text:text,checked:!!chk,hasIssue:hasIssue,hasPR:hasPR});
+      cur.items.push({text:text,checked:!!chk,hasIssue:/#\d+/.test(text),hasPR:!!text.match(/\bpr\b|\bpull request\b|merged|closes|closed via/i)});
     }
-  }
-  if(cur) sections.push(cur);
+  });
+  if(cur)sections.push(cur);
   return sections.filter(function(s){return s.items.length>0;});
 }
-
 function checklistStats(sections){
-  var total=0,checkedPR=0,checkedManual=0,withIssue=0,future=0;
-  sections.forEach(function(s){s.items.forEach(function(item){
-    total++;
-    if(item.checked){if(item.hasPR)checkedPR++;else checkedManual++;}
-    if(item.hasIssue)withIssue++;
-    if(!item.hasIssue&&!item.checked)future++;
+  var t=0,cPR=0,cM=0,wi=0,fu=0;
+  sections.forEach(function(s){s.items.forEach(function(i){
+    t++;
+    if(i.checked){if(i.hasPR)cPR++;else cM++;}
+    if(i.hasIssue)wi++;
+    if(!i.hasIssue&&!i.checked)fu++;
   });});
-  return {total:total,checked:checkedPR+checkedManual,checkedPR:checkedPR,checkedManual:checkedManual,withIssue:withIssue,future:future,open:total-checkedPR-checkedManual};
+  return{total:t,checked:cPR+cM,checkedPR:cPR,checkedManual:cM,withIssue:wi,future:fu,open:t-cPR-cM};
 }
 
-function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return [];}}
+function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveIgnored(){try{localStorage.setItem(IGNORED_KEY,JSON.stringify(S.ignored));}catch(e){}}
-function loadHistory(){try{var v=localStorage.getItem(STORAGE_KEY);return v?JSON.parse(v):[];}catch(e){return [];}}
+function loadHistory(){try{var v=localStorage.getItem(STORAGE_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveHistory(h){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(h));}catch(e){}}
 
-function hasCSLabel(issue){return issue.labels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});}
+function hasCSLabel(i){return i.labels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});}
 
 function showSetup(){document.getElementById('setup').style.display='block';document.getElementById('dash').style.display='none';}
 function showDash(){document.getElementById('setup').style.display='none';document.getElementById('dash').style.display='block';}
 function showErr(elId,msg){var el=document.getElementById(elId);el.className='err-box';el.textContent=msg;el.style.display='block';}
 function hideErr(elId){document.getElementById(elId).style.display='none';}
 
+function buildTabs(){
+  var html='';
+  TABS.forEach(function(t){
+    var count='';
+    if(t.id==='ignored')count=' ('+S.ignored.length+')';
+    html+='<button class="tab'+(S.activeTab===t.id?' active':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(S.activeTab===t.id?'background:'+t.color+';border-color:'+t.color:'')+'">'+esc(t.label)+count+'</button>';
+  });
+  document.getElementById('tabsWrap').innerHTML=html;
+}
+
 function switchTab(name){
   S.activeTab=name;
-  ['tracking','patches','testing','items','inbox','ignored','report','qa'].forEach(function(t){
-    var el=document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1));
-    if(el) el.className='tab'+(t===name?' active':'');
-  });
-  var isSpecial=name==='report'||name==='qa';
-  document.getElementById('issueList').style.display=isSpecial?'none':'block';
-  document.getElementById('reportView').style.display=name==='report'?'block':'none';
-  document.getElementById('qaView').style.display=name==='qa'?'block':'none';
-  if(name==='report') renderReport();
-  else if(name==='qa') renderQA();
-  else renderIssues();
+  buildTabs();
+  renderMain();
 }
 
 async function ghFetch(path){
   var r=await fetch('https://api.github.com'+path,{headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json'}});
-  if(!r.ok) throw new Error('GitHub '+r.status+': '+r.statusText+' ('+path+')');
+  if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);
   return r.json();
 }
 
@@ -270,32 +273,24 @@ async function loadLabelColors(){
 }
 
 async function loadEpics(){
-  if(!S.zhToken||!S.workspaceId) return;
+  if(!S.zhToken||!S.workspaceId)return;
   for(var ri=0;ri<S.repos.length;ri++){
     try{
       var repo=S.repos[ri];
       var repoData=await ghFetch('/repos/'+repo);
       var repoId=repoData.id;
-      var epicsRes=await fetch('https://api.zenhub.com/p2/workspaces/'+S.workspaceId+'/repositories/'+repoId+'/epics',{
-        headers:{'X-Authentication-Token':S.zhToken}
-      });
-      if(!epicsRes.ok) continue;
-      var epicsData=await epicsRes.json();
-      var epicList=epicsData.epic_issues||[];
+      var er=await fetch('https://api.zenhub.com/p2/workspaces/'+S.workspaceId+'/repositories/'+repoId+'/epics',{headers:{'X-Authentication-Token':S.zhToken}});
+      if(!er.ok)continue;
+      var ed=await er.json();
+      var epicList=ed.epic_issues||[];
       for(var ei=0;ei<epicList.length;ei++){
         var epicNum=epicList[ei].issue_number;
         try{
           var epicIssue=await ghFetch('/repos/'+repo+'/issues/'+epicNum);
-          var epicDetail=await fetch('https://api.zenhub.com/p2/workspaces/'+S.workspaceId+'/repositories/'+repoId+'/epics/'+epicNum,{
-            headers:{'X-Authentication-Token':S.zhToken}
-          });
-          if(!epicDetail.ok) continue;
-          var epicDetailData=await epicDetail.json();
-          var children=epicDetailData.issues||[];
-          children.forEach(function(child){
-            var key=child.issue_number+'_'+repo;
-            S.epicCache[key]={epicNum:epicNum,epicTitle:epicIssue.title};
-          });
+          var edr=await fetch('https://api.zenhub.com/p2/workspaces/'+S.workspaceId+'/repositories/'+repoId+'/epics/'+epicNum,{headers:{'X-Authentication-Token':S.zhToken}});
+          if(!edr.ok)continue;
+          var edd=await edr.json();
+          (edd.issues||[]).forEach(function(child){S.epicCache[child.issue_number+'_'+repo]={epicNum:epicNum,epicTitle:epicIssue.title};});
         }catch(e){}
       }
     }catch(e){}
@@ -309,144 +304,156 @@ async function connect(){
   var rp=document.getElementById('reposInput').value.trim();
   hideErr('setupErr');
   if(!gh||!rp){showErr('setupErr','GitHub token and at least one repo are required.');return;}
-  S.ghToken=gh; S.zhToken=zh; S.workspaceId=ws;
+  S.ghToken=gh;S.zhToken=zh;S.workspaceId=ws;
   S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
   S.ignored=loadIgnored();
   var btn=document.getElementById('connectBtn');
-  btn.disabled=true; btn.innerHTML='<span class="spin spin-dark"></span>Fetching...';
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>Connecting...';
   try{
     await loadLabelColors();
     await loadIssues();
-    if(S.zhToken&&S.workspaceId) await loadEpics();
+    if(S.zhToken&&S.workspaceId)await loadEpics();
     showDash();
-    renderIssues();
+    buildTabs();
+    renderMain();
   }catch(e){showErr('setupErr',e.message);}
-  btn.disabled=false; btn.textContent='Connect and fetch issues';
+  btn.disabled=false;btn.textContent='▶ Connect';
 }
 
 async function loadIssues(){
-  var all=[];
+  var open=[],closed=[];
   for(var ri=0;ri<S.repos.length;ri++){
     var repo=S.repos[ri];
-    var data=await ghFetch('/repos/'+repo+'/issues?state=open&per_page=100');
-    for(var ii=0;ii<data.length;ii++){
-      var i=data[ii];
-      if(i.pull_request) continue;
-      all.push({id:i.number,repo:repo,title:i.title,body:i.body||'',
+    var openData=await ghFetch('/repos/'+repo+'/issues?state=open&per_page=100');
+    openData.forEach(function(i){
+      if(i.pull_request)return;
+      open.push({id:i.number,repo:repo,title:i.title,body:i.body||'',
         labels:i.labels.map(function(l){return l.name;}),
         assignees:i.assignees.map(function(a){return a.login;}),
-        createdAt:i.created_at,url:i.html_url});
-    }
+        createdAt:i.created_at,url:i.html_url,state:'open'});
+    });
+    var closedData=await ghFetch('/repos/'+repo+'/issues?state=closed&per_page=50&sort=updated&direction=desc');
+    closedData.forEach(function(i){
+      if(i.pull_request)return;
+      var labels=i.labels.map(function(l){return l.name;});
+      if(!labels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))return;
+      closed.push({id:i.number,repo:repo,title:i.title,body:i.body||'',
+        labels:labels,assignees:i.assignees.map(function(a){return a.login;}),
+        createdAt:i.created_at,closedAt:i.closed_at,url:i.html_url,state:'closed'});
+    });
   }
-  S.issues=all;
+  S.issues=open;
+  S.closedIssues=closed.sort(function(a,b){return new Date(a.closedAt)-new Date(b.closedAt);});
   captureWeeklySnapshot();
-  renderStats();
-  updateIgnoredCount();
   document.getElementById('dashMeta').textContent=
-    all.length+' open issues across '+S.repos.length+' repo'+(S.repos.length!==1?'s':'')+' — loaded '+todayStr();
+    open.length+' open issues across '+S.repos.length+' repo'+(S.repos.length!==1?'s':'')+' — '+todayStr();
 }
 
 async function doRefresh(){
   var btn=document.getElementById('refreshBtn');
-  btn.disabled=true; btn.innerHTML='<span class="spin"></span>Refreshing...';
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
     await loadLabelColors();
     await loadIssues();
     if(S.zhToken&&S.workspaceId){S.epicCache={};await loadEpics();}
-    renderIssues();
+    buildTabs();renderMain();
   }catch(e){showErr('dashErr',e.message);}
-  btn.disabled=false; btn.textContent='Refresh';
+  btn.disabled=false;btn.innerHTML='&#x21BB; Refresh';
 }
 
-function getReportTrackingIssues(){
-  return S.issues.filter(function(i){
-    return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';})&&isReportTracking(i.title);
-  });
+function getReportTracking(){
+  return S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';})&&isReportTracking(i.title);});
 }
 
 function captureWeeklySnapshot(){
-  var tracking=getReportTrackingIssues();
-  if(!tracking.length) return;
-  var totalTasks=0,checkedPR=0,checkedManual=0,future=0;
-  var issueNums=[];
+  var tracking=getReportTracking();
+  if(!tracking.length)return;
+  var total=0,cPR=0,cM=0,fut=0,nums=[];
   tracking.forEach(function(issue){
-    issueNums.push(issue.id);
-    var stats=checklistStats(parseChecklists(issue.body));
-    totalTasks+=stats.total; checkedPR+=stats.checkedPR; checkedManual+=stats.checkedManual; future+=stats.future;
+    nums.push(issue.id);
+    var st=checklistStats(parseChecklists(issue.body));
+    total+=st.total;cPR+=st.checkedPR;cM+=st.checkedManual;fut+=st.future;
   });
-  var checked=checkedPR+checkedManual;
-  var history=loadHistory();
-  var today=todayStr();
-  var row={date:today,tracking:issueNums.join('/'),total:totalTasks,closed:checked,closedPR:checkedPR,closedManual:checkedManual,noIssue:future,open:totalTasks-checked};
-  if(history.length>0&&history[history.length-1].date===today) history[history.length-1]=row;
+  var checked=cPR+cM;
+  var history=loadHistory(),today=todayStr();
+  var row={date:today,tracking:nums.join('/'),total:total,closed:checked,closedPR:cPR,closedManual:cM,noIssue:fut,open:total-checked};
+  if(history.length>0&&history[history.length-1].date===today)history[history.length-1]=row;
   else history.push(row);
   saveHistory(history);
 }
 
 function getTabIssues(){
   var t=S.activeTab;
-  if(t==='ignored') return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;});
+  if(t==='ignored')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;});
+  if(t==='closed')return S.closedIssues;
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
-  if(t==='tracking') return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';});});
-  if(t==='patches') return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch'||l.toLowerCase()==='production patch';});});
-  if(t==='testing') return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
-  if(t==='items') return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
-  if(t==='inbox') return base.filter(function(i){return !hasCSLabel(i);});
+  if(t==='tracking')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';});});
+  if(t==='uat')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});
+  if(t==='prod')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});});
+  if(t==='testing')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
+  if(t==='taskitem')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
+  if(t==='newitems')return base.filter(function(i){return !hasCSLabel(i);});
+  if(t==='qa')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';})&&isQATracking(i.title);});
   return base;
 }
 
 function renderStats(){
-  var all=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
-  var tracking=all.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';});});
-  var patches=all.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch'||l.toLowerCase()==='production patch';});});
-  var testing=all.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
-  var items=all.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
-  var inbox=all.filter(function(i){return !hasCSLabel(i);});
-  var noParent=all.filter(function(i){
-    return hasCSLabel(i)&&S.zhToken&&!S.epicCache[i.id+'_'+i.repo];
-  });
+  var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
+  var tracking=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';});});
+  var uat=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});
+  var prod=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});});
+  var testing=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
+  var taskitem=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
+  var newitems=base.filter(function(i){return !hasCSLabel(i);});
+  var noParent=S.zhToken?base.filter(function(i){return hasCSLabel(i)&&!S.epicCache[i.id+'_'+i.repo];}).length:null;
+
+  var stats=[
+    {n:tracking.length, l:'CS Tracking',     c:'#4338ca', tab:'tracking'},
+    {n:uat.length,      l:'UAT Patch',        c:'#d97706', tab:'uat'},
+    {n:prod.length,     l:'Production Patch', c:'#dc2626', tab:'prod'},
+    {n:testing.length,  l:'CS In Testing',    c:'#7c3aed', tab:'testing'},
+    {n:taskitem.length, l:'CS Task Item',     c:'#059669', tab:'taskitem'},
+    {n:newitems.length, l:'New Issues',       c:'#0891b2', tab:'newitems'},
+    {n:S.closedIssues.length,l:'Recently Closed',c:'#374151',tab:'closed'},
+  ];
+  if(noParent!==null)stats.push({n:noParent,l:'Missing Parent',c:'#ef4444',tab:'tracking'});
+
   var html='';
-  html+=stat(tracking.length,'CS Tracking','#185FA5','tracking');
-  html+=stat(patches.length,'Patches','#E24B4A','patches');
-  html+=stat(testing.length,'CS In Testing','#7F77DD','testing');
-  html+=stat(items.length,'CS Task Items','#1D9E75','items');
-  html+=stat(inbox.length,'Inbox','#888','inbox');
-  if(S.zhToken) html+=stat(noParent.length,'Missing Parent','#E24B4A','tracking');
+  stats.forEach(function(s){
+    html+='<div class="stat-card" style="border-top-color:'+s.c+'" onclick="switchTab(\''+s.tab+'\')">';
+    html+='<div class="stat-num" style="color:'+s.c+'">'+s.n+'</div>';
+    html+='<div class="stat-lbl">'+esc(s.l)+'</div>';
+    html+='</div>';
+  });
   document.getElementById('statGrid').innerHTML=html;
 }
 
-function stat(num,label,color,tab){
-  return '<div class="stat" onclick="switchTab(\''+tab+'\')" title="View '+esc(label)+'"><div class="stat-num" style="color:'+color+'">'+num+'</div><div class="stat-lbl">'+esc(label)+'</div></div>';
-}
+function ignoreIssue(key){if(S.ignored.indexOf(key)===-1)S.ignored.push(key);saveIgnored();renderMain();}
+function unignoreIssue(key){S.ignored=S.ignored.filter(function(k){return k!==key;});saveIgnored();renderMain();}
+function toggleExpand(tkey){S.expanded[tkey]=!S.expanded[tkey];renderMain();}
 
-function updateIgnoredCount(){
-  var el=document.getElementById('ignoredCount');
-  if(el) el.textContent=S.ignored.length?'('+S.ignored.length+')':'';
+function epicHtml(issue){
+  if(!S.zhToken)return'';
+  var key=issue.id+'_'+issue.repo;
+  var epic=S.epicCache[key];
+  if(epic)return'<span class="epic-badge">&#9670; #'+epic.epicNum+' '+esc(epic.epicTitle)+'</span>';
+  if(S.ignored.indexOf(key)===-1)return'<span class="no-epic-badge">&#9888; No parent epic</span>';
+  return'';
 }
-
-function ignoreIssue(tkey){
-  if(S.ignored.indexOf(tkey)===-1) S.ignored.push(tkey);
-  saveIgnored(); renderStats(); renderIssues(); updateIgnoredCount();
-}
-function unignoreIssue(tkey){
-  S.ignored=S.ignored.filter(function(k){return k!==tkey;});
-  saveIgnored(); renderStats(); renderIssues(); updateIgnoredCount();
-}
-function toggleExpand(tkey){S.expanded[tkey]=!S.expanded[tkey];renderIssues();}
 
 function renderChecklist(issue,tkey){
   var sections=parseChecklists(issue.body);
   var stats=checklistStats(sections);
-  if(stats.total===0) return '';
+  if(stats.total===0)return'';
   var pct=Math.round((stats.checked/stats.total)*100);
   var html='<div class="progress-wrap">';
   html+='<div class="progress-label"><span>'+stats.checked+'/'+stats.total+' complete</span><span>'+pct+'%</span></div>';
   html+='<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
-  html+='<div style="font-size:11px;color:#888;margin-top:5px;display:flex;gap:12px;flex-wrap:wrap">';
-  html+='<span style="color:#3B6D11">&#10003; '+stats.checkedPR+' via PR</span>';
-  html+='<span style="color:#854F0B">&#10003; '+stats.checkedManual+' manual approval</span>';
-  html+='<span>'+stats.withIssue+' open with issue</span>';
-  html+='<span style="color:#aaa">'+stats.future+' future</span>';
+  html+='<div class="checklist-meta">';
+  html+='<span class="pr">&#10003; '+stats.checkedPR+' via PR</span>';
+  html+='<span class="manual">&#10003; '+stats.checkedManual+' manual</span>';
+  html+='<span>'+stats.withIssue+' open w/ issue</span>';
+  html+='<span>'+stats.future+' future</span>';
   html+='</div></div>';
   if(sections.length){
     html+='<div style="margin-top:8px"><button class="btn-sm" onclick="toggleExpand(\''+tkey+'\')">'+(S.expanded[tkey]?'Hide checklist':'Show checklist')+'</button></div>';
@@ -455,8 +462,8 @@ function renderChecklist(issue,tkey){
         html+='<div class="checklist-section"><div class="checklist-section-title">'+esc(sec.title)+'</div>';
         sec.items.forEach(function(item){
           var cls,icon,tag='';
-          if(item.checked&&item.hasPR){cls='done-pr';icon='&#10003;';tag='<span class="badge" style="background:#EAF3DE;color:#27500A;margin-left:4px">PR</span>';}
-          else if(item.checked){cls='done-manual';icon='&#10003;';tag='<span class="badge" style="background:#FAEEDA;color:#633806;margin-left:4px">manual</span>';}
+          if(item.checked&&item.hasPR){cls='done-pr';icon='&#10003;';tag='<span class="badge" style="background:#d1fae5;color:#065f46;margin-left:4px">PR</span>';}
+          else if(item.checked){cls='done-manual';icon='&#10003;';tag='<span class="badge" style="background:#fef3c7;color:#92400e;margin-left:4px">manual</span>';}
           else if(!item.hasIssue){cls='future';icon='&#9675;';}
           else{cls='open-issue';icon='&#9679;';}
           html+='<div class="checklist-item '+cls+'"><span>'+icon+'</span><span class="item-text">'+esc(item.text)+'</span>'+tag+'</div>';
@@ -468,143 +475,144 @@ function renderChecklist(issue,tkey){
   return html;
 }
 
-function epicHtml(issue){
-  if(!S.zhToken) return '';
-  var key=issue.id+'_'+issue.repo;
-  var epic=S.epicCache[key];
-  if(epic){
-    return '<span class="parent-badge">&#9670; #'+epic.epicNum+' '+esc(epic.epicTitle)+'</span> ';
+function renderIssueCard(issue){
+  var tkey=issue.id+'_'+issue.repo.replace(/\//g,'__');
+  var ikey=issue.id+'_'+issue.repo;
+  var isIgnored=S.ignored.indexOf(ikey)!==-1;
+  var isTracking=issue.labels.some(function(l){return l.toLowerCase()==='cs tracking';});
+  var isReport=isTracking&&isReportTracking(issue.title);
+  var isQA=isTracking&&isQATracking(issue.title);
+  var isClosed=issue.state==='closed';
+  var hasMissingEpic=S.zhToken&&!S.epicCache[ikey]&&!isIgnored&&hasCSLabel(issue);
+
+  var days=isClosed?null:ageInDays(issue.createdAt);
+  var age=days!==null?ageLabel(days):null;
+
+  var html='<div class="issue-card'+(hasMissingEpic?' missing-epic':'')+'">';
+  html+='<div class="issue-body">';
+  html+='<div class="issue-title"><a href="'+esc(issue.url)+'" target="_blank">#'+issue.id+' '+esc(issue.title)+'</a>';
+  if(isReport)html+=' <span class="badge" style="background:#e0e7ff;color:#3730a3">in report</span>';
+  if(isQA)html+=' <span class="badge" style="background:#ede9fe;color:#4c1d95">QA</span>';
+  html+='</div>';
+  html+='<div class="issue-meta">';
+  html+='<span>'+esc(issue.repo)+'</span>';
+  if(age)html+='<span class="'+age.cls+'">'+age.text+' old</span>';
+  if(isClosed&&issue.closedAt)html+='<span style="color:#059669;font-weight:600">Closed '+new Date(issue.closedAt).toLocaleDateString()+'</span>';
+  if(issue.assignees.length)html+='<span>'+esc(issue.assignees.join(', '))+'</span>';
+  html+='</div>';
+  html+='<div class="tags">';
+  html+=epicHtml(issue);
+  issue.labels.forEach(function(l){html+=labelBadge(l);});
+  html+='</div>';
+  if(isTracking&&!isClosed)html+=renderChecklist(issue,tkey);
+  html+='</div>';
+  html+='<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">';
+  if(!isClosed){
+    if(!isIgnored)html+='<button class="btn-ignore" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button>';
+    else html+='<button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button>';
   }
-  if(S.ignored.indexOf(key)===-1){
-    return '<span class="missing-parent">&#9888; No parent epic</span> ';
-  }
-  return '';
+  html+='</div>';
+  html+='</div>';
+  return html;
 }
 
-function renderIssues(){
+function renderMain(){
+  renderStats();
+  buildTabs();
+  hideErr('dashErr');
+
+  var t=S.activeTab;
+  if(t==='report'){renderReport();return;}
+  if(t==='qa'){renderQA();return;}
+
   var list=getTabIssues();
+  if(t==='closed'){
+    list=list.slice().sort(function(a,b){return new Date(a.closedAt)-new Date(b.closedAt);});
+  } else if(t!=='ignored'){
+    list=list.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+  }
+
   if(!list.length){
-    document.getElementById('issueList').innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#888">No issues here.</div>';
+    document.getElementById('mainContent').innerHTML='<div class="empty-state">No issues here.</div>';
     return;
   }
-  list.sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
-  var html='';
-  list.forEach(function(issue){
-    var days=ageInDays(issue.createdAt);
-    var age=ageLabel(days);
-    var tkey=issue.id+'_'+issue.repo.replace(/\//g,'__');
-    var ikey=issue.id+'_'+issue.repo;
-    var isIgnored=S.ignored.indexOf(ikey)!==-1;
-    var isTracking=issue.labels.some(function(l){return l.toLowerCase()==='cs tracking';});
-    var isReport=isTracking&&isReportTracking(issue.title);
-    var isQA=isTracking&&isQATracking(issue.title);
-
-    html+='<div class="card issue-row">';
-    html+='<div class="issue-body">';
-    html+='<div class="issue-title"><a href="'+esc(issue.url)+'" target="_blank">#'+issue.id+' '+esc(issue.title)+'</a>';
-    if(isReport) html+=' <span class="badge" style="background:#185FA5;color:#fff">in report</span>';
-    if(isQA) html+=' <span class="badge" style="background:#7F77DD;color:#fff">QA tracking</span>';
-    html+='</div>';
-    html+='<div class="issue-meta" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">';
-    html+='<span>'+esc(issue.repo)+'</span> <span>&middot;</span> <span class="'+age.cls+'">'+age.text+' old</span>';
-    if(issue.assignees.length) html+='<span>&middot;</span><span>'+esc(issue.assignees.join(', '))+'</span>';
-    html+='</div>';
-    html+='<div class="tags" style="margin-top:6px">';
-    html+=epicHtml(issue);
-    issue.labels.forEach(function(l){html+=labelBadge(l);});
-    html+='</div>';
-    if(isTracking) html+=renderChecklist(issue,tkey);
-    html+='</div>';
-    html+='<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">';
-    if(!isIgnored){
-      html+='<button class="btn-ignore" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button>';
-    } else {
-      html+='<button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button>';
-    }
-    html+='</div>';
-    html+='</div>';
-  });
-  document.getElementById('issueList').innerHTML=html;
+  var html='<div class="issue-list">';
+  list.forEach(function(i){html+=renderIssueCard(i);});
+  html+='</div>';
+  document.getElementById('mainContent').innerHTML=html;
 }
 
 function renderReport(){
   var history=loadHistory();
-  var el=document.getElementById('reportView');
   if(!history.length){
-    el.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#888">No history yet — captured automatically on each load.</div>';
+    document.getElementById('mainContent').innerHTML='<div class="empty-state">No history yet — captured automatically on each load.</div>';
     return;
   }
-  var html='<div class="report-actions">';
-  html+='<button class="btn-plain btn-sm" onclick="exportCSV()">Export CSV</button>';
-  html+='<button class="btn-plain btn-sm" onclick="clearHistory()" style="color:#A32D2D;border-color:#E24B4A">Clear history</button>';
+  var html='<div style="display:flex;gap:8px;margin-bottom:16px">';
+  html+='<button class="btn-sm" onclick="exportCSV()">&#x2B07; Export CSV</button>';
+  html+='<button class="btn-danger-sm" onclick="clearHistory()">Clear history</button>';
   html+='</div>';
-  html+='<div class="card" style="overflow-x:auto"><table class="report-table"><thead><tr>';
-  html+='<th>Date</th><th>Tracking issues</th><th class="num">Total tasks</th><th class="num">Net change</th><th class="num">Closed</th><th class="num">Via PR</th><th class="num">Manual approval</th><th class="num">No issue raised</th><th class="num">Open</th>';
+  html+='<div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.07);overflow-x:auto">';
+  html+='<table class="report-table"><thead><tr>';
+  ['Date','Tracking issues','Total tasks','Net change','Closed','Via PR','Manual approval','No issue raised','Open'].forEach(function(h){
+    html+='<th>'+h+'</th>';
+  });
   html+='</tr></thead><tbody>';
   for(var i=0;i<history.length;i++){
-    var row=history[i];
-    var prev=i>0?history[i-1]:null;
+    var row=history[i],prev=i>0?history[i-1]:null;
     var net=prev!==null?row.total-prev.total:null;
     var netStr=net===null?'&mdash;':(net>0?'<span class="pos">+'+net+'</span>':(net<0?'<span class="neg">'+net+'</span>':'0'));
-    html+='<tr><td>'+esc(row.date)+'</td><td style="font-size:12px;color:#666">'+esc(row.tracking)+'</td>';
+    html+='<tr><td>'+esc(row.date)+'</td><td style="font-size:12px;color:#6b7280">'+esc(row.tracking)+'</td>';
     html+='<td class="num">'+row.total+'</td><td class="num">'+netStr+'</td>';
     html+='<td class="num">'+row.closed+'</td>';
-    html+='<td class="num" style="color:#3B6D11">'+(row.closedPR||0)+'</td>';
-    html+='<td class="num" style="color:#854F0B">'+(row.closedManual||0)+'</td>';
+    html+='<td class="num" style="color:#059669">'+(row.closedPR||0)+'</td>';
+    html+='<td class="num" style="color:#d97706">'+(row.closedManual||0)+'</td>';
     html+='<td class="num">'+row.noIssue+'</td><td class="num">'+row.open+'</td></tr>';
   }
   html+='</tbody></table></div>';
-  el.innerHTML=html;
+  document.getElementById('mainContent').innerHTML=html;
 }
 
 function renderQA(){
-  var el=document.getElementById('qaView');
   var qaIssues=S.issues.filter(function(i){
     return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';})&&isQATracking(i.title);
   });
   if(!qaIssues.length){
-    el.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:#888">No QA tracking issues found for this month or last month.</div>';
+    document.getElementById('mainContent').innerHTML='<div class="empty-state">No QA tracking issues found for this month or last month.</div>';
     return;
   }
-  var html='';
+  var html='<div class="issue-list">';
   qaIssues.forEach(function(issue){
     var tkey=issue.id+'_'+issue.repo.replace(/\//g,'__');
     var stats=checklistStats(parseChecklists(issue.body));
     var pct=stats.total>0?Math.round((stats.checked/stats.total)*100):0;
-    html+='<div class="card">';
-    html+='<div style="font-size:14px;font-weight:500;margin-bottom:12px"><a href="'+esc(issue.url)+'" target="_blank">#'+issue.id+' '+esc(issue.title)+'</a></div>';
+    html+='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07)">';
+    html+='<div style="font-size:15px;font-weight:700;margin-bottom:14px;color:#1e1b4b"><a href="'+esc(issue.url)+'" target="_blank">#'+issue.id+' '+esc(issue.title)+'</a></div>';
     if(stats.total>0){
-      html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:12px">';
-      html+=miniStat(stats.total,'Total','#185FA5');
-      html+=miniStat(stats.checked,'Closed','#3B6D11');
-      html+=miniStat(stats.checkedPR,'Via PR','#27500A');
-      html+=miniStat(stats.checkedManual,'Manual approval','#854F0B');
-      html+=miniStat(stats.open,'Open','#A32D2D');
-      html+=miniStat(stats.future,'Future','#888');
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:14px">';
+      [{n:stats.total,l:'Total',c:'#4338ca'},{n:stats.checked,l:'Closed',c:'#059669'},{n:stats.checkedPR,l:'Via PR',c:'#059669'},{n:stats.checkedManual,l:'Manual',c:'#d97706'},{n:stats.open,l:'Open',c:'#dc2626'},{n:stats.future,l:'Future',c:'#9ca3af'}].forEach(function(s){
+        html+='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px"><div style="font-size:1.4rem;font-weight:800;color:'+s.c+'">'+s.n+'</div><div style="font-size:11px;color:#6b7280;font-weight:600">'+s.l+'</div></div>';
+      });
       html+='</div>';
       html+='<div class="progress-bar" style="margin-bottom:12px"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
       html+=renderChecklist(issue,tkey);
     }else{
-      html+='<p style="color:#888;font-size:13px">No checklist items found.</p>';
+      html+='<p style="color:#9ca3af;font-size:13px">No checklist items found.</p>';
     }
     html+='</div>';
   });
-  el.innerHTML=html;
-}
-
-function miniStat(num,label,color){
-  return '<div style="background:#f9f9f7;border:0.5px solid #e0e0dc;border-radius:8px;padding:8px 10px"><div style="font-size:20px;font-weight:500;color:'+color+'">'+num+'</div><div style="font-size:11px;color:#888">'+esc(label)+'</div></div>';
+  html+='</div>';
+  document.getElementById('mainContent').innerHTML=html;
 }
 
 function exportCSV(){
   var history=loadHistory();
   var rows=['Date,Tracking Issues,Total Tasks,Net Change,Closed,Via PR,Manual Approval,No Issue Raised,Open'];
-  for(var i=0;i<history.length;i++){
-    var row=history[i];
+  history.forEach(function(row,i){
     var prev=i>0?history[i-1]:null;
     var net=prev!==null?row.total-prev.total:'';
     rows.push([row.date,row.tracking,row.total,net,row.closed,row.closedPR||0,row.closedManual||0,row.noIssue,row.open].join(','));
-  }
+  });
   var blob=new Blob([rows.join('\n')],{type:'text/csv'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -613,7 +621,7 @@ function exportCSV(){
 }
 
 function clearHistory(){
-  if(!confirm('Clear all report history? This cannot be undone.')) return;
+  if(!confirm('Clear all report history? This cannot be undone.'))return;
   localStorage.removeItem(STORAGE_KEY);
   renderReport();
 }
