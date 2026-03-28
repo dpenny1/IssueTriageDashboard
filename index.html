@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ZenHub + GitHub AI Triage</title>
+<title>CS Issue Triage Dashboard</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f5f3;color:#1a1a18;min-height:100vh}
 p{line-height:1.6}
 a{color:#185FA5;text-decoration:none}
 a:hover{text-decoration:underline}
-input{font-family:inherit;font-size:13px;padding:7px 10px;border:0.5px solid #ccc;border-radius:8px;width:100%;outline:none;background:#fff;color:#1a1a18;margin-bottom:8px}
-input:focus{border-color:#185FA5;box-shadow:0 0 0 3px rgba(24,95,165,0.12)}
+input,select{font-family:inherit;font-size:13px;padding:7px 10px;border:0.5px solid #ccc;border-radius:8px;width:100%;outline:none;background:#fff;color:#1a1a18;margin-bottom:8px}
+input:focus,select:focus{border-color:#185FA5;box-shadow:0 0 0 3px rgba(24,95,165,0.12)}
 button{font-family:inherit;cursor:pointer;border-radius:8px;font-size:13px;transition:opacity 0.15s}
 button:disabled{opacity:0.5;cursor:not-allowed}
 .btn{padding:6px 14px;border:0.5px solid #ccc;background:transparent;color:#1a1a18}
@@ -21,27 +21,34 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 .wrap{max-width:1100px;margin:0 auto;padding:1.5rem 1rem}
 .card{background:#fff;border:0.5px solid #e0e0dc;border-radius:12px;padding:1rem 1.25rem;margin-bottom:12px}
 .lbl{font-size:12px;color:#666;margin-bottom:2px;display:block;margin-top:10px}
+.lbl:first-child{margin-top:0}
 .badge{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500;display:inline-block}
 .err-box{background:#FCEBEB;border:0.5px solid #E24B4A;border-radius:8px;padding:10px 12px;margin-bottom:10px;color:#A32D2D;font-size:13px}
 .tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
 .tab{padding:7px 16px;border-radius:8px;border:0.5px solid #e0e0dc;background:transparent;color:#666;font-size:13px}
 .tab.active{border-color:#185FA5;background:#E6F1FB;color:#0C447C;font-weight:500}
-.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
-.pcol{background:#f5f5f3;border-radius:10px;padding:10px}
-.icard{background:#fff;border:0.5px solid #e0e0dc;border-radius:8px;padding:10px 12px;margin-bottom:8px}
-.ititle{font-size:12px;font-weight:500;margin-bottom:4px;line-height:1.4}
-.imeta{font-size:11px;color:#888}
-.litem{display:flex;align-items:flex-start;gap:12px}
-.lbody{flex:1}
-.ltitle{font-size:14px;font-weight:500;margin-bottom:4px}
-.lmeta{font-size:12px;color:#888;margin-bottom:6px}
+.filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.filters select{width:auto;margin-bottom:0}
+.filters label{font-size:12px;color:#666;white-space:nowrap}
+.issue-row{display:flex;align-items:flex-start;gap:12px}
+.issue-body{flex:1}
+.issue-title{font-size:14px;font-weight:500;margin-bottom:4px}
+.issue-meta{font-size:12px;color:#888;margin-bottom:6px}
 .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-.tri-box{margin-top:8px;padding:8px 10px;background:#f5f5f3;border-radius:6px;font-size:12px}
+.action-box{margin-top:10px;padding:10px 12px;background:#f0f6ff;border:0.5px solid #b5d4f4;border-radius:8px;font-size:13px}
+.action-box .action-label{font-size:11px;font-weight:500;color:#185FA5;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.04em}
+.action-box .action-text{color:#1a1a18;line-height:1.6}
+.age-ok{color:#3B6D11}
+.age-warn{color:#854F0B}
+.age-old{color:#A32D2D}
 .hrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
 .hacts{display:flex;gap:8px;flex-wrap:wrap}
-.blk-bar{background:#FCEBEB;border-left:3px solid #E24B4A;border-radius:8px;padding:10px 14px;margin-bottom:16px}
 .spin{display:inline-block;width:12px;height:12px;border:2px solid #ccc;border-top-color:#185FA5;border-radius:50%;animation:sp 0.7s linear infinite;vertical-align:middle;margin-right:5px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:#fff;border:0.5px solid #e0e0dc;border-radius:10px;padding:12px 14px}
+.stat-num{font-size:24px;font-weight:500;margin-bottom:2px}
+.stat-lbl{font-size:12px;color:#888}
 #setup{display:block}
 #dash{display:none}
 </style>
@@ -51,8 +58,8 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 
 <div id="setup">
   <div style="margin-bottom:20px">
-    <h1 style="font-size:20px;font-weight:500;margin-bottom:6px">ZenHub + GitHub AI Triage</h1>
-    <p style="font-size:13px;color:#666">Tokens stay in your browser only.</p>
+    <h1 style="font-size:20px;font-weight:500;margin-bottom:6px">CS Issue Triage Dashboard</h1>
+    <p style="font-size:13px;color:#666">Focused on customer bugs, feature requests, and failed testing items.</p>
   </div>
   <div class="card">
     <span class="lbl">GitHub personal access token (classic, repo scope)</span>
@@ -75,46 +82,58 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 <div id="dash">
   <div class="hrow">
     <div>
-      <h1 style="font-size:20px;font-weight:500" id="dashTitle">Issue Triage Dashboard</h1>
+      <h1 style="font-size:20px;font-weight:500">CS Issue Triage</h1>
       <p id="dashMeta" style="font-size:12px;color:#888;margin-top:2px"></p>
     </div>
     <div class="hacts">
       <button class="btn" onclick="showSetup()">Reconnect</button>
       <button class="btn" id="refreshBtn" onclick="refresh()">Refresh</button>
-      <button class="btn-primary" id="aiBtn" onclick="runAI()">Run AI analysis</button>
     </div>
   </div>
-  <div id="blkBar" style="display:none" class="blk-bar"></div>
+
+  <div class="stat-grid" id="statGrid"></div>
+
   <div class="tabs">
-    <button class="tab active" id="tabBoard" onclick="switchTab('board')">Board</button>
-    <button class="tab" id="tabList" onclick="switchTab('list')">List</button>
-    <button class="tab" id="tabAI" onclick="switchTab('ai')">AI Analysis</button>
+    <button class="tab active" id="tabAll" onclick="switchTab('all')">All issues</button>
+    <button class="tab" id="tabBug" onclick="switchTab('bug')">Customer bugs</button>
+    <button class="tab" id="tabFeat" onclick="switchTab('feat')">Feature requests</button>
+    <button class="tab" id="tabTest" onclick="switchTab('test')">Failed testing</button>
   </div>
+
+  <div class="filters">
+    <label>Sort by:</label>
+    <select id="sortBy" onchange="renderIssues()">
+      <option value="age">Age (oldest first)</option>
+      <option value="priority">Priority (critical first)</option>
+      <option value="recent">Recently added</option>
+    </select>
+    <label style="margin-left:8px">Priority:</label>
+    <select id="filterPriority" onchange="renderIssues()">
+      <option value="all">All priorities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+  </div>
+
   <div id="dashErr" style="display:none"></div>
-  <div id="boardView"></div>
-  <div id="listView" style="display:none"></div>
-  <div id="aiView" style="display:none">
-    <div class="card" style="text-align:center;padding:2rem">
-      <p style="color:#888;font-size:14px">Click "Run AI analysis" to get a backlog summary, priority recommendations, and label suggestions.</p>
-    </div>
-  </div>
+  <div id="issueList"></div>
 </div>
 
 </div>
 <script>
 var S = {
   ghToken: '', anthroKey: '', zhToken: '', workspaceId: '',
-  repos: [], issues: [], aiAnalysis: null, issueAI: {}
+  repos: [], issues: [], issueAI: {}, activeTab: 'all'
 };
 
-var PIPES = ['New Issues','Backlog','In Progress','Review','Done'];
-var PCOL = {
-  'New Issues':  {bg:'#E6F1FB',tx:'#0C447C',bd:'#378ADD'},
-  'Backlog':     {bg:'#F1EFE8',tx:'#444441',bd:'#888780'},
-  'In Progress': {bg:'#FAEEDA',tx:'#633806',bd:'#EF9F27'},
-  'Review':      {bg:'#EEEDFE',tx:'#3C3489',bd:'#7F77DD'},
-  'Done':        {bg:'#EAF3DE',tx:'#27500A',bd:'#639922'}
+var TYPE_KEYWORDS = {
+  bug: ['bug','error','broken','crash','fail','issue','problem','defect','not working','customer report'],
+  feat: ['feature','request','enhancement','improve','add','would like','suggestion'],
+  test: ['test','testing','failed test','qa','regression','acceptance']
 };
+
 var PRCOL = {
   critical: {bg:'#FCEBEB',tx:'#A32D2D'},
   high:     {bg:'#FAECE7',tx:'#993C1D'},
@@ -122,12 +141,32 @@ var PRCOL = {
   low:      {bg:'#EAF3DE',tx:'#3B6D11'}
 };
 
+var PRIORITY_ORDER = {critical:0,high:1,medium:2,low:3,null:4,undefined:4};
+
 function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function mkBadge(bg, tx, label) {
   return '<span class="badge" style="background:' + bg + ';color:' + tx + '">' + esc(label) + '</span>';
+}
+
+function detectType(issue) {
+  var text = (issue.title + ' ' + issue.body + ' ' + issue.labels.join(' ')).toLowerCase();
+  if (TYPE_KEYWORDS.test.some(function(k){return text.indexOf(k)!==-1;})) return 'test';
+  if (TYPE_KEYWORDS.bug.some(function(k){return text.indexOf(k)!==-1;})) return 'bug';
+  if (TYPE_KEYWORDS.feat.some(function(k){return text.indexOf(k)!==-1;})) return 'feat';
+  return 'bug';
+}
+
+function ageInDays(dateStr) {
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+}
+
+function ageLabel(days) {
+  if (days < 3) return {text: days + 'd', cls: 'age-ok'};
+  if (days < 7) return {text: days + 'd', cls: 'age-warn'};
+  return {text: days + 'd', cls: 'age-old'};
 }
 
 function showSetup() {
@@ -152,11 +191,12 @@ function hideErr(elId) {
 }
 
 function switchTab(name) {
-  ['board','list','ai'].forEach(function(t) {
-    document.getElementById(t + 'View').style.display = t === name ? 'block' : 'none';
+  S.activeTab = name;
+  ['all','bug','feat','test'].forEach(function(t) {
     var tb = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
     if (tb) tb.className = 'tab' + (t === name ? ' active' : '');
   });
+  renderIssues();
 }
 
 async function ghFetch(path) {
@@ -186,7 +226,7 @@ async function callClaude(system, userMsg, maxTokens) {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: maxTokens || 1500,
+      max_tokens: maxTokens || 500,
       system: system,
       messages: [{ role: 'user', content: userMsg }]
     })
@@ -229,28 +269,30 @@ async function loadIssues() {
   var all = [];
   for (var ri = 0; ri < S.repos.length; ri++) {
     var repo = S.repos[ri];
-    var data = await ghFetch('/repos/' + repo + '/issues?state=open&per_page=50');
+    var data = await ghFetch('/repos/' + repo + '/issues?state=open&per_page=100');
     for (var ii = 0; ii < data.length; ii++) {
       var i = data[ii];
       if (i.pull_request) continue;
-      all.push({
-        id: i.number,
-        repo: repo,
-        title: i.title,
-        body: i.body || '',
+      var issue = {
+        id: i.number, repo: repo, title: i.title, body: i.body || '',
         labels: i.labels.map(function(l) { return l.name; }),
         assignees: i.assignees.map(function(a) { return a.login; }),
-        createdAt: i.created_at,
-        url: i.html_url,
-        pipeline: 'New Issues',
-        priority: null,
-        aiLabels: []
-      });
+        createdAt: i.created_at, url: i.html_url,
+        priority: null, type: null
+      };
+      issue.type = detectType(issue);
+      var lowerLabels = issue.labels.map(function(l){return l.toLowerCase();});
+      if (lowerLabels.indexOf('critical') !== -1) issue.priority = 'critical';
+      else if (lowerLabels.indexOf('high') !== -1) issue.priority = 'high';
+      else if (lowerLabels.indexOf('medium') !== -1) issue.priority = 'medium';
+      else if (lowerLabels.indexOf('low') !== -1) issue.priority = 'low';
+      all.push(issue);
     }
   }
   S.issues = all;
   S.issueAI = {};
-  renderDash();
+  renderStats();
+  renderIssues();
 }
 
 async function refresh() {
@@ -262,162 +304,107 @@ async function refresh() {
   btn.textContent = 'Refresh';
 }
 
-function renderDash() {
-  var repos = [];
-  S.issues.forEach(function(i) { if (repos.indexOf(i.repo) === -1) repos.push(i.repo); });
-  document.getElementById('dashMeta').textContent =
-    S.issues.length + ' open issues across ' + repos.length + ' repo' + (repos.length !== 1 ? 's' : '');
-  renderBoard();
-  renderList();
-}
-
-function renderBoard() {
-  var byP = {};
-  PIPES.forEach(function(p) {
-    byP[p] = S.issues.filter(function(i) { return i.pipeline === p; });
-  });
-  var html = '<div class="board">';
-  PIPES.forEach(function(p) {
-    var c = PCOL[p];
-    html += '<div class="pcol">';
-    html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">';
-    html += '<span class="badge" style="background:' + c.bg + ';color:' + c.tx + ';border:0.5px solid ' + c.bd + '">' + esc(p) + '</span>';
-    html += '<span style="font-size:11px;color:#aaa">' + byP[p].length + '</span></div>';
-    byP[p].forEach(function(i) {
-      var pc = i.priority ? PRCOL[i.priority] : null;
-      html += '<div class="icard">';
-      html += '<div class="ititle">' + esc(i.title.slice(0,60)) + (i.title.length > 60 ? '&hellip;' : '') + '</div>';
-      html += '<div class="imeta">#' + i.id + ' &middot; ' + esc(i.repo.split('/')[1]) + '</div>';
-      if (pc) html += '<div style="margin-top:4px">' + mkBadge(pc.bg, pc.tx, i.priority) + '</div>';
-      html += '</div>';
-    });
-    html += '</div>';
-  });
-  html += '</div>';
-  document.getElementById('boardView').innerHTML = html;
-}
-
-function renderList() {
+function renderStats() {
+  var bugs = S.issues.filter(function(i){return i.type==='bug';}).length;
+  var feats = S.issues.filter(function(i){return i.type==='feat';}).length;
+  var tests = S.issues.filter(function(i){return i.type==='test';}).length;
+  var old = S.issues.filter(function(i){return ageInDays(i.createdAt)>=7;}).length;
   var html = '';
-  S.issues.forEach(function(i) {
+  html += stat(S.issues.length, 'Total open', '#185FA5');
+  html += stat(bugs, 'Customer bugs', '#A32D2D');
+  html += stat(feats, 'Feature requests', '#854F0B');
+  html += stat(tests, 'Failed testing', '#3C3489');
+  html += stat(old, '7+ days old', '#888');
+  document.getElementById('statGrid').innerHTML = html;
+  document.getElementById('dashMeta').textContent =
+    S.issues.length + ' open issues across ' + S.repos.length + ' repo' + (S.repos.length !== 1 ? 's' : '');
+}
+
+function stat(num, label, color) {
+  return '<div class="stat"><div class="stat-num" style="color:' + color + '">' + num + '</div><div class="stat-lbl">' + label + '</div></div>';
+}
+
+function getFilteredIssues() {
+  var list = S.issues.slice();
+  if (S.activeTab !== 'all') {
+    list = list.filter(function(i) { return i.type === S.activeTab; });
+  }
+  var fp = document.getElementById('filterPriority');
+  if (fp && fp.value !== 'all') {
+    list = list.filter(function(i) { return i.priority === fp.value; });
+  }
+  var sort = document.getElementById('sortBy');
+  var sortVal = sort ? sort.value : 'age';
+  if (sortVal === 'age') {
+    list.sort(function(a,b){ return new Date(a.createdAt) - new Date(b.createdAt); });
+  } else if (sortVal === 'priority') {
+    list.sort(function(a,b){ return (PRIORITY_ORDER[a.priority]||4) - (PRIORITY_ORDER[b.priority]||4); });
+  } else {
+    list.sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); });
+  }
+  return list;
+}
+
+function typeInfo(type) {
+  if (type === 'bug') return {bg:'#FCEBEB', tx:'#A32D2D', label:'Customer bug'};
+  if (type === 'feat') return {bg:'#FAEEDA', tx:'#854F0B', label:'Feature request'};
+  if (type === 'test') return {bg:'#EEEDFE', tx:'#3C3489', label:'Failed testing'};
+  return {bg:'#F1EFE8', tx:'#444441', label:'Other'};
+}
+
+function renderIssues() {
+  var list = getFilteredIssues();
+  var html = '';
+  if (!list.length) {
+    html = '<div class="card" style="text-align:center;padding:2rem;color:#888">No issues found for this filter.</div>';
+    document.getElementById('issueList').innerHTML = html;
+    return;
+  }
+  list.forEach(function(i) {
+    var days = ageInDays(i.createdAt);
+    var age = ageLabel(days);
     var pc = i.priority ? PRCOL[i.priority] : null;
+    var tc = typeInfo(i.type);
     var tkey = i.id + '_' + i.repo.replace(/\//g, '__');
     var tr = S.issueAI[tkey];
-    html += '<div class="card litem">';
-    html += '<div class="lbody">';
-    html += '<div class="ltitle"><a href="' + esc(i.url) + '" target="_blank">#' + i.id + ' ' + esc(i.title) + '</a></div>';
-    html += '<div class="lmeta">' + esc(i.repo) + ' &middot; ' + new Date(i.createdAt).toLocaleDateString();
+    html += '<div class="card issue-row">';
+    html += '<div class="issue-body">';
+    html += '<div class="issue-title"><a href="' + esc(i.url) + '" target="_blank">#' + i.id + ' ' + esc(i.title) + '</a></div>';
+    html += '<div class="issue-meta">';
+    html += esc(i.repo) + ' &middot; ';
+    html += '<span class="' + age.cls + '" style="font-weight:500">' + age.text + ' old</span>';
     if (i.assignees.length) html += ' &middot; ' + esc(i.assignees.join(', '));
     html += '</div>';
     html += '<div class="tags">';
-    i.labels.forEach(function(l) { html += mkBadge('#E6F1FB','#0C447C',l); });
-    (i.aiLabels || []).forEach(function(l) { html += mkBadge('#EEEDFE','#3C3489','+ ' + l); });
+    html += mkBadge(tc.bg, tc.tx, tc.label);
     if (pc) html += mkBadge(pc.bg, pc.tx, i.priority);
+    i.labels.forEach(function(l) { html += mkBadge('#E6F1FB','#0C447C',l); });
     html += '</div>';
     if (tr && tr !== 'loading' && !tr.error) {
-      html += '<div class="tri-box">';
-      html += '<div style="font-weight:500;margin-bottom:4px">AI triage</div>';
-      html += '<div style="color:#555;margin-bottom:4px">' + esc(tr.notes) + '</div>';
-      html += '<div style="color:#999">Suggested pipeline: ' + esc(tr.pipeline) + '</div>';
+      html += '<div class="action-box">';
+      html += '<div class="action-label">Suggested next action</div>';
+      html += '<div class="action-text">' + esc(tr.next_action) + '</div>';
+      if (tr.urgency) {
+        html += '<div style="margin-top:6px;font-size:12px;color:#666">Urgency: <strong>' + esc(tr.urgency) + '</strong>';
+        if (tr.reason) html += ' &mdash; ' + esc(tr.reason);
+        html += '</div>';
+      }
       html += '</div>';
     }
     if (tr && tr.error) {
-      html += '<div class="err-box" style="margin-top:8px">Triage error: ' + esc(tr.error) + '</div>';
+      html += '<div class="err-box" style="margin-top:8px">Error: ' + esc(tr.error) + '</div>';
     }
     html += '</div>';
     var loading = tr === 'loading';
-    html += '<button class="btn" onclick="triageOne(\'' + tkey + '\')" ' + (loading ? 'disabled' : '') + '>';
-    html += loading ? '<span class="spin"></span>' : 'Triage';
+    html += '<button class="btn" onclick="suggestAction(\'' + tkey + '\')" ' + (loading ? 'disabled' : '') + '>';
+    html += loading ? '<span class="spin"></span>' : 'Suggest action';
     html += '</button>';
     html += '</div>';
   });
-  if (!html) html = '<div class="card" style="text-align:center;padding:2rem;color:#888">No issues found.</div>';
-  document.getElementById('listView').innerHTML = html;
+  document.getElementById('issueList').innerHTML = html;
 }
 
-function renderAnalysis() {
-  var a = S.aiAnalysis;
-  if (!a) return;
-  var html = '';
-  html += '<div class="card"><div style="font-size:13px;font-weight:500;margin-bottom:8px">Backlog summary</div>';
-  html += '<p style="font-size:13px;color:#555">' + esc(a.backlog_summary) + '</p></div>';
-  if (a.priorities && a.priorities.length) {
-    html += '<div class="card"><div style="font-size:13px;font-weight:500;margin-bottom:10px">Priority recommendations</div>';
-    a.priorities.forEach(function(p) {
-      var pc = PRCOL[p.priority] || {bg:'#eee',tx:'#333'};
-      html += '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">';
-      html += mkBadge(pc.bg, pc.tx, p.priority);
-      html += '<div><div style="font-size:13px;font-weight:500">#' + p.id + ' [' + esc(p.repo) + ']</div>';
-      html += '<div style="font-size:12px;color:#666">' + esc(p.reason) + '</div></div></div>';
-    });
-    html += '</div>';
-  }
-  if (a.suggested_labels && a.suggested_labels.length) {
-    html += '<div class="card"><div style="font-size:13px;font-weight:500;margin-bottom:10px">Suggested labels</div>';
-    a.suggested_labels.forEach(function(l) {
-      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-      html += '<span style="font-size:12px;color:#888;min-width:90px">#' + l.id + ' [' + esc(l.repo.split('/')[1]) + ']</span>';
-      html += '<div class="tags">';
-      (l.labels || []).forEach(function(lb) { html += mkBadge('#EEEDFE','#3C3489',lb); });
-      html += '</div></div>';
-    });
-    html += '</div>';
-  }
-  if (a.blockers && a.blockers.length) {
-    html += '<div class="card"><div style="font-size:13px;font-weight:500;color:#A32D2D;margin-bottom:10px">Blockers</div>';
-    a.blockers.forEach(function(b) {
-      html += '<div style="font-size:13px;margin-bottom:6px"><strong>#' + b.id + ' [' + esc(b.repo) + ']</strong> - ' + esc(b.description) + '</div>';
-    });
-    html += '</div>';
-  }
-  document.getElementById('aiView').innerHTML = html;
-}
-
-async function runAI() {
-  if (!S.issues.length) return;
-  var btn = document.getElementById('aiBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span>Analyzing...';
-  hideErr('dashErr');
-  var summary = S.issues.map(function(i) {
-    return '#' + i.id + ' [' + i.repo + '] "' + i.title + '" labels:[' + i.labels.join(',') + '] pipeline:' + i.pipeline + ' assignees:[' + (i.assignees.join(',') || 'none') + ']';
-  }).join('\n');
-  try {
-    var sys = 'You are a senior engineering project manager. Analyze GitHub issues and respond ONLY with a valid JSON object (no markdown, no backticks, no extra text) with these keys: backlog_summary (string), priorities (array of objects with id (number), repo (string), reason (string), priority (one of: critical, high, medium, low)), suggested_labels (array of objects with id (number), repo (string), labels (array of strings)), blockers (array of objects with id (number), repo (string), description (string)).';
-    var parsed = await callClaude(sys, 'Analyze these issues:\n' + summary, 1500);
-    S.aiAnalysis = parsed;
-    S.issues = S.issues.map(function(i) {
-      var p = (parsed.priorities || []).filter(function(x) { return x.id === i.id && x.repo === i.repo; })[0];
-      var l = (parsed.suggested_labels || []).filter(function(x) { return x.id === i.id && x.repo === i.repo; })[0];
-      return {
-        id: i.id, repo: i.repo, title: i.title, body: i.body,
-        labels: i.labels, assignees: i.assignees, createdAt: i.createdAt,
-        url: i.url, pipeline: i.pipeline,
-        priority: (p && p.priority) || i.priority,
-        aiLabels: (l && l.labels) || []
-      };
-    });
-    if (parsed.blockers && parsed.blockers.length) {
-      var bar = document.getElementById('blkBar');
-      bar.style.display = 'block';
-      var bhtml = '<div style="font-size:13px;font-weight:500;color:#A32D2D;margin-bottom:4px">Blockers detected</div>';
-      parsed.blockers.forEach(function(b) {
-        bhtml += '<div style="font-size:12px;color:#791F1F;margin:2px 0">#' + b.id + ' [' + esc(b.repo) + '] - ' + esc(b.description) + '</div>';
-      });
-      bar.innerHTML = bhtml;
-    }
-    renderBoard();
-    renderList();
-    renderAnalysis();
-    switchTab('ai');
-  } catch(e) {
-    showErr('dashErr', 'AI error: ' + e.message);
-  }
-  btn.disabled = false;
-  btn.textContent = 'Run AI analysis';
-}
-
-async function triageOne(tkey) {
+async function suggestAction(tkey) {
   var parts = tkey.split('_');
   var id = parseInt(parts[0]);
   var repo = parts.slice(1).join('_').replace(/__/g, '/');
@@ -427,16 +414,17 @@ async function triageOne(tkey) {
   }
   if (!issue) return;
   S.issueAI[tkey] = 'loading';
-  renderList();
+  renderIssues();
   try {
-    var sys = 'You are a senior engineering triage assistant. Respond ONLY with a valid JSON object (no markdown, no backticks): {"priority":"critical or high or medium or low","labels":[],"pipeline":"string","notes":"string"}';
-    var msg = 'Triage this issue:\nTitle: ' + issue.title + '\nBody: ' + issue.body.slice(0,500) + '\nLabels: ' + issue.labels.join(', ') + '\nRepo: ' + issue.repo;
-    var parsed = await callClaude(sys, msg, 500);
+    var days = ageInDays(issue.createdAt);
+    var sys = 'You are a customer service manager reviewing software issues. Respond ONLY with a valid JSON object (no markdown, no backticks): {"next_action":"a specific, practical next action the CS team should take (1-2 sentences)","urgency":"immediate or soon or routine","reason":"brief reason for the urgency level"}';
+    var msg = 'Issue type: ' + issue.type + '\nTitle: ' + issue.title + '\nBody: ' + issue.body.slice(0,400) + '\nLabels: ' + issue.labels.join(', ') + '\nAge: ' + days + ' days old\nPriority: ' + (issue.priority || 'not set');
+    var parsed = await callClaude(sys, msg, 400);
     S.issueAI[tkey] = parsed;
   } catch(e) {
     S.issueAI[tkey] = { error: e.message };
   }
-  renderList();
+  renderIssues();
 }
 </script>
 </body>
