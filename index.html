@@ -97,6 +97,10 @@ tr:hover td{background:#f9fafb}
     <div class="fg"><label>GitHub Personal Access Token</label>
       <input type="password" id="ghToken" placeholder="ghp_..." onkeydown="if(event.key==='Enter')connect()"/>
     </div>
+    <div class="fg"><label>ZenHub API Token <span style="font-size:11px;color:#9ca3af;font-weight:400">(optional — for pipeline data)</span></label>
+      <input type="text" id="zhTokenInput" placeholder="Paste from app.zenhub.com → API Tokens" autocomplete="off"/>
+      <div class="hint">Leave blank to skip ZenHub integration</div>
+    </div>
     <input type="hidden" id="reposInput"/>
     <div id="setupErr" style="display:none"></div>
     <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center">
@@ -197,6 +201,10 @@ function renderProfileDd(){
   var sel=document.getElementById('profileSelect');if(!sel)return;
   sel.innerHTML='<option value="">-- Select a project --</option>';
   loadProfiles().forEach(function(p){sel.innerHTML+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});
+  // Pre-fill saved ZH token if present
+  loadZHCreds();
+  var zhInput=document.getElementById('zhTokenInput');
+  if(zhInput&&S.zhToken)zhInput.placeholder='Token saved — paste new one to update';
 }
 function onProfileSel(){
   var sel=document.getElementById('profileSelect');
@@ -309,14 +317,28 @@ async function zhGet(path){
 function setStatus(html){var el=document.getElementById('loadedAt');if(el)el.innerHTML=html;}
 
 async function connect(){
-  var gh=document.getElementById('ghToken').value.trim(),rp=document.getElementById('reposInput').value.trim();
+  var gh=document.getElementById('ghToken').value.trim();
+  var zhTok=document.getElementById('zhTokenInput').value.trim();
+  var rp=document.getElementById('reposInput').value.trim();
   hideErr('setupErr');
   if(!gh||!rp){showErr('setupErr','Please select a project and enter your GitHub token.');return;}
   S.ghToken=gh;S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
   S.ignored=loadIgnored();loadZHCreds();S.repoWorkspaceMap={};
+  // Override ZenHub token if provided on login page
+  if(zhTok){S.zhToken=zhTok;saveZHCreds();}
   if(S.activeProfile){
-    if(S.activeProfile.type==='group')(S.activeProfile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});
-    else if(S.activeProfile.zhWorkspace){S.zhWorkspace=S.activeProfile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=S.activeProfile.zhWorkspace;}
+    if(S.activeProfile.type==='group'){
+      (S.activeProfile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});
+      // Use first repo's workspace as default
+      if(!S.zhWorkspace&&S.activeProfile.repos&&S.activeProfile.repos[0]&&S.activeProfile.repos[0].zhWorkspace)
+        S.zhWorkspace=S.activeProfile.repos[0].zhWorkspace;
+    } else {
+      if(S.activeProfile.zhWorkspace){
+        S.zhWorkspace=S.activeProfile.zhWorkspace;
+        if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=S.activeProfile.zhWorkspace;
+      }
+    }
+    saveZHCreds();
   }
   var btn=document.getElementById('connectBtn');btn.disabled=true;btn.innerHTML='<span class="spin spd"></span>Loading...';
   var cache=loadCache();
