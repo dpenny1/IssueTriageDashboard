@@ -555,7 +555,8 @@ async function loadIssues(){
       open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',
         labels:iss.labels.map(function(l){ return l.name; }),
         assignees:iss.assignees.map(function(a){ return a.login; }),
-        createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:null});
+        createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,
+        parent:iss.parent_issue_url?{url:iss.parent_issue_url}:null});
     });
     var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&per_page=50&sort=updated&direction=desc');
     cd.forEach(function(iss){
