@@ -5,8 +5,36 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>CS Issues Hub</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>"/>
+<!-- ── Vault styles ── -->
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+.tv-bar{background:white;border:1px solid #e5e7eb;border-radius:14px;padding:20px 24px;margin-bottom:28px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.tv-bar label{font-size:15px;font-weight:600;display:block;margin-bottom:8px;color:#374151}
+.tv-locked,.tv-unlocked{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.tv-unlocked{display:none;flex-direction:column;align-items:stretch}
+.tv-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.tv-bar input[type=password],.tv-bar input[type=text],.tv-bar select{padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;background:white}
+.tv-bar select{flex:1;min-width:200px}
+.tv-bar input.tv-wide{flex:1;min-width:220px}
+.tv-bar input.tv-name{width:150px}
+.tv-bar input.tv-tok{flex:1;min-width:180px;font-family:monospace}
+.tv-hint{font-size:13px;color:#9ca3af;margin-top:4px}
+.tv-msg{font-size:13px;min-height:18px;margin-top:4px}
+.tv-msg.ok{color:#059669}.tv-msg.err{color:#dc2626}
+.tv-divider{border-top:1px solid #f3f4f6;margin-top:14px;padding-top:14px}
+.tv-manage{display:none;margin-top:12px}
+.tv-token-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tv-chip{display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:8px;padding:5px 10px;font-size:13px}
+.tv-chip span{font-weight:600}
+.tv-btn{border:1px solid #e5e7eb;background:white;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;color:#374151;white-space:nowrap}
+.tv-btn:hover{background:#f1f5f9}
+.tv-btn.primary{background:#4338ca;color:white;border-color:#4338ca}
+.tv-btn.primary:hover{background:#3730a3}
+.tv-btn.primary:disabled{background:#a5b4fc;cursor:not-allowed}
+.tv-btn.danger{color:#dc2626;border-color:#fca5a5}
+.tv-btn.danger:hover{background:#fef2f2}
+.tv-btn.sm{padding:3px 9px;font-size:12px}
+.tv-manual-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f3f4f6}
+</style>
 body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9fafb;color:#1a1a1a;min-height:100vh;font-size:15px}
 a{color:#4338ca;text-decoration:none}a:hover{text-decoration:underline}
 .hdr{background:linear-gradient(135deg,#1e1b4b 0%,#4338ca 60%,#6366f1 100%);padding:16px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
@@ -89,26 +117,78 @@ tr:hover td{background:#f9fafb}
     <div><h1>📋 CS Issues Hub</h1><p>Select a project to get started</p></div>
     <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-w">🛠 PM Tools</a>
   </div></div>
-  <div class="main"><div class="sw"><div class="sc">
-    <h2>🔐 Connect</h2>
-    <div class="fg"><label>Project</label>
-      <select id="profileSelect" onchange="onProfileSel()"><option value="">-- Select a project --</option></select>
-      <div class="hint">Don't see your project? <a href="#" onclick="showCfg();return false">Configure projects</a></div>
+  <div class="main"><div class="sw">
+
+    <!-- Token Vault -->
+    <div class="tv-bar" id="tv-bar">
+      <div id="tv-locked">
+        <label>🔒 Token Vault</label>
+        <div class="tv-locked">
+          <input type="password" id="tv-pw" class="tv-wide" placeholder="Enter master password to unlock vault..." onkeydown="if(event.key==='Enter')TokenVault._unlock()"/>
+          <button class="tv-btn primary" onclick="TokenVault._unlock()">Unlock</button>
+        </div>
+        <p id="tv-lock-msg" class="tv-msg err"></p>
+        <p class="tv-hint">Tokens are AES-256-GCM encrypted and stored locally.</p>
+      </div>
+      <div id="tv-unlocked" style="display:none">
+        <label>🔓 Token Vault</label>
+        <div class="tv-row">
+          <select id="tv-select" onchange="TokenVault._onSelect()"><option value="">— select a saved token —</option></select>
+          <button class="tv-btn primary" id="tv-btn-load" onclick="TokenVault._triggerLoad()" disabled>▶ Use Token</button>
+          <button class="tv-btn" onclick="TokenVault._lock()">🔒 Lock</button>
+          <button class="tv-btn" id="tv-btn-manage" onclick="TokenVault._toggleManage()">⚙️ Manage</button>
+        </div>
+        <p class="tv-hint" id="tv-sel-hint">Select a token then click Use Token.</p>
+        <div class="tv-manual-row">
+          <span style="font-size:13px;color:#6b7280;white-space:nowrap">Or use token once:</span>
+          <input type="password" id="tv-manual-tok" class="tv-tok" placeholder="Paste token manually (not saved)..."/>
+          <button class="tv-btn" onclick="TokenVault._useManual()">▶ Use</button>
+        </div>
+        <div class="tv-manage" id="tv-manage">
+          <div class="tv-divider">
+            <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Add a new token</div>
+            <div class="tv-row">
+              <input type="text" id="tv-add-name" class="tv-name" placeholder="Name (e.g. GitHub Token)"/>
+              <input type="password" id="tv-add-tok" class="tv-tok" placeholder="Paste token value"/>
+              <button class="tv-btn" onclick="TokenVault._add()">＋ Save</button>
+            </div>
+            <p id="tv-add-msg" class="tv-msg"></p>
+            <div class="tv-token-list" id="tv-token-list"></div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="fg"><label>GitHub Personal Access Token</label>
-      <input type="password" id="ghToken" placeholder="ghp_..." onkeydown="if(event.key==='Enter')connect()"/>
+
+    <div class="sc" id="connectCard" style="display:none">
+      <h2>🔐 Connect</h2>
+      <div class="fg"><label>Project</label>
+        <select id="profileSelect" onchange="onProfileSel()"><option value="">-- Select a project --</option></select>
+        <div class="hint">Don't see your project? <a href="#" onclick="showCfg();return false">Configure projects</a></div>
+      </div>
+      <div class="fg">
+        <label>GitHub Token</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="ghTokenStatus" style="font-size:13px;color:#6b7280">Not set</span>
+          <button class="btn-sm" onclick="clearGHToken()">Clear</button>
+        </div>
+      </div>
+      <div class="fg">
+        <label>ZenHub Token <span style="font-size:11px;color:#9ca3af;font-weight:400">(optional)</span></label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="zhTokenStatus" style="font-size:13px;color:#6b7280">Not set</span>
+          <button class="btn-sm" onclick="clearZHToken()">Clear</button>
+        </div>
+        <div class="hint">Use the vault to set tokens. Multiple tokens can be stored — set GitHub first, then ZenHub.</div>
+      </div>
+      <input type="hidden" id="reposInput"/>
+      <div id="setupErr" style="display:none"></div>
+      <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center">
+        <a href="#" onclick="showCfg();return false" style="font-size:13px;color:#6b7280">⚙ Manage projects</a>
+        <button class="btn-p" id="connectBtn" onclick="connect()">▶ Load Dashboard</button>
+      </div>
     </div>
-    <div class="fg"><label>ZenHub API Token <span style="font-size:11px;color:#9ca3af;font-weight:400">(optional)</span></label>
-      <input type="text" id="zhTokenInput" placeholder="Paste from app.zenhub.com → API Tokens" autocomplete="off"/>
-      <div class="hint">Leave blank to skip ZenHub integration</div>
-    </div>
-    <input type="hidden" id="reposInput"/>
-    <div id="setupErr" style="display:none"></div>
-    <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center">
-      <a href="#" onclick="showCfg();return false" style="font-size:13px;color:#6b7280">⚙ Manage projects</a>
-      <button class="btn-p" id="connectBtn" onclick="connect()">▶ Load Dashboard</button>
-    </div>
-  </div></div></div>
+
+  </div></div>
 </div>
 
 <div id="cfgScr">
@@ -149,6 +229,72 @@ tr:hover td{background:#f9fafb}
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],activeTab:'newitems',labelColors:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},showSettings:false,activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
+
+// ── Token Vault ──────────────────────────────────────────────────────────────
+var TokenVault=(function(){
+  var VAULT_KEY='centralview_vault_v1';
+  var _pw=null,_data=[];
+  async function deriveKey(pw,salt){var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
+  async function encrypt(text,pw){var salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));var key=await deriveKey(pw,salt);var ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,new TextEncoder().encode(text));var buf=new Uint8Array(28+ct.byteLength);buf.set(salt,0);buf.set(iv,16);buf.set(new Uint8Array(ct),28);return btoa(String.fromCharCode(...buf));}
+  async function decrypt(b64,pw){var buf=Uint8Array.from(atob(b64),function(c){return c.charCodeAt(0);});var key=await deriveKey(pw,buf.slice(0,16));var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(16,28)},key,buf.slice(28));return new TextDecoder().decode(plain);}
+  function load(){try{var r=localStorage.getItem(VAULT_KEY);return r?JSON.parse(r):[];}catch(e){return[];}}
+  function save(d){localStorage.setItem(VAULT_KEY,JSON.stringify(d));_data=d;}
+  function rebuildDropdown(){var sel=document.getElementById('tv-select'),cur=sel.value;sel.innerHTML="<option value=''>— select a saved token —</option>";_data.forEach(function(e){var o=document.createElement('option');o.value=e.name;o.textContent=e.name;sel.appendChild(o);});if(cur)sel.value=cur;}
+  function renderChips(){var el=document.getElementById('tv-token-list');if(!_data.length){el.innerHTML="<span style='font-size:13px;color:#9ca3af'>No tokens saved yet.</span>";return;}el.innerHTML=_data.map(function(e){return "<span class='tv-chip'><span>"+e.name+"</span><button class='tv-btn danger sm' onclick='TokenVault._delete(\""+e.name+"\")'>✕</button></span>";}).join('');}
+  var pub={
+    onToken:null,
+    getToken:async function(){var name=document.getElementById('tv-select').value;if(!name)return null;var entry=_data.find(function(e){return e.name===name;});if(!entry)return null;try{return await decrypt(entry.encrypted,_pw);}catch(e){return null;}},
+    _unlock:async function(){
+      var pw=document.getElementById('tv-pw').value,msg=document.getElementById('tv-lock-msg');msg.textContent='';
+      if(!pw){msg.textContent='Enter your master password.';return;}
+      var data=load();
+      if(data.length>0){try{await decrypt(data[0].encrypted,pw);}catch(e){msg.textContent='Incorrect password.';return;}}
+      _pw=pw;_data=data;
+      document.getElementById('tv-locked').style.display='none';
+      document.getElementById('tv-unlocked').style.display='block';
+      document.getElementById('tv-pw').value='';
+      document.getElementById('connectCard').style.display='block';
+      rebuildDropdown();
+      if(_data.length===1){document.getElementById('tv-select').value=_data[0].name;pub._onSelect();}
+    },
+    _lock:function(){_pw=null;_data=[];document.getElementById('tv-locked').style.display='block';document.getElementById('tv-unlocked').style.display='none';document.getElementById('tv-manage').style.display='none';document.getElementById('tv-btn-load').disabled=true;document.getElementById('connectCard').style.display='none';},
+    _onSelect:function(){var name=document.getElementById('tv-select').value;document.getElementById('tv-btn-load').disabled=!name;document.getElementById('tv-sel-hint').textContent=name?'Token "'+name+'" selected — click Use Token.':'Select a token then click Use Token.';},
+    _triggerLoad:async function(){
+      var tok=await pub.getToken();
+      if(!tok){alert('Could not decrypt token. Please re-unlock the vault.');return;}
+      if(typeof pub.onToken==='function')pub.onToken(tok);
+    },
+    _useManual:function(){var tok=document.getElementById('tv-manual-tok').value.trim();if(!tok){alert('Please paste a token first.');return;}document.getElementById('tv-manual-tok').value='';if(typeof pub.onToken==='function')pub.onToken(tok);},
+    _toggleManage:function(){var m=document.getElementById('tv-manage');var open=m.style.display==='block';m.style.display=open?'none':'block';document.getElementById('tv-btn-manage').textContent=open?'⚙️ Manage':'✖ Close';if(!open)renderChips();},
+    _add:async function(){
+      var name=document.getElementById('tv-add-name').value.trim(),tok=document.getElementById('tv-add-tok').value.trim(),msg=document.getElementById('tv-add-msg');
+      msg.className='tv-msg';msg.textContent='';
+      if(!name){msg.className='tv-msg err';msg.textContent='Enter a name.';return;}
+      if(!tok){msg.className='tv-msg err';msg.textContent='Enter the token value.';return;}
+      if(_data.find(function(e){return e.name===name;})){msg.className='tv-msg err';msg.textContent='Name already exists.';return;}
+      try{var enc=await encrypt(tok,_pw);save(_data.concat([{name:name,encrypted:enc}]));rebuildDropdown();renderChips();document.getElementById('tv-add-name').value='';document.getElementById('tv-add-tok').value='';msg.className='tv-msg ok';msg.textContent='"'+name+'" saved.';setTimeout(function(){msg.textContent='';},3000);}catch(e){msg.className='tv-msg err';msg.textContent='Encryption failed.';}
+    },
+    _delete:function(name){if(!confirm('Delete token "'+name+'"?'))return;save(_data.filter(function(e){return e.name!==name;}));rebuildDropdown();renderChips();var sel=document.getElementById('tv-select');if(sel.value===name){sel.value='';pub._onSelect();}}
+  };
+  return pub;
+})();
+
+// Wire vault token selection to set GH or ZH token
+TokenVault.onToken=function(tok){
+  // Heuristic: ZenHub tokens start with a long hex, GitHub tokens start with "ghp_" or "github_"
+  var isGH=tok.indexOf('ghp_')===0||tok.indexOf('github_')===0||tok.indexOf('gho_')===0;
+  if(isGH||!S.ghToken){
+    S.ghToken=tok;
+    document.getElementById('ghTokenStatus').innerHTML='<span style="color:#059669;font-weight:600">✓ GitHub token set</span>';
+  } else {
+    // Second token treated as ZenHub
+    S.pendingZHToken=tok;
+    document.getElementById('zhTokenStatus').innerHTML='<span style="color:#059669;font-weight:600">✓ ZenHub token set</span>';
+  }
+};
+
+function clearGHToken(){S.ghToken='';document.getElementById('ghTokenStatus').textContent='Not set';}
+function clearZHToken(){S.pendingZHToken='';document.getElementById('zhTokenStatus').textContent='Not set';}
 var TAB_DEFS=[
   {id:'newitems',label:'New Issues',color:'#0891b2'},
   {id:'prod',label:'Production Patch',color:'#dc2626'},
@@ -203,8 +349,6 @@ function renderProfileDd(){
   sel.innerHTML='<option value="">-- Select a project --</option>';
   loadProfiles().forEach(function(p){sel.innerHTML+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});
   loadZHCreds();
-  var zi=document.getElementById('zhTokenInput');
-  if(zi&&S.zhToken)zi.placeholder='Token saved — paste new one to update';
 }
 function onProfileSel(){
   var sel=document.getElementById('profileSelect');
@@ -263,12 +407,14 @@ async function zhPost(path,body){var r=await fetch('https://api.zenhub.com'+path
 async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{headers:{'X-Authentication-Token':S.zhToken}});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
 
 async function connect(){
-  var gh=document.getElementById('ghToken').value.trim(),zhTok=document.getElementById('zhTokenInput').value.trim(),rp=document.getElementById('reposInput').value.trim();
+  var rp=document.getElementById('reposInput').value.trim();
   hideErr('setupErr');
-  if(!gh||!rp){showErr('setupErr','Please select a project and enter your GitHub token.');return;}
-  S.ghToken=gh;S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
+  if(!S.ghToken){showErr('setupErr','Please unlock the vault and set your GitHub token.');return;}
+  if(!rp){showErr('setupErr','Please select a project.');return;}
+  S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
   S.ignored=loadIgnored();loadZHCreds();S.repoWorkspaceMap={};
-  if(zhTok){S.zhToken=zhTok;saveZHCreds();}
+  // Apply pending ZH token if set via vault
+  if(S.pendingZHToken){S.zhToken=S.pendingZHToken;saveZHCreds();}
   if(S.activeProfile){
     if(S.activeProfile.type==='group'){(S.activeProfile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(!S.zhWorkspace&&S.activeProfile.repos&&S.activeProfile.repos[0])S.zhWorkspace=S.activeProfile.repos[0].zhWorkspace||'';}
     else if(S.activeProfile.zhWorkspace){S.zhWorkspace=S.activeProfile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=S.activeProfile.zhWorkspace;}
