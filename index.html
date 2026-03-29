@@ -36,13 +36,13 @@ a:hover{text-decoration:underline}
 .fg .hint{font-size:12px;color:#9ca3af;margin-top:4px}
 .err-box{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;color:#991b1b;font-size:13px;margin-top:10px}
 .stat-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;justify-content:center}
-.stat-card{background:#fff;border-radius:10px;padding:12px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.07);cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;border-top:3px solid transparent;white-space:nowrap;min-width:130px;text-align:center}
+.stat-card{background:#fff;border-radius:12px;padding:20px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.07);cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;border-top:4px solid transparent;white-space:nowrap;flex:1;min-width:150px;text-align:center}
 .stat-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.12)}
-.stat-num{font-size:1.9rem;font-weight:800;margin-bottom:2px}
-.stat-lbl{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em}
-.tabs-wrap{display:flex;gap:4px;border-bottom:1px solid #e5e7eb;margin-bottom:20px;flex-wrap:wrap}
-.tab{padding:10px 18px;font-size:13px;font-weight:600;border-radius:8px 8px 0 0;border:none;background:transparent;color:#6b7280;cursor:pointer;white-space:nowrap}
-.tab.active{border:1px solid #e5e7eb;border-bottom:1px solid #f9fafb;background:#f9fafb;color:#4338ca;margin-bottom:-1px;position:relative;z-index:1}
+.stat-num{font-size:2.8rem;font-weight:800;margin-bottom:4px}
+.stat-lbl{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em}
+.tabs-wrap{display:flex;gap:0;border-bottom:2px solid #e5e7eb;margin-bottom:20px;flex-wrap:nowrap;width:100%}
+.tab{padding:12px 0;font-size:13px;font-weight:600;border-radius:8px 8px 0 0;border:none;background:transparent;color:#6b7280;cursor:pointer;white-space:nowrap;flex:1;text-align:center}
+.tab.active{border:1px solid #e5e7eb;border-bottom:2px solid #f9fafb;background:#f9fafb;color:#4338ca;margin-bottom:-2px;position:relative;z-index:1}
 .tab-cnt{margin-left:5px;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;background:#f3f4f6;color:#6b7280}
 .tab.active .tab-cnt{background:#e0e7ff;color:#4338ca}
 .search-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
@@ -675,21 +675,23 @@ function renderStats(){
   var testingN = base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='cs in testing'; }); }).length
                + S.closedIssues.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='cs in testing'; }); }).length;
   var stats=[
-    {n:base.filter(function(i){ return !hasCSLabel(i); }).length,                                                                              l:'New Issues',       c:'#0891b2', tab:'newitems'},
-    {n:base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='production patch'; }); }).length,                  l:'Production Patch', c:'#dc2626', tab:'prod'},
-    {n:base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='uat patch'; }); }).length,                         l:'UAT Patch',        c:'#d97706', tab:'uat'},
-    {n:base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs task item'; }); }).length, l:'CS Items', c:'#4338ca', tab:'csitems'},
-    {n:testingN,                                                                                                                                l:'CS In Testing',    c:'#7c3aed', tab:'testing'},
-    {n:base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='cs task item'; }); }).length,                      l:'CS Task Items',    c:'#059669', tab:'taskitem'},
-    {n:getExceptions().length,                                                                                                                  l:'Exceptions',       c:'#b91c1c', tab:'exceptions'},
-    {n:S.closedIssues.length,                                                                                                                   l:'Recently Closed',  c:'#374151', tab:'closed'}
+    {n:base.filter(function(i){ return !hasCSLabel(i); }).length,                                                                                        tab:'newitems'},
+    {n:base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='production patch'; }); }).length,                            tab:'prod'},
+    {n:base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='uat patch'; }); }).length,                                   tab:'uat'},
+    {n:base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs task item'; }); }).length, tab:'csitems'},
+    {n:testingN,                                                                                                                                          tab:'testing'},
+    {n:base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='cs task item'; }); }).length,                                tab:'taskitem'},
+    {n:getExceptions().length,                                                                                                                            tab:'exceptions'},
+    {n:S.closedIssues.length,                                                                                                                             tab:'closed'}
   ];
   var html='';
   stats.forEach(function(s){
     if((s.tab==='prod'||s.tab==='uat')&&s.n===0) return;
-    html+='<div class="stat-card" style="border-top-color:'+s.c+'" onclick="switchTab(\''+s.tab+'\')" title="'+esc(s.l)+'">';
-    html+='<div class="stat-num" style="color:'+s.c+'">'+s.n+'</div>';
-    html+='<div class="stat-lbl">'+esc(s.l)+'</div></div>';
+    var def=TAB_DEFS.find(function(d){ return d.id===s.tab; });
+    var c=def?def.color:'#6b7280', l=def?def.label:s.tab;
+    html+='<div class="stat-card" style="border-top-color:'+c+'" onclick="switchTab(\''+s.tab+'\')" title="'+esc(l)+'">';
+    html+='<div class="stat-num" style="color:'+c+'">'+s.n+'</div>';
+    html+='<div class="stat-lbl">'+esc(l)+'</div></div>';
   });
   document.getElementById('statGrid').innerHTML=html;
 }
