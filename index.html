@@ -180,12 +180,17 @@ var TAB_DEFS = [
   {id:'uat',        label:'UAT Patch',        color:'#d97706'},
   {id:'csitems',    label:'CS Items',         color:'#4338ca'},
   {id:'testing',    label:'CS In Testing',    color:'#059669'},
-  {id:'taskitem',   label:'CS Task Items',    color:'#7c3aed'},
+  {id:'taskitem',   label:'CS Task Items',    color:'#7c3aed', labelKey:'cs task item'},
   {id:'exceptions', label:'Exceptions',       color:'#b91c1c'},
   {id:'closed',     label:'Recently Closed',  color:'#374151'},
   {id:'ignored',    label:'Ignored',          color:'#6b7280'},
   {id:'report',     label:'Weekly Report',    color:'#1e1b4b'}
 ];
+
+function tabColor(def){
+  if(def.labelKey&&S.labelColors[def.labelKey]) return '#'+S.labelColors[def.labelKey];
+  return def.color;
+}
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function zhIssueUrl(issue){
@@ -692,7 +697,7 @@ function renderStats(){
   stats.forEach(function(s){
     if((s.tab==='prod'||s.tab==='uat')&&s.n===0) return;
     var def=TAB_DEFS.find(function(d){ return d.id===s.tab; });
-    var c=def?def.color:'#6b7280', l=def?def.label:s.tab;
+    var c=tabColor(def), l=def?def.label:s.tab;
     html+='<div class="stat-card" style="border-top-color:'+c+'" onclick="switchTab(\''+s.tab+'\')" title="'+esc(l)+'">';
     html+='<div class="stat-num" style="color:'+c+'">'+s.n+'</div>';
     html+='<div class="stat-lbl">'+esc(l)+'</div></div>';
@@ -706,8 +711,8 @@ function buildTabs(){
   var html='';
   TAB_DEFS.forEach(function(t){
     if((t.id==='prod'&&prodN===0)||(t.id==='uat'&&uatN===0)) return;
-    var cnt=getTabIssues(t.id).length, active=S.activeTab===t.id;
-    html+='<button class="tab'+(active?' active':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+t.color:'')+'">'+esc(t.label)+'<span class="tab-cnt">'+cnt+'</span></button>';
+    var cnt=getTabIssues(t.id).length, active=S.activeTab===t.id, c=tabColor(t);
+    html+='<button class="tab'+(active?' active':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+c:'')+'">'+esc(t.label)+'<span class="tab-cnt">'+cnt+'</span></button>';
   });
   document.getElementById('tabsWrap').innerHTML=html;
 }
@@ -743,7 +748,7 @@ function renderExceptionReason(issue){
 
 function renderTable(issues,tab,def){
   var isClosed=tab==='closed', isIgnored=tab==='ignored', isTesting=tab==='testing', isExc=tab==='exceptions';
-  var color=def?def.color:'#374151', label=def?def.label:tab;
+  var color=def?tabColor(def):'#374151', label=def?def.label:tab;
   var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
   var html='<div class="group-hdr" style="background:'+color+'"><span class="gtitle">'+esc(label)+'<span class="gcnt">'+issues.length+'</span></span>';
   if(S.zhToken&&!isClosed&&!isIgnored&&pipes.length){
