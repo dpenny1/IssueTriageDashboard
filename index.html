@@ -107,9 +107,7 @@ tr:hover td{background:#f9fafb}
         <button class="btn-sm" onclick="toggleVault('gh')" id="vaultBtnGH" style="font-size:11px;padding:3px 9px">🔒 Use Vault</button>
       </label>
       <input type="password" id="ghToken" placeholder="ghp_..." onkeydown="if(event.key==='Enter')connect()"/>
-      <div id="vaultPanelGH" style="display:none">
-        <div class="vault-panel" id="vaultInnerGH"></div>
-      </div>
+      <div id="vaultPanelGH" style="display:none"><div class="vault-panel" id="vaultInnerGH"></div></div>
     </div>
     <div class="fg">
       <label style="display:flex;align-items:center;justify-content:space-between">
@@ -117,9 +115,7 @@ tr:hover td{background:#f9fafb}
         <button class="btn-sm" onclick="toggleVault('zh')" id="vaultBtnZH" style="font-size:11px;padding:3px 9px">🔒 Use Vault</button>
       </label>
       <input type="text" id="zhTokenInput" placeholder="Paste from app.zenhub.com → API Tokens" autocomplete="off"/>
-      <div id="vaultPanelZH" style="display:none">
-        <div class="vault-panel" id="vaultInnerZH"></div>
-      </div>
+      <div id="vaultPanelZH" style="display:none"><div class="vault-panel" id="vaultInnerZH"></div></div>
     </div>
     <input type="hidden" id="reposInput"/>
     <div id="setupErr" style="display:none"></div>
@@ -181,7 +177,7 @@ var TAB_DEFS=[
   {id:'report',label:'Weekly Report',color:'#1e1b4b'}
 ];
 
-// ── Token Vault ──────────────────────────────────────────────────────────────
+// ── Token Vault (single shared vault) ───────────────────────────────────────
 var Vault=(function(){
   var KEY='cis_vault_v1',_pw=null,_data=[];
   async function deriveKey(pw,salt){var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
@@ -191,11 +187,7 @@ var Vault=(function(){
   function save(d){localStorage.setItem(KEY,JSON.stringify(d));_data=d;}
   return{
     isUnlocked:function(){return _pw!==null;},
-    unlock:async function(pw){
-      var data=load();
-      if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}}
-      _pw=pw;_data=data;
-    },
+    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}}; _pw=pw;_data=data;},
     lock:function(){_pw=null;_data=[];},
     list:function(){return _data.map(function(e){return e.name;});},
     get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
@@ -205,102 +197,105 @@ var Vault=(function(){
 })();
 
 // ── Vault UI ─────────────────────────────────────────────────────────────────
-var _vaultTarget=null; // 'gh' or 'zh'
+var _activeVaultTarget=null;
 
 function toggleVault(target){
-  var sameTarget=_vaultTarget===target;
-  // Close both panels first
-  ['gh','zh'].forEach(function(t){
-    document.getElementById('vaultPanel'+t.toUpperCase()).style.display='none';
-    document.getElementById('vaultBtn'+t.toUpperCase()).textContent='🔒 Use Vault';
+  // If same target already open, close it
+  if(_activeVaultTarget===target){
+    _activeVaultTarget=null;
+    document.getElementById('vaultPanel'+target.toUpperCase()).style.display='none';
+    document.getElementById('vaultBtn'+target.toUpperCase()).textContent='🔒 Use Vault';
+    return;
+  }
+  // Close any open panel
+  ['GH','ZH'].forEach(function(t){
+    document.getElementById('vaultPanel'+t).style.display='none';
+    document.getElementById('vaultBtn'+t).textContent='🔒 Use Vault';
   });
-  if(sameTarget){_vaultTarget=null;return;}
-  _vaultTarget=target;
-  var panelId='vaultPanel'+target.toUpperCase();
-  var innerId='vaultInner'+target.toUpperCase();
-  document.getElementById(panelId).style.display='block';
+  _activeVaultTarget=target;
+  document.getElementById('vaultPanel'+target.toUpperCase()).style.display='block';
   document.getElementById('vaultBtn'+target.toUpperCase()).textContent='✖ Close';
-  renderVaultPanel(innerId,target);
+  renderVaultPanel(target);
 }
 
-function renderVaultPanel(innerId,target){
-  var el=document.getElementById(innerId);
+function renderVaultPanel(target){
+  var el=document.getElementById('vaultInner'+target.toUpperCase());
   var h='';
   if(!Vault.isUnlocked()){
     h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">🔒 Unlock Vault</div>';
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
-    h+='<input type="password" id="vaultPwInput_'+target+'" placeholder="Master password..." style="flex:1;min-width:160px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')vaultUnlock(\''+target+'\')"/>';
-    h+='<button class="btn-sm" onclick="vaultUnlock(\''+target+'\')">Unlock</button>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+    h+='<input type="password" id="vaultPw" placeholder="Master password..." style="flex:1;min-width:160px;padding:8px 12px;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')vaultUnlock(\''+target+'\')"/>';
+    h+='<button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="vaultUnlock(\''+target+'\')">Unlock</button>';
     h+='</div>';
-    h+='<div id="vaultErr_'+target+'" style="font-size:12px;color:#dc2626;margin-top:6px;min-height:16px"></div>';
-    h+='<div class="hint">New vault? Enter a password to create one.</div>';
+    h+='<div id="vaultErr" style="font-size:12px;color:#dc2626;margin-top:6px;min-height:16px"></div>';
+    h+='<div class="hint">New vault? Enter any password to create one.</div>';
   } else {
     var tokens=Vault.list();
     h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
-    h+='<span style="font-size:13px;font-weight:600;color:#374151">🔓 Vault Unlocked</span>';
-    h+='<button class="btn-sm" onclick="vaultLock(\''+target+'\')">🔒 Lock</button>';
+    h+='<span style="font-size:13px;font-weight:600;color:#374151">🔓 Select a token to use</span>';
+    h+='<div style="display:flex;gap:6px"><button class="btn-sm" onclick="vaultManageToggle()">⚙ Manage</button><button class="btn-sm" onclick="vaultLockAll()">🔒 Lock</button></div>';
     h+='</div>';
     if(tokens.length){
-      h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
+      h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">';
       tokens.forEach(function(name){
-        h+='<div class="vault-chip" style="cursor:pointer" onclick="vaultUse(\''+target+'\',\''+esc(name)+'\')">'+esc(name)+' <span style="font-size:10px;opacity:0.7">▶ Use</span></div>';
+        h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(name)+'\')" title="Click to use this token">'+esc(name)+' ▶</button>';
       });
       h+='</div>';
     } else {
-      h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:10px">No tokens saved yet.</div>';
+      h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">No tokens saved yet — add one below.</div>';
     }
-    h+='<div style="border-top:1px solid #e0e7ff;padding-top:10px;margin-top:4px">';
-    h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Save a new token</div>';
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
-    h+='<input type="text" id="vaultNewName_'+target+'" placeholder="Name" style="width:130px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>';
+    // Always show add form
+    h+='<div id="vaultManage">';
+    h+='<div style="border-top:1px solid #e0e7ff;padding-top:10px;margin-top:6px">';
+    h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Add New Token</div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+    h+='<input type="text" id="vaultNewName_'+target+'" placeholder="Name (e.g. GitHub Prod)" style="width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>';
     h+='<input type="password" id="vaultNewTok_'+target+'" placeholder="Token value" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>';
     h+='<button class="btn-sm" onclick="vaultSave(\''+target+'\')">＋ Save</button>';
     h+='</div>';
     h+='<div id="vaultSaveMsg_'+target+'" style="font-size:12px;margin-top:5px;min-height:16px"></div>';
     if(tokens.length){
-      h+='<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px">';
-      tokens.forEach(function(name){h+='<button class="btn-sm" style="font-size:11px;border-color:#fca5a5;color:#dc2626" onclick="vaultDel(\''+target+'\',\''+esc(name)+'\')">✕ '+esc(name)+'</button>';});
+      h+='<div style="font-size:12px;font-weight:600;color:#374151;margin:8px 0 4px">Saved Tokens</div>';
+      h+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
+      tokens.forEach(function(name){h+='<div style="display:flex;align-items:center;gap:4px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:7px;padding:3px 8px;font-size:12px"><span style="font-weight:600">'+esc(name)+'</span><button class="btn-sm" style="border-color:#fca5a5;color:#dc2626;padding:1px 6px;font-size:11px" onclick="vaultDel(\''+target+'\',\''+esc(name)+'\')">✕</button></div>';});
       h+='</div>';
     }
-    h+='</div>';
+    h+='</div></div>';
   }
   el.innerHTML=h;
 }
 
 async function vaultUnlock(target){
-  var pw=document.getElementById('vaultPwInput_'+target).value;
-  var errEl=document.getElementById('vaultErr_'+target);
+  var pw=document.getElementById('vaultPw').value;
+  var errEl=document.getElementById('vaultErr');
   errEl.textContent='';
   if(!pw){errEl.textContent='Enter a password.';return;}
-  try{
-    await Vault.unlock(pw);
-    renderVaultPanel('vaultInner'+target.toUpperCase(),target);
-  }catch(e){errEl.textContent=e.message;}
+  try{await Vault.unlock(pw);renderVaultPanel(target);}
+  catch(e){errEl.textContent=e.message;}
 }
-function vaultLock(target){Vault.lock();renderVaultPanel('vaultInner'+target.toUpperCase(),target);}
+function vaultLockAll(){Vault.lock();['GH','ZH'].forEach(function(t){document.getElementById('vaultPanel'+t).style.display='none';document.getElementById('vaultBtn'+t).textContent='🔒 Use Vault';});_activeVaultTarget=null;}
 async function vaultUse(target,name){
   try{
     var tok=await Vault.get(name);
-    if(target==='gh'){document.getElementById('ghToken').value=tok;}
-    else{document.getElementById('zhTokenInput').value=tok;}
+    if(target==='gh')document.getElementById('ghToken').value=tok;
+    else document.getElementById('zhTokenInput').value=tok;
     toggleVault(target); // close panel
-  }catch(e){alert('Failed to decrypt token: '+e.message);}
+  }catch(e){alert('Failed to decrypt: '+e.message);}
 }
 async function vaultSave(target){
   var name=document.getElementById('vaultNewName_'+target).value.trim();
   var tok=document.getElementById('vaultNewTok_'+target).value.trim();
   var msgEl=document.getElementById('vaultSaveMsg_'+target);
-  if(!name||!tok){msgEl.style.color='#dc2626';msgEl.textContent='Name and token required.';return;}
+  if(!name||!tok){msgEl.style.color='#dc2626';msgEl.textContent='Name and token are required.';return;}
   try{
     await Vault.add(name,tok);
     msgEl.style.color='#059669';msgEl.textContent='"'+name+'" saved!';
-    setTimeout(function(){renderVaultPanel('vaultInner'+target.toUpperCase(),target);},800);
+    setTimeout(function(){renderVaultPanel(target);},600);
   }catch(e){msgEl.style.color='#dc2626';msgEl.textContent=e.message;}
 }
 function vaultDel(target,name){
   if(!confirm('Delete "'+name+'" from vault?'))return;
-  Vault.del(name);
-  renderVaultPanel('vaultInner'+target.toUpperCase(),target);
+  Vault.del(name);renderVaultPanel(target);
 }
 
 // ── Core helpers ─────────────────────────────────────────────────────────────
