@@ -117,7 +117,7 @@ tr:hover td{background:#f9fafb}
 
 <div id="dash">
   <div class="header"><div class="header-inner">
-    <div><h1>&#x1F4CB; CS Issues Hub</h1><p id="dashMeta">Loading...</p></div>
+    <div><h1 id="dashTitle">&#x1F4CB; CS Issues Hub</h1><p id="dashMeta">Loading...</p></div>
     <div class="header-btns">
       <span id="loadedAt" style="color:#c7d2fe;font-size:12px"></span>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-white">&#x1F6E0; PM Tools</a>
@@ -367,11 +367,24 @@ async function loadZHDependencies(){
 
 function repoForId(repoId){return Object.keys(S.repoIds).find(function(r){return S.repoIds[r]===repoId;})||null;}
 
+async function ghFetchAll(path){
+  var results=[],page=1,per=100;
+  while(true){
+    var sep=path.indexOf('?')!==-1?'&':'?';
+    var batch=await ghFetch(path+sep+'per_page='+per+'&page='+page);
+    if(!Array.isArray(batch)||!batch.length)break;
+    results=results.concat(batch);
+    if(batch.length<per)break;
+    page++;
+  }
+  return results;
+}
+
 async function loadIssues(){
   var open=[],closed=[];
   for(var i=0;i<S.repos.length;i++){
     var repo=S.repos[i];
-    var od=await ghFetch('/repos/'+repo+'/issues?state=open&per_page=100');
+    var od=await ghFetchAll('/repos/'+repo+'/issues?state=open');
     od.forEach(function(iss){
       if(iss.pull_request)return;
       open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',
@@ -380,20 +393,24 @@ async function loadIssues(){
         createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,
         parent:iss.parent_issue_url?{url:iss.parent_issue_url}:null});
     });
-    var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&per_page=50&sort=updated&direction=desc');
-    cd.forEach(function(iss){
-      if(iss.pull_request)return;
+    var cd=await ghFetchAll('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc');
+    var count=0;
+    for(var j=0;j<cd.length;j++){
+      var iss=cd[j];
+      if(iss.pull_request)continue;
       var lbls=iss.labels.map(function(l){return l.name;});
-      if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))return;
-      if(lbls.some(function(l){return l.toLowerCase()==='cs in testing';}))return;
+      if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))continue;
+      if(lbls.some(function(l){return l.toLowerCase()==='cs in testing';}))continue;
       closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',
         labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),
         createdAt:iss.created_at,closedAt:iss.closed_at,url:iss.html_url,state:'closed',pipeline:null,parent:null});
-    });
+      if(++count>=50)break;
+    }
   }
   S.issues=open;
   S.closedIssues=closed.sort(function(a,b){return new Date(a.closedAt)-new Date(b.closedAt);});
-  document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
+  var projName=S.activeProfile?S.activeProfile.name:'';
+      document.getElementById('dashTitle').textContent=(S.activeProfile?S.activeProfile.name+' Issues':'CS Issues Hub');
   document.getElementById('loadedAt').textContent='Loaded '+new Date().toLocaleTimeString();
 }
 
@@ -669,7 +686,7 @@ function importCSV(){
       var start=lines[0].toLowerCase().indexOf('date')!==-1?1:0,imported=[],skipped=0;
       for(var i=start;i<lines.length;i++){
         var cols=lines[i].split(',');
-        if(cols.length<9){skipped++;continue;}
+        if(cols.length<8){skipped++;continue;}
         var row={date:(cols[0]||'').trim(),tracking:(cols[1]||'').trim(),total:parseInt(cols[2])||0,closed:parseInt(cols[4])||0,closedPR:parseInt(cols[5])||0,closedManual:parseInt(cols[6])||0,noIssue:parseInt(cols[7])||0,open:parseInt(cols[8])||0};
         if(!row.date){skipped++;continue;}
         imported.push(row);
