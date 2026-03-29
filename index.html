@@ -81,6 +81,8 @@ tr:hover td{background:#f9fafb}
 @keyframes sp{to{transform:rotate(360deg)}}
 .settings-panel{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px 24px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
 .pipe-select{font-size:11px;padding:3px 7px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#374151;cursor:pointer}
+.auto-closed-items{display:flex;flex-direction:column;gap:3px}
+.auto-closed-item{font-size:11px;background:#fff3cd;border:1px solid #ffc107;border-radius:5px;padding:3px 7px;color:#7a4f00;max-width:280px;word-break:break-word}
 #setup,#configureScreen,#dash{display:none}
 </style>
 </head>
@@ -193,8 +195,32 @@ function ageCls(d){ return d<3?'age-ok':d<7?'age-warn':'age-old'; }
 function todayStr(){ var d=new Date(); return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear(); }
 function hasCSLabel(i){ return i.labels.some(function(l){ return CS_LABELS.indexOf(l.toLowerCase())!==-1; }); }
 function isReportTracking(t){ var l=t.toLowerCase(); return l.indexOf('cs ')===0&&l.indexOf('research')===-1; }
-function isException(issue){ return issue.state==='open'&&hasCSLabel(issue)&&!issue.parent; }
 function locSort(a,b){ return a.toLowerCase().localeCompare(b.toLowerCase()); }
+
+// Returns array of checklist item texts that were auto-closed (checked via PR)
+function getAutoClosedItems(issue){
+  var isTaskItem=issue.labels.some(function(l){ return l.toLowerCase()==='cs task item'; });
+  if(!isTaskItem||issue.state!=='open') return [];
+  var secs=parseChecklists(issue.body);
+  var hits=[];
+  secs.forEach(function(s){
+    s.items.forEach(function(item){
+      if(item.checked&&item.hasPR) hits.push(item.text);
+    });
+  });
+  return hits;
+}
+
+function isException(issue){
+  // Original rule: open CS-labelled issue with no parent
+  if(issue.state==='open'&&hasCSLabel(issue)&&!issue.parent) return true;
+  // New rule: open CS Task Item with any checklist item auto-closed via PR
+  if(issue.state==='open'){
+    var autoItems=getAutoClosedItems(issue);
+    if(autoItems.length>0) return true;
+  }
+  return false;
+}
 
 function sortLabels(labels){
   var csItem  = labels.filter(function(l){ return l.toLowerCase()==='cs item'; });
@@ -263,14 +289,12 @@ function renderConfigureScreen(){
     html+='<div class="empty-state" style="margin-bottom:20px">No projects yet.</div>';
   }
 
-  // Add forms — tabbed
   html+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">';
   html+='<div style="display:flex;gap:8px;margin-bottom:16px">';
   html+='<button class="btn-sm" id="cfgTabSingle" onclick="showCfgTab(\'single\')" style="background:#4338ca;color:#fff;border-color:#4338ca">Individual project</button>';
   html+='<button class="btn-sm" id="cfgTabGroup" onclick="showCfgTab(\'group\')">Group project</button>';
   html+='</div>';
 
-  // Single
   html+='<div id="cfgSingle">';
   html+='<div style="font-size:13px;font-weight:700;color:#1e1b4b;margin-bottom:12px">Add individual project</div>';
   html+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Display name</label><input type="text" id="pName" placeholder="e.g. Phoenix" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
@@ -279,7 +303,6 @@ function renderConfigureScreen(){
   html+='<div id="profileFormErr" style="display:none;margin-top:8px"></div>';
   html+='<div style="margin-top:14px"><button class="btn-primary" onclick="saveNewProfile()">Add project</button></div></div>';
 
-  // Group
   html+='<div id="cfgGroup" style="display:none">';
   html+='<div style="font-size:13px;font-weight:700;color:#1e1b4b;margin-bottom:12px">Add group project</div>';
   html+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Group name</label><input type="text" id="gName" placeholder="e.g. All Products" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
@@ -383,7 +406,6 @@ async function connect(){
   S.ghToken=gh;
   S.repos=rp.split(',').map(function(r){ return r.trim(); }).filter(Boolean);
   S.ignored=loadIgnored(); loadZHCreds();
-  // For group profiles, store per-repo workspace mapping
   S.repoWorkspaceMap={};
   if(S.activeProfile){
     if(S.activeProfile.type==='group'){
@@ -596,6 +618,20 @@ function switchTab(name){
 function ignoreIssue(key){ if(S.ignored.indexOf(key)===-1) S.ignored.push(key); saveIgnored(); buildTabs(); renderMain(); }
 function unignoreIssue(key){ S.ignored=S.ignored.filter(function(k){ return k!==key; }); saveIgnored(); buildTabs(); renderMain(); }
 
+function renderExceptionReason(issue){
+  var autoItems=getAutoClosedItems(issue);
+  if(autoItems.length>0){
+    var html='<div class="auto-closed-items">';
+    html+='<div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">&#x26A0; Auto-closed via PR:</div>';
+    autoItems.forEach(function(txt){
+      html+='<div class="auto-closed-item">'+esc(txt)+'</div>';
+    });
+    html+='</div>';
+    return html;
+  }
+  return '<span class="badge" style="background:#fee2e2;color:#991b1b">&#9888; No parent</span>';
+}
+
 function renderTable(issues,tab,def){
   var isClosed=tab==='closed', isIgnored=tab==='ignored', isTesting=tab==='testing', isExc=tab==='exceptions';
   var color=def?def.color:'#374151', label=def?def.label:tab;
@@ -611,7 +647,7 @@ function renderTable(issues,tab,def){
   if(S.repos.length>1) html+=th('repo','Repo');
   html+='<th>Assignee</th>';
   if(isTesting) html+='<th>Status</th>';
-  if(isExc) html+='<th>Exception</th>';
+  if(isExc) html+='<th>Exception reason</th>';
   if(S.zhToken) html+='<th>Pipeline</th>';
   html+=(isClosed?th('closed','Closed'):th('age','Age'))+'<th></th></tr></thead><tbody>';
   if(!issues.length){ html+='<tr><td colspan="99" class="empty-row">No issues found.</td></tr>'; }
@@ -619,6 +655,7 @@ function renderTable(issues,tab,def){
     var ikey=issue.id+'_'+issue.repo;
     var days=issue.state==='closed'?null:ageInDays(issue.createdAt);
     var isOpenTesting=isTesting&&issue.state==='open';
+    var hasAutoClosed=isExc&&getAutoClosedItems(issue).length>0;
     html+='<tr'+(isOpenTesting||isExc?' style="background:#fff5f5"':'')+'>'; 
     html+='<td style="color:#6b7280;font-size:12px">#'+issue.id+'</td>';
     html+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
@@ -628,7 +665,7 @@ function renderTable(issues,tab,def){
     if(S.repos.length>1) html+='<td style="font-size:12px;color:#6b7280">'+esc(issue.repo.split('/')[1])+'</td>';
     html+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
     if(isTesting) html+='<td>'+(isOpenTesting?'<span class="open-flag">&#9888; Should be closed</span>':'<span class="badge" style="background:#d1fae5;color:#065f46">Closed</span>')+'</td>';
-    if(isExc) html+='<td><span class="badge" style="background:#fee2e2;color:#991b1b">&#9888; No parent</span></td>';
+    if(isExc) html+='<td style="min-width:220px">'+renderExceptionReason(issue)+'</td>';
     if(S.zhToken){
       var rp=S.zhPipelines[issue.repo]||[], cur=issue.pipeline?issue.pipeline.pipelineId:'', curN=issue.pipeline?issue.pipeline.pipelineName:'—';
       if(rp.length&&issue.state==='open'){
