@@ -225,15 +225,17 @@ function isNewIssuesPipeline(issue){
   return issue.pipeline&&issue.pipeline.pipelineName.toLowerCase()==='new issues';
 }
 
+function isExceptionExempt(issue){
+  var t=issue.title.toLowerCase();
+  return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;
+}
+
 function isException(issue){
   if(issue.state!=='open') return false;
-  // Has a parent = properly tracked, never an exception
   if(issue.parent) return false;
-  // CS-labelled issue with no parent = exception
+  if(isExceptionExempt(issue)) return false;
   if(hasCSLabel(issue)) return true;
-  // CS Task Item with a checklist item auto-closed via PR and no parent = exception
   if(getAutoClosedItems(issue).length>0) return true;
-  // Sitting in "New Issues" pipeline with no parent = exception
   if(isNewIssuesPipeline(issue)) return true;
   return false;
 }
