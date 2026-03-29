@@ -515,14 +515,22 @@ function repoForId(repoId){
 }
 
 async function showZHDebug(){
-  var issueNum=prompt('Enter an issue number to inspect (one that should have a parent):');
-  if(!issueNum) return;
-  issueNum=parseInt(issueNum);
+  var issueNum=prompt('Enter an issue number to inspect (one that should have a parent):\n\nLeave blank to just list your ZenHub workspaces.');
   var repo=S.repos[0];
   var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;
   var repoId=S.repoIds[repo];
-  if(!ws||!repoId){ alert('ZenHub not connected.'); return; }
   var out={};
+
+  // Always fetch workspaces so user can verify the correct ID
+  try{
+    var wsList=await zhGet('/p2/workspaces');
+    out['YOUR_WORKSPACES']=wsList;
+  } catch(e){ out['YOUR_WORKSPACES']='ERROR: '+e.message; }
+
+  if(!issueNum){ var win=window.open('','_blank'); win.document.write('<pre style="font-size:12px;padding:16px;white-space:pre-wrap">'+JSON.stringify(out,null,2)+'</pre>'); return; }
+
+  issueNum=parseInt(issueNum);
+  if(!ws||!repoId){ alert('ZenHub not connected.'); return; }
   var paths=[
     '/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueNum,
     '/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueNum+'/relationships',
@@ -532,7 +540,6 @@ async function showZHDebug(){
     try{ out[paths[i]]=await zhGet(paths[i]); }
     catch(e){ out[paths[i]]='ERROR: '+e.message; }
   }
-  // Check if this issue is in any epic
   try{
     var epicsData=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');
     var foundInEpics=[];
@@ -546,6 +553,7 @@ async function showZHDebug(){
     }
     out['foundInEpics']=foundInEpics;
   } catch(e){ out['epicSearch']='ERROR: '+e.message; }
+
   var win=window.open('','_blank');
   win.document.write('<pre style="font-size:12px;padding:16px;white-space:pre-wrap">'+JSON.stringify(out,null,2)+'</pre>');
 }
