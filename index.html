@@ -189,6 +189,13 @@ var TAB_DEFS = [
 ];
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function zhIssueUrl(issue){
+  var ws=S.repoWorkspaceMap&&S.repoWorkspaceMap[issue.repo]?S.repoWorkspaceMap[issue.repo]:S.zhWorkspace;
+  var parts=issue.repo.split('/');
+  var owner=parts[0], repo=parts[1];
+  if(ws) return 'https://app.zenhub.com/workspaces/'+ws+'/issues/'+owner+'/'+repo+'/'+issue.id;
+  return 'https://app.zenhub.com/issues/'+owner+'/'+repo+'/'+issue.id;
+}
 function lum(hex){ hex=(hex||'cccccc').replace('#',''); if(hex.length===3) hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2]; var r=parseInt(hex.substr(0,2),16)/255,g=parseInt(hex.substr(2,2),16)/255,b=parseInt(hex.substr(4,2),16)/255; return 0.2126*r+0.7152*g+0.0722*b; }
 function textForBg(hex){ return lum(hex)>0.45?'#1a1a1a':'#ffffff'; }
 function labelBadge(name){ var c=S.labelColors[name.toLowerCase()]||'e5e7eb'; return '<span class="badge" style="background:#'+c+';color:'+textForBg(c)+'">'+esc(name)+'</span>'; }
@@ -457,7 +464,36 @@ async function loadZHData(){
       });
     } catch(e){}
   }
+  // Apply pipeline data
   S.issues.forEach(function(i){ var m=S.zhIssueMap[i.id+'_'+i.repo]; if(m) i.pipeline=m; });
+  // Load parent/child relationships for each repo
+  await loadZHDependencies();
+}
+
+async function loadZHDependencies(){
+  for(var i=0;i<S.repos.length;i++){
+    var repo=S.repos[i];
+    var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;
+    var repoId=S.repoIds[repo];
+    if(!S.zhToken||!ws||!repoId) continue;
+    try{
+      var deps=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/dependencies');
+      (deps.dependencies||[]).forEach(function(dep){
+        // ZenHub dependency: { blocking: {issue_number, repo_id}, blocked: {issue_number, repo_id} }
+        // "blocking" = parent, "blocked" = child
+        var parentNum=dep.blocking.issue_number;
+        var childNum=dep.blocked.issue_number;
+        var childRepo=repoForId(dep.blocked.repo_id)||repo;
+        var child=S.issues.find(function(iss){ return iss.id===childNum&&iss.repo===childRepo; });
+        if(child) child.parent={issueNumber:parentNum, repoId:dep.blocking.repo_id};
+      });
+    } catch(e){}
+  }
+}
+
+function repoForId(repoId){
+  var match=Object.keys(S.repoIds).find(function(r){ return S.repoIds[r]===repoId; });
+  return match||null;
 }
 
 async function loadIssues(){
@@ -673,7 +709,7 @@ function renderTable(issues,tab,def){
     var hasAutoClosed=isExc&&getAutoClosedItems(issue).length>0;
     html+='<tr'+(isOpenTesting||isExc?' style="background:#fff5f5"':'')+'>'; 
     html+='<td style="color:#6b7280;font-size:12px">#'+issue.id+'</td>';
-    html+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
+    html+='<td style="min-width:200px"><a href="'+esc(zhIssueUrl(issue))+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
     html+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';
     sortLabels(issue.labels).forEach(function(l){ html+=labelBadge(l); });
     html+='</div></td>';
