@@ -92,6 +92,7 @@ tr:hover td{background:#f9fafb}
   <div class="header">
     <div class="header-inner">
       <div><h1>&#x1F4CB; CS GitHub Issues Hub</h1><p>Select a project to get started</p></div>
+      <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-white">&#x1F6E0; PM Tools</a>
     </div>
   </div>
   <div class="main">
@@ -137,6 +138,7 @@ tr:hover td{background:#f9fafb}
       <div><h1>&#x1F4CB; CS GitHub Issues Hub</h1><p id="dashMeta">Loading...</p></div>
       <div class="header-btns">
         <span id="loadedAt" style="color:#c7d2fe;font-size:12px"></span>
+        <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-white">&#x1F6E0; PM Tools</a>
         <button class="btn btn-white" onclick="showSetup()">&#x21BA; Reconnect</button>
         <button class="btn btn-white" id="refreshBtn" onclick="doRefresh()">&#x21BB; Refresh</button>
         <button class="btn btn-white" onclick="toggleSettings()">&#x2699;&#xFE0F; ZenHub</button>
@@ -211,6 +213,10 @@ function getAutoClosedItems(issue){
   return hits;
 }
 
+function isNewIssuesPipeline(issue){
+  return issue.pipeline&&issue.pipeline.pipelineName.toLowerCase()==='new issues';
+}
+
 function isException(issue){
   // Never flag issues that have a parent
   if(issue.parent) return false;
@@ -221,6 +227,8 @@ function isException(issue){
     var autoItems=getAutoClosedItems(issue);
     if(autoItems.length>0) return true;
   }
+  // New rule: issue sitting in "New Issues" pipeline
+  if(issue.state==='open'&&isNewIssuesPipeline(issue)) return true;
   return false;
 }
 
@@ -621,17 +629,22 @@ function ignoreIssue(key){ if(S.ignored.indexOf(key)===-1) S.ignored.push(key); 
 function unignoreIssue(key){ S.ignored=S.ignored.filter(function(k){ return k!==key; }); saveIgnored(); buildTabs(); renderMain(); }
 
 function renderExceptionReason(issue){
+  var parts=[];
   var autoItems=getAutoClosedItems(issue);
   if(autoItems.length>0){
     var html='<div class="auto-closed-items">';
     html+='<div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">&#x26A0; Auto-closed via PR:</div>';
-    autoItems.forEach(function(txt){
-      html+='<div class="auto-closed-item">'+esc(txt)+'</div>';
-    });
+    autoItems.forEach(function(txt){ html+='<div class="auto-closed-item">'+esc(txt)+'</div>'; });
     html+='</div>';
-    return html;
+    parts.push(html);
   }
-  return '<span class="badge" style="background:#fee2e2;color:#991b1b">&#9888; No parent</span>';
+  if(isNewIssuesPipeline(issue)){
+    parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">&#9888; Still in New Issues pipeline</span>');
+  }
+  if(!parts.length){
+    parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">&#9888; No parent</span>');
+  }
+  return parts.join('<div style="margin-top:4px"></div>');
 }
 
 function renderTable(issues,tab,def){
