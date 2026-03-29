@@ -130,7 +130,6 @@ tr:hover td{background:#f9fafb}
   </div></div>
   <div class="main">
     <div id="settingsPanel" style="display:none"></div>
-    <div id="zhBanner"></div>
     <div class="sgrid" id="statGrid"></div>
     <div class="tw" id="tabsWrap"></div>
     <div class="sb" id="searchBar">
@@ -171,7 +170,10 @@ function ageDays(d){return Math.floor((Date.now()-new Date(d).getTime())/8640000
 function ageCls(d){return d<3?'ao':d<7?'aw':'ab';}
 function todayStr(){var d=new Date();return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
 function hasCS(i){return i.labels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});}
-function isRptTrk(t){var l=t.toLowerCase();return l.indexOf('cs ')===0&&l.indexOf('research')===-1;}
+function isRptTrk(t){
+  var l=t.toLowerCase().trim();
+  return l.indexOf('cs ')===0&&l.indexOf('research')===-1;
+}
 function lsort(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}
 function sortLbls(labels){
   var a=labels.filter(function(l){return l.toLowerCase()==='cs item';});
@@ -479,7 +481,13 @@ async function loadIssues(){
 function getAutoClosedItems(issue){
   if(!issue.labels.some(function(l){return l.toLowerCase()==='cs task item';})||issue.state!=='open')return[];
   var hits=[];
-  parseChecklists(issue.body).forEach(function(s){s.items.forEach(function(item){if(item.checked&&item.hasPR)hits.push(item.text);});});
+  (issue.body||'').split('\n').forEach(function(line){
+    var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
+    if(chk){
+      var text=chk[1].trim();
+      if(/#\d+/.test(text))hits.push(text);
+    }
+  });
   return hits;
 }
 function isNIP(issue){return issue.pipeline&&issue.pipeline.pipelineName.toLowerCase()==='new issues';}
@@ -722,7 +730,6 @@ function renderZHBanner(){
 
 function renderMain(){
   renderStats();buildTabs();hideErr('dashErr');
-  renderZHBanner();
   if(S.activeTab==='report'){renderReport();return;}
   var def=TAB_DEFS.find(function(d){return d.id===S.activeTab;});
   document.getElementById('mainContent').innerHTML=renderTable(applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab)),S.activeTab,def);
@@ -790,7 +797,7 @@ function renderReport(){
   if(!snap){
     var anyTracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
     var msg=anyTracking.length
-      ?'Found '+anyTracking.length+' CS Task Item issue(s) but none match the title filter (must start with "CS " and not contain "research"). Titles: '+anyTracking.map(function(i){return '"'+i.title+'"';}).join(', ')
+      ?'Found '+anyTracking.length+' CS Task Item issue(s) but none start with "CS " (excluding research). Titles: '+anyTracking.map(function(i){return '"'+i.title+'"';}).join(', ')
       :'No open issues with the "CS Task Item" label found.';
     h+='<div style="color:#9ca3af;font-size:13px">'+esc(msg)+'</div>';
   }
@@ -842,9 +849,44 @@ function checklistStats(sections){
   sections.forEach(function(s){s.items.forEach(function(i){t++;if(i.checked){if(i.hasPR)cPR++;else cM++;}if(i.hasIssue)wi++;if(!i.hasIssue&&!i.checked)fu++;});});
   return{total:t,checked:cPR+cM,checkedPR:cPR,checkedManual:cM,withIssue:wi,future:fu,open:t-cPR-cM};
 }
+function delRptRow(idx){if(!confirm('Remove this row?'))return;var h=loadHistory();h.splice(idx,1);saveHistory(h);renderReport();}
+
+function importCSV(){
+  var inp=document.createElement('input');inp.type='file';inp.accept='.csv';
+  inp.onchange=function(e){
+    var file=e.target.files[0];if(!file)return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var lines=ev.target.result.split('\n').map(function(l){return l.trim();}).filter(Boolean);
+      if(!lines.length){alert('Empty file.');return;}
+      var start=lines[0].toLowerCase().indexOf('date')!==-1?1:0,imported=[],skipped=0;
+      for(var i=start;i<lines.length;i++){
+        var cols=lines[i].split(',');
+        if(cols.length<5){skipped++;continue;}
+        var row={date:(cols[0]||'').trim(),tracking:(cols[1]||'').trim(),total:parseInt(cols[2])||0,closed:parseInt(cols[3])||0,open:parseInt(cols[4])||0,noIssue:parseInt(cols[5])||0};
+        if(!row.date){skipped++;continue;}
+        imported.push(row);
+      }
+      if(!imported.length){alert('No valid rows found.');return;}
+      var history=loadHistory(),existing={},added=0,dupes=0;
+      history.forEach(function(r){existing[r.date]=1;});
+      imported.forEach(function(r){if(existing[r.date])dupes++;else{history.push(r);added++;}});
+      history.sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+      saveHistory(history);
+      alert('Imported '+added+' row(s).'+(dupes?' Skipped '+dupes+' duplicate(s).':''));
+      renderReport();
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+}
+
 function exportCSV(){
-  var history=loadHistory(),rows=['Date,Tracking Issues,Total Tasks,Net Change,Closed,Via PR,Manual Approval,No Issue Raised,Open'];
-  history.forEach(function(row,i){var prev=i>0?history[i-1]:null,net=prev!==null?row.total-prev.total:'';rows.push([row.date,row.tracking,row.total,net,row.closed,row.closedPR||0,row.closedManual||0,row.noIssue,row.open].join(','));});
+  var history=loadHistory(),rows=['Date,Tracking Issues,Total,Closed,Open,No Issue Raised'];
+  history.forEach(function(row,i){
+    var prev=i>0?history[i-1]:null,net=prev!==null?row.total-prev.total:'';
+    rows.push([row.date,row.tracking,row.total,row.closed,row.open,row.noIssue||0].join(','));
+  });
   var blob=new Blob([rows.join('\n')],{type:'text/csv'}),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='cs_report.csv';a.click();
 }
