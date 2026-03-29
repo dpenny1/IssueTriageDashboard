@@ -475,20 +475,33 @@ async function loadZHDependencies(){
     var repoId=S.repoIds[repo];
     if(!S.zhToken||!ws||!repoId) continue;
     try{
-      // Fetch all epics for this repo
+      // Get all epics
       var epicsData=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');
       var epics=epicsData.epic_issues||[];
-      // For each epic, fetch its issues (children)
       for(var j=0;j<epics.length;j++){
         var epicNum=epics[j].issue_number;
         var epicRepoId=epics[j].repo_id||repoId;
         try{
           var epicDetail=await zhGet('/p2/workspaces/'+ws+'/repositories/'+epicRepoId+'/epics/'+epicNum);
+          // Every issue returned here is a child at any level — mark them all
           (epicDetail.issues||[]).forEach(function(child){
             var childRepo=repoForId(child.repo_id)||repo;
             var childIssue=S.issues.find(function(iss){ return iss.id===child.issue_number&&iss.repo===childRepo; });
             if(childIssue) childIssue.parent={issueNumber:epicNum,repoId:epicRepoId};
           });
+        } catch(e){}
+      }
+      // Also check issue-level parent relationships via the sub-issues endpoint
+      // so issues that are children of non-epic issues are also covered
+      for(var k=0;k<S.issues.length;k++){
+        var iss=S.issues[k];
+        if(iss.repo!==repo||iss.parent) continue;
+        try{
+          var rel=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+iss.id+'/relationships');
+          var hasParent=(rel.relationships||[]).some(function(r){
+            return r.type==='parentof'||r.type==='parent'||r.role==='child';
+          });
+          if(hasParent) iss.parent={issueNumber:'unknown',repoId:repoId};
         } catch(e){}
       }
     } catch(e){}
