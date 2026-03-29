@@ -5,36 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>CS Issues Hub</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>"/>
-<!-- ── Vault styles ── -->
 <style>
-.tv-bar{background:white;border:1px solid #e5e7eb;border-radius:14px;padding:20px 24px;margin-bottom:28px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
-.tv-bar label{font-size:15px;font-weight:600;display:block;margin-bottom:8px;color:#374151}
-.tv-locked,.tv-unlocked{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.tv-unlocked{display:none;flex-direction:column;align-items:stretch}
-.tv-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.tv-bar input[type=password],.tv-bar input[type=text],.tv-bar select{padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;background:white}
-.tv-bar select{flex:1;min-width:200px}
-.tv-bar input.tv-wide{flex:1;min-width:220px}
-.tv-bar input.tv-name{width:150px}
-.tv-bar input.tv-tok{flex:1;min-width:180px;font-family:monospace}
-.tv-hint{font-size:13px;color:#9ca3af;margin-top:4px}
-.tv-msg{font-size:13px;min-height:18px;margin-top:4px}
-.tv-msg.ok{color:#059669}.tv-msg.err{color:#dc2626}
-.tv-divider{border-top:1px solid #f3f4f6;margin-top:14px;padding-top:14px}
-.tv-manage{display:none;margin-top:12px}
-.tv-token-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.tv-chip{display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:8px;padding:5px 10px;font-size:13px}
-.tv-chip span{font-weight:600}
-.tv-btn{border:1px solid #e5e7eb;background:white;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;color:#374151;white-space:nowrap}
-.tv-btn:hover{background:#f1f5f9}
-.tv-btn.primary{background:#4338ca;color:white;border-color:#4338ca}
-.tv-btn.primary:hover{background:#3730a3}
-.tv-btn.primary:disabled{background:#a5b4fc;cursor:not-allowed}
-.tv-btn.danger{color:#dc2626;border-color:#fca5a5}
-.tv-btn.danger:hover{background:#fef2f2}
-.tv-btn.sm{padding:3px 9px;font-size:12px}
-.tv-manual-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f3f4f6}
-</style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9fafb;color:#1a1a1a;min-height:100vh;font-size:15px}
 a{color:#4338ca;text-decoration:none}a:hover{text-decoration:underline}
 .hdr{background:linear-gradient(135deg,#1e1b4b 0%,#4338ca 60%,#6366f1 100%);padding:16px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
@@ -108,87 +80,54 @@ tr:hover td{background:#f9fafb}
 .ps{font-size:11px;padding:3px 7px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#374151;cursor:pointer}
 .aci{display:flex;flex-direction:column;gap:3px}
 .acit{font-size:11px;background:#fff3cd;border:1px solid #ffc107;border-radius:5px;padding:3px 7px;color:#7a4f00;max-width:280px;word-break:break-word}
+/* Vault */
+.vault-panel{background:#f8f7ff;border:1px solid #c7d2fe;border-radius:10px;padding:16px;margin-top:10px}
+.vault-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.vault-row input{flex:1;min-width:160px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace}
+.vault-chip{display:inline-flex;align-items:center;gap:6px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3}
 #setup,#cfgScr,#dash{display:none}
 </style>
 </head>
 <body>
+
 <div id="setup">
   <div class="hdr"><div class="hdr-in">
     <div><h1>📋 CS Issues Hub</h1><p>Select a project to get started</p></div>
     <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-w">🛠 PM Tools</a>
   </div></div>
-  <div class="main"><div class="sw">
-
-    <!-- Token Vault -->
-    <div class="tv-bar" id="tv-bar">
-      <div id="tv-locked">
-        <label>🔒 Token Vault</label>
-        <div class="tv-locked">
-          <input type="password" id="tv-pw" class="tv-wide" placeholder="Enter master password to unlock vault..." onkeydown="if(event.key==='Enter')TokenVault._unlock()"/>
-          <button class="tv-btn primary" onclick="TokenVault._unlock()">Unlock</button>
-        </div>
-        <p id="tv-lock-msg" class="tv-msg err"></p>
-        <p class="tv-hint">Tokens are AES-256-GCM encrypted and stored locally.</p>
-      </div>
-      <div id="tv-unlocked" style="display:none">
-        <label>🔓 Token Vault</label>
-        <div class="tv-row">
-          <select id="tv-select" onchange="TokenVault._onSelect()"><option value="">— select a saved token —</option></select>
-          <button class="tv-btn primary" id="tv-btn-load" onclick="TokenVault._triggerLoad()" disabled>▶ Use Token</button>
-          <button class="tv-btn" onclick="TokenVault._lock()">🔒 Lock</button>
-          <button class="tv-btn" id="tv-btn-manage" onclick="TokenVault._toggleManage()">⚙️ Manage</button>
-        </div>
-        <p class="tv-hint" id="tv-sel-hint">Select a token then click Use Token.</p>
-        <div class="tv-manual-row">
-          <span style="font-size:13px;color:#6b7280;white-space:nowrap">Or use token once:</span>
-          <input type="password" id="tv-manual-tok" class="tv-tok" placeholder="Paste token manually (not saved)..."/>
-          <button class="tv-btn" onclick="TokenVault._useManual()">▶ Use</button>
-        </div>
-        <div class="tv-manage" id="tv-manage">
-          <div class="tv-divider">
-            <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Add a new token</div>
-            <div class="tv-row">
-              <input type="text" id="tv-add-name" class="tv-name" placeholder="Name (e.g. GitHub Token)"/>
-              <input type="password" id="tv-add-tok" class="tv-tok" placeholder="Paste token value"/>
-              <button class="tv-btn" onclick="TokenVault._add()">＋ Save</button>
-            </div>
-            <p id="tv-add-msg" class="tv-msg"></p>
-            <div class="tv-token-list" id="tv-token-list"></div>
-          </div>
-        </div>
+  <div class="main"><div class="sw"><div class="sc">
+    <h2>🔐 Connect</h2>
+    <div class="fg"><label>Project</label>
+      <select id="profileSelect" onchange="onProfileSel()"><option value="">-- Select a project --</option></select>
+      <div class="hint">Don't see your project? <a href="#" onclick="showCfg();return false">Configure projects</a></div>
+    </div>
+    <div class="fg">
+      <label style="display:flex;align-items:center;justify-content:space-between">
+        <span>GitHub Personal Access Token</span>
+        <button class="btn-sm" onclick="toggleVault('gh')" id="vaultBtnGH" style="font-size:11px;padding:3px 9px">🔒 Use Vault</button>
+      </label>
+      <input type="password" id="ghToken" placeholder="ghp_..." onkeydown="if(event.key==='Enter')connect()"/>
+      <div id="vaultPanelGH" style="display:none">
+        <div class="vault-panel" id="vaultInnerGH"></div>
       </div>
     </div>
-
-    <div class="sc" id="connectCard" style="display:none">
-      <h2>🔐 Connect</h2>
-      <div class="fg"><label>Project</label>
-        <select id="profileSelect" onchange="onProfileSel()"><option value="">-- Select a project --</option></select>
-        <div class="hint">Don't see your project? <a href="#" onclick="showCfg();return false">Configure projects</a></div>
-      </div>
-      <div class="fg">
-        <label>GitHub Token</label>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span id="ghTokenStatus" style="font-size:13px;color:#6b7280">Not set</span>
-          <button class="btn-sm" onclick="clearGHToken()">Clear</button>
-        </div>
-      </div>
-      <div class="fg">
-        <label>ZenHub Token <span style="font-size:11px;color:#9ca3af;font-weight:400">(optional)</span></label>
-        <div style="display:flex;align-items:center;gap:10px">
-          <span id="zhTokenStatus" style="font-size:13px;color:#6b7280">Not set</span>
-          <button class="btn-sm" onclick="clearZHToken()">Clear</button>
-        </div>
-        <div class="hint">Use the vault to set tokens. Multiple tokens can be stored — set GitHub first, then ZenHub.</div>
-      </div>
-      <input type="hidden" id="reposInput"/>
-      <div id="setupErr" style="display:none"></div>
-      <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center">
-        <a href="#" onclick="showCfg();return false" style="font-size:13px;color:#6b7280">⚙ Manage projects</a>
-        <button class="btn-p" id="connectBtn" onclick="connect()">▶ Load Dashboard</button>
+    <div class="fg">
+      <label style="display:flex;align-items:center;justify-content:space-between">
+        <span>ZenHub API Token <span style="font-size:11px;color:#9ca3af;font-weight:400">(optional)</span></span>
+        <button class="btn-sm" onclick="toggleVault('zh')" id="vaultBtnZH" style="font-size:11px;padding:3px 9px">🔒 Use Vault</button>
+      </label>
+      <input type="text" id="zhTokenInput" placeholder="Paste from app.zenhub.com → API Tokens" autocomplete="off"/>
+      <div id="vaultPanelZH" style="display:none">
+        <div class="vault-panel" id="vaultInnerZH"></div>
       </div>
     </div>
-
-  </div></div>
+    <input type="hidden" id="reposInput"/>
+    <div id="setupErr" style="display:none"></div>
+    <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center">
+      <a href="#" onclick="showCfg();return false" style="font-size:13px;color:#6b7280">⚙ Manage projects</a>
+      <button class="btn-p" id="connectBtn" onclick="connect()">▶ Load Dashboard</button>
+    </div>
+  </div></div></div>
 </div>
 
 <div id="cfgScr">
@@ -229,72 +168,6 @@ tr:hover td{background:#f9fafb}
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],activeTab:'newitems',labelColors:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},showSettings:false,activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
-
-// ── Token Vault ──────────────────────────────────────────────────────────────
-var TokenVault=(function(){
-  var VAULT_KEY='centralview_vault_v1';
-  var _pw=null,_data=[];
-  async function deriveKey(pw,salt){var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
-  async function encrypt(text,pw){var salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));var key=await deriveKey(pw,salt);var ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,new TextEncoder().encode(text));var buf=new Uint8Array(28+ct.byteLength);buf.set(salt,0);buf.set(iv,16);buf.set(new Uint8Array(ct),28);return btoa(String.fromCharCode(...buf));}
-  async function decrypt(b64,pw){var buf=Uint8Array.from(atob(b64),function(c){return c.charCodeAt(0);});var key=await deriveKey(pw,buf.slice(0,16));var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(16,28)},key,buf.slice(28));return new TextDecoder().decode(plain);}
-  function load(){try{var r=localStorage.getItem(VAULT_KEY);return r?JSON.parse(r):[];}catch(e){return[];}}
-  function save(d){localStorage.setItem(VAULT_KEY,JSON.stringify(d));_data=d;}
-  function rebuildDropdown(){var sel=document.getElementById('tv-select'),cur=sel.value;sel.innerHTML="<option value=''>— select a saved token —</option>";_data.forEach(function(e){var o=document.createElement('option');o.value=e.name;o.textContent=e.name;sel.appendChild(o);});if(cur)sel.value=cur;}
-  function renderChips(){var el=document.getElementById('tv-token-list');if(!_data.length){el.innerHTML="<span style='font-size:13px;color:#9ca3af'>No tokens saved yet.</span>";return;}el.innerHTML=_data.map(function(e){return "<span class='tv-chip'><span>"+e.name+"</span><button class='tv-btn danger sm' onclick='TokenVault._delete(\""+e.name+"\")'>✕</button></span>";}).join('');}
-  var pub={
-    onToken:null,
-    getToken:async function(){var name=document.getElementById('tv-select').value;if(!name)return null;var entry=_data.find(function(e){return e.name===name;});if(!entry)return null;try{return await decrypt(entry.encrypted,_pw);}catch(e){return null;}},
-    _unlock:async function(){
-      var pw=document.getElementById('tv-pw').value,msg=document.getElementById('tv-lock-msg');msg.textContent='';
-      if(!pw){msg.textContent='Enter your master password.';return;}
-      var data=load();
-      if(data.length>0){try{await decrypt(data[0].encrypted,pw);}catch(e){msg.textContent='Incorrect password.';return;}}
-      _pw=pw;_data=data;
-      document.getElementById('tv-locked').style.display='none';
-      document.getElementById('tv-unlocked').style.display='block';
-      document.getElementById('tv-pw').value='';
-      document.getElementById('connectCard').style.display='block';
-      rebuildDropdown();
-      if(_data.length===1){document.getElementById('tv-select').value=_data[0].name;pub._onSelect();}
-    },
-    _lock:function(){_pw=null;_data=[];document.getElementById('tv-locked').style.display='block';document.getElementById('tv-unlocked').style.display='none';document.getElementById('tv-manage').style.display='none';document.getElementById('tv-btn-load').disabled=true;document.getElementById('connectCard').style.display='none';},
-    _onSelect:function(){var name=document.getElementById('tv-select').value;document.getElementById('tv-btn-load').disabled=!name;document.getElementById('tv-sel-hint').textContent=name?'Token "'+name+'" selected — click Use Token.':'Select a token then click Use Token.';},
-    _triggerLoad:async function(){
-      var tok=await pub.getToken();
-      if(!tok){alert('Could not decrypt token. Please re-unlock the vault.');return;}
-      if(typeof pub.onToken==='function')pub.onToken(tok);
-    },
-    _useManual:function(){var tok=document.getElementById('tv-manual-tok').value.trim();if(!tok){alert('Please paste a token first.');return;}document.getElementById('tv-manual-tok').value='';if(typeof pub.onToken==='function')pub.onToken(tok);},
-    _toggleManage:function(){var m=document.getElementById('tv-manage');var open=m.style.display==='block';m.style.display=open?'none':'block';document.getElementById('tv-btn-manage').textContent=open?'⚙️ Manage':'✖ Close';if(!open)renderChips();},
-    _add:async function(){
-      var name=document.getElementById('tv-add-name').value.trim(),tok=document.getElementById('tv-add-tok').value.trim(),msg=document.getElementById('tv-add-msg');
-      msg.className='tv-msg';msg.textContent='';
-      if(!name){msg.className='tv-msg err';msg.textContent='Enter a name.';return;}
-      if(!tok){msg.className='tv-msg err';msg.textContent='Enter the token value.';return;}
-      if(_data.find(function(e){return e.name===name;})){msg.className='tv-msg err';msg.textContent='Name already exists.';return;}
-      try{var enc=await encrypt(tok,_pw);save(_data.concat([{name:name,encrypted:enc}]));rebuildDropdown();renderChips();document.getElementById('tv-add-name').value='';document.getElementById('tv-add-tok').value='';msg.className='tv-msg ok';msg.textContent='"'+name+'" saved.';setTimeout(function(){msg.textContent='';},3000);}catch(e){msg.className='tv-msg err';msg.textContent='Encryption failed.';}
-    },
-    _delete:function(name){if(!confirm('Delete token "'+name+'"?'))return;save(_data.filter(function(e){return e.name!==name;}));rebuildDropdown();renderChips();var sel=document.getElementById('tv-select');if(sel.value===name){sel.value='';pub._onSelect();}}
-  };
-  return pub;
-})();
-
-// Wire vault token selection to set GH or ZH token
-TokenVault.onToken=function(tok){
-  // Heuristic: ZenHub tokens start with a long hex, GitHub tokens start with "ghp_" or "github_"
-  var isGH=tok.indexOf('ghp_')===0||tok.indexOf('github_')===0||tok.indexOf('gho_')===0;
-  if(isGH||!S.ghToken){
-    S.ghToken=tok;
-    document.getElementById('ghTokenStatus').innerHTML='<span style="color:#059669;font-weight:600">✓ GitHub token set</span>';
-  } else {
-    // Second token treated as ZenHub
-    S.pendingZHToken=tok;
-    document.getElementById('zhTokenStatus').innerHTML='<span style="color:#059669;font-weight:600">✓ ZenHub token set</span>';
-  }
-};
-
-function clearGHToken(){S.ghToken='';document.getElementById('ghTokenStatus').textContent='Not set';}
-function clearZHToken(){S.pendingZHToken='';document.getElementById('zhTokenStatus').textContent='Not set';}
 var TAB_DEFS=[
   {id:'newitems',label:'New Issues',color:'#0891b2'},
   {id:'prod',label:'Production Patch',color:'#dc2626'},
@@ -308,6 +181,129 @@ var TAB_DEFS=[
   {id:'report',label:'Weekly Report',color:'#1e1b4b'}
 ];
 
+// ── Token Vault ──────────────────────────────────────────────────────────────
+var Vault=(function(){
+  var KEY='cis_vault_v1',_pw=null,_data=[];
+  async function deriveKey(pw,salt){var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
+  async function encrypt(text,pw){var salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));var key=await deriveKey(pw,salt);var ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,new TextEncoder().encode(text));var buf=new Uint8Array(28+ct.byteLength);buf.set(salt,0);buf.set(iv,16);buf.set(new Uint8Array(ct),28);return btoa(String.fromCharCode(...buf));}
+  async function decrypt(b64,pw){var buf=Uint8Array.from(atob(b64),function(c){return c.charCodeAt(0);});var key=await deriveKey(pw,buf.slice(0,16));var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(16,28)},key,buf.slice(28));return new TextDecoder().decode(plain);}
+  function load(){try{var v=localStorage.getItem(KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+  function save(d){localStorage.setItem(KEY,JSON.stringify(d));_data=d;}
+  return{
+    isUnlocked:function(){return _pw!==null;},
+    unlock:async function(pw){
+      var data=load();
+      if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}}
+      _pw=pw;_data=data;
+    },
+    lock:function(){_pw=null;_data=[];},
+    list:function(){return _data.map(function(e){return e.name;});},
+    get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
+    add:async function(name,tok){if(_data.find(function(e){return e.name===name;}))throw new Error('Name already exists');var enc=await encrypt(tok,_pw);save(_data.concat([{name:name,enc:enc}]));},
+    del:function(name){save(_data.filter(function(e){return e.name!==name;}));}
+  };
+})();
+
+// ── Vault UI ─────────────────────────────────────────────────────────────────
+var _vaultTarget=null; // 'gh' or 'zh'
+
+function toggleVault(target){
+  var sameTarget=_vaultTarget===target;
+  // Close both panels first
+  ['gh','zh'].forEach(function(t){
+    document.getElementById('vaultPanel'+t.toUpperCase()).style.display='none';
+    document.getElementById('vaultBtn'+t.toUpperCase()).textContent='🔒 Use Vault';
+  });
+  if(sameTarget){_vaultTarget=null;return;}
+  _vaultTarget=target;
+  var panelId='vaultPanel'+target.toUpperCase();
+  var innerId='vaultInner'+target.toUpperCase();
+  document.getElementById(panelId).style.display='block';
+  document.getElementById('vaultBtn'+target.toUpperCase()).textContent='✖ Close';
+  renderVaultPanel(innerId,target);
+}
+
+function renderVaultPanel(innerId,target){
+  var el=document.getElementById(innerId);
+  var h='';
+  if(!Vault.isUnlocked()){
+    h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">🔒 Unlock Vault</div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    h+='<input type="password" id="vaultPwInput_'+target+'" placeholder="Master password..." style="flex:1;min-width:160px;padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')vaultUnlock(\''+target+'\')"/>';
+    h+='<button class="btn-sm" onclick="vaultUnlock(\''+target+'\')">Unlock</button>';
+    h+='</div>';
+    h+='<div id="vaultErr_'+target+'" style="font-size:12px;color:#dc2626;margin-top:6px;min-height:16px"></div>';
+    h+='<div class="hint">New vault? Enter a password to create one.</div>';
+  } else {
+    var tokens=Vault.list();
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
+    h+='<span style="font-size:13px;font-weight:600;color:#374151">🔓 Vault Unlocked</span>';
+    h+='<button class="btn-sm" onclick="vaultLock(\''+target+'\')">🔒 Lock</button>';
+    h+='</div>';
+    if(tokens.length){
+      h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
+      tokens.forEach(function(name){
+        h+='<div class="vault-chip" style="cursor:pointer" onclick="vaultUse(\''+target+'\',\''+esc(name)+'\')">'+esc(name)+' <span style="font-size:10px;opacity:0.7">▶ Use</span></div>';
+      });
+      h+='</div>';
+    } else {
+      h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:10px">No tokens saved yet.</div>';
+    }
+    h+='<div style="border-top:1px solid #e0e7ff;padding-top:10px;margin-top:4px">';
+    h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Save a new token</div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    h+='<input type="text" id="vaultNewName_'+target+'" placeholder="Name" style="width:130px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>';
+    h+='<input type="password" id="vaultNewTok_'+target+'" placeholder="Token value" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>';
+    h+='<button class="btn-sm" onclick="vaultSave(\''+target+'\')">＋ Save</button>';
+    h+='</div>';
+    h+='<div id="vaultSaveMsg_'+target+'" style="font-size:12px;margin-top:5px;min-height:16px"></div>';
+    if(tokens.length){
+      h+='<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px">';
+      tokens.forEach(function(name){h+='<button class="btn-sm" style="font-size:11px;border-color:#fca5a5;color:#dc2626" onclick="vaultDel(\''+target+'\',\''+esc(name)+'\')">✕ '+esc(name)+'</button>';});
+      h+='</div>';
+    }
+    h+='</div>';
+  }
+  el.innerHTML=h;
+}
+
+async function vaultUnlock(target){
+  var pw=document.getElementById('vaultPwInput_'+target).value;
+  var errEl=document.getElementById('vaultErr_'+target);
+  errEl.textContent='';
+  if(!pw){errEl.textContent='Enter a password.';return;}
+  try{
+    await Vault.unlock(pw);
+    renderVaultPanel('vaultInner'+target.toUpperCase(),target);
+  }catch(e){errEl.textContent=e.message;}
+}
+function vaultLock(target){Vault.lock();renderVaultPanel('vaultInner'+target.toUpperCase(),target);}
+async function vaultUse(target,name){
+  try{
+    var tok=await Vault.get(name);
+    if(target==='gh'){document.getElementById('ghToken').value=tok;}
+    else{document.getElementById('zhTokenInput').value=tok;}
+    toggleVault(target); // close panel
+  }catch(e){alert('Failed to decrypt token: '+e.message);}
+}
+async function vaultSave(target){
+  var name=document.getElementById('vaultNewName_'+target).value.trim();
+  var tok=document.getElementById('vaultNewTok_'+target).value.trim();
+  var msgEl=document.getElementById('vaultSaveMsg_'+target);
+  if(!name||!tok){msgEl.style.color='#dc2626';msgEl.textContent='Name and token required.';return;}
+  try{
+    await Vault.add(name,tok);
+    msgEl.style.color='#059669';msgEl.textContent='"'+name+'" saved!';
+    setTimeout(function(){renderVaultPanel('vaultInner'+target.toUpperCase(),target);},800);
+  }catch(e){msgEl.style.color='#dc2626';msgEl.textContent=e.message;}
+}
+function vaultDel(target,name){
+  if(!confirm('Delete "'+name+'" from vault?'))return;
+  Vault.del(name);
+  renderVaultPanel('vaultInner'+target.toUpperCase(),target);
+}
+
+// ── Core helpers ─────────────────────────────────────────────────────────────
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function tabColor(def){if(def&&def.labelKey&&S.labelColors[def.labelKey])return '#'+S.labelColors[def.labelKey];return def?def.color:'#6b7280';}
 function lum(h){h=(h||'cccccc').replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];var r=parseInt(h.substr(0,2),16)/255,g=parseInt(h.substr(2,2),16)/255,b=parseInt(h.substr(4,2),16)/255;return 0.2126*r+0.7152*g+0.0722*b;}
@@ -318,12 +314,7 @@ function ageCls(d){return d<3?'ao':d<7?'aw':'ab';}
 function todayStr(){var d=new Date();return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
 function hasCS(i){return i.labels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});}
 function lsort(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}
-function sortLbls(labels){
-  var a=labels.filter(function(l){return l.toLowerCase()==='cs item';});
-  var b=labels.filter(function(l){return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs item';}).sort(lsort);
-  var c=labels.filter(function(l){return l.toLowerCase().indexOf('cs ')!==0;}).sort(lsort);
-  return a.concat(b).concat(c);
-}
+function sortLbls(labels){var a=labels.filter(function(l){return l.toLowerCase()==='cs item';});var b=labels.filter(function(l){return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs item';}).sort(lsort);var c=labels.filter(function(l){return l.toLowerCase().indexOf('cs ')!==0;}).sort(lsort);return a.concat(b).concat(c);}
 function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveIgnored(){try{localStorage.setItem(IGNORED_KEY,JSON.stringify(S.ignored));}catch(e){}}
 function loadHistory(){try{var v=localStorage.getItem(STORAGE_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
@@ -387,12 +378,7 @@ function renderCfg(){
   h+='<div id="gErr" style="display:none;margin-top:8px"></div><div style="margin-top:14px"><button class="btn-p" onclick="saveGroup()">Save group</button></div></div></div>';
   document.getElementById('cfgList').innerHTML=h;window._gr=[];
 }
-function showCfgTab(t){
-  document.getElementById('cfgS').style.display=t==='s'?'block':'none';
-  document.getElementById('cfgG').style.display=t==='g'?'block':'none';
-  document.getElementById('ctS').style.cssText=t==='s'?'background:#4338ca;color:#fff;border-color:#4338ca':'';
-  document.getElementById('ctG').style.cssText=t==='g'?'background:#4338ca;color:#fff;border-color:#4338ca':'';
-}
+function showCfgTab(t){document.getElementById('cfgS').style.display=t==='s'?'block':'none';document.getElementById('cfgG').style.display=t==='g'?'block':'none';document.getElementById('ctS').style.cssText=t==='s'?'background:#4338ca;color:#fff;border-color:#4338ca':'';document.getElementById('ctG').style.cssText=t==='g'?'background:#4338ca;color:#fff;border-color:#4338ca':'';}
 function addGRepo(){var r=document.getElementById('gRI').value.trim(),w=document.getElementById('gWI').value.trim();if(!r){showErr('gErr','Repo required.');return;}if(!window._gr)window._gr=[];window._gr.push({repo:r,zhWorkspace:w});document.getElementById('gRI').value='';document.getElementById('gWI').value='';renderGRepos();}
 function renderGRepos(){var el=document.getElementById('gRepoList');if(!el)return;if(!window._gr||!window._gr.length){el.innerHTML='<div style="font-size:12px;color:#9ca3af">No repos added yet.</div>';return;}el.innerHTML=window._gr.map(function(r,i){return '<div style="display:flex;align-items:center;gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:7px 10px;font-size:12px"><span style="flex:1;font-weight:600">'+esc(r.repo)+'</span><span style="color:#9ca3af">'+esc(r.zhWorkspace||'no workspace')+'</span><button class="btn-d" style="padding:2px 8px;font-size:11px" onclick="remGRepo('+i+')">✕</button></div>';}).join('');}
 function remGRepo(i){window._gr.splice(i,1);renderGRepos();}
@@ -407,14 +393,14 @@ async function zhPost(path,body){var r=await fetch('https://api.zenhub.com'+path
 async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{headers:{'X-Authentication-Token':S.zhToken}});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
 
 async function connect(){
+  var gh=document.getElementById('ghToken').value.trim();
+  var zhTok=document.getElementById('zhTokenInput').value.trim();
   var rp=document.getElementById('reposInput').value.trim();
   hideErr('setupErr');
-  if(!S.ghToken){showErr('setupErr','Please unlock the vault and set your GitHub token.');return;}
-  if(!rp){showErr('setupErr','Please select a project.');return;}
-  S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
+  if(!gh||!rp){showErr('setupErr','Please select a project and enter your GitHub token.');return;}
+  S.ghToken=gh;S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
   S.ignored=loadIgnored();loadZHCreds();S.repoWorkspaceMap={};
-  // Apply pending ZH token if set via vault
-  if(S.pendingZHToken){S.zhToken=S.pendingZHToken;saveZHCreds();}
+  if(zhTok){S.zhToken=zhTok;saveZHCreds();}
   if(S.activeProfile){
     if(S.activeProfile.type==='group'){(S.activeProfile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(!S.zhWorkspace&&S.activeProfile.repos&&S.activeProfile.repos[0])S.zhWorkspace=S.activeProfile.repos[0].zhWorkspace||'';}
     else if(S.activeProfile.zhWorkspace){S.zhWorkspace=S.activeProfile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=S.activeProfile.zhWorkspace;}
@@ -441,38 +427,20 @@ function zhLoad(){
   setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');
   loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});
 }
-async function bgRefresh(){
-  try{await Promise.all([loadLabelColors(),loadIssues()]);saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();}
-  catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}
-}
-async function doRefresh(){
-  var btn=document.getElementById('refreshBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
-  try{await Promise.all([loadLabelColors(),loadIssues()]);saveCache();populateFilters();buildTabs();renderMain();if(S.zhToken&&S.zhWorkspace){S.zhIssueMap={};zhLoad();}else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}
-  catch(e){showErr('dashErr',e.message);}
-  btn.disabled=false;btn.innerHTML='↻ Refresh';
-}
+async function bgRefresh(){try{await Promise.all([loadLabelColors(),loadIssues()]);saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();}catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}}
+async function doRefresh(){var btn=document.getElementById('refreshBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';try{await Promise.all([loadLabelColors(),loadIssues()]);saveCache();populateFilters();buildTabs();renderMain();if(S.zhToken&&S.zhWorkspace){S.zhIssueMap={};zhLoad();}else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}catch(e){showErr('dashErr',e.message);}btn.disabled=false;btn.innerHTML='↻ Refresh';}
 function startAutoRefresh(){if(S.autoRefreshTimer)clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=setInterval(function(){doRefresh();},15*60*1000);}
 function stopAutoRefresh(){if(S.autoRefreshTimer){clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=null;}}
 
 async function loadLabelColors(){for(var i=0;i<S.repos.length;i++){try{var lb=await ghFetch('/repos/'+S.repos[i]+'/labels?per_page=100');lb.forEach(function(l){S.labelColors[l.name.toLowerCase()]=l.color;});}catch(e){}}}
-
 async function loadZHData(){
-  S.zhIssueMap={};
-  S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});
-  for(var i=0;i<S.repos.length;i++){
-    var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;
-    if(!S.zhToken||!ws)continue;
-    try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){console.error('ZH board',repo,e.message);}
-  }
+  S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});
+  for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){console.error('ZH',repo,e.message);}}
   S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});
   await loadZHDeps();
 }
 async function loadZHDeps(){
-  for(var i=0;i<S.repos.length;i++){
-    var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace,repoId=S.repoIds[repo];
-    if(!S.zhToken||!ws||!repoId)continue;
-    try{var ed=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');for(var j=0;j<(ed.epic_issues||[]).length;j++){var ep=ed.epic_issues[j];try{var edet=await zhGet('/p2/workspaces/'+ws+'/repositories/'+(ep.repo_id||repoId)+'/epics/'+ep.issue_number);(edet.issues||[]).forEach(function(child){var cr=repoForId(child.repo_id)||repo;var ci=S.issues.find(function(iss){return iss.id===child.issue_number&&iss.repo===cr;});if(ci)ci.parent={issueNumber:ep.issue_number};});}catch(e){}}}catch(e){}
-  }
+  for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace,repoId=S.repoIds[repo];if(!S.zhToken||!ws||!repoId)continue;try{var ed=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');for(var j=0;j<(ed.epic_issues||[]).length;j++){var ep=ed.epic_issues[j];try{var edet=await zhGet('/p2/workspaces/'+ws+'/repositories/'+(ep.repo_id||repoId)+'/epics/'+ep.issue_number);(edet.issues||[]).forEach(function(child){var cr=repoForId(child.repo_id)||repo;var ci=S.issues.find(function(iss){return iss.id===child.issue_number&&iss.repo===cr;});if(ci)ci.parent={issueNumber:ep.issue_number};});}catch(e){}}}catch(e){}}
 }
 function repoForId(id){return Object.keys(S.repoIds).find(function(r){return S.repoIds[r]===id;})||null;}
 
@@ -483,43 +451,20 @@ async function loadIssues(){
     var od=await ghFetchAll('/repos/'+repo+'/issues?state=open',10);
     od.forEach(function(iss){if(iss.pull_request)return;open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:iss.parent_issue_url?{url:iss.parent_issue_url}:null});});
     var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100');
-    if(!Array.isArray(cd))cd=[];
-    var count=0;
+    if(!Array.isArray(cd))cd=[];var count=0;
     for(var j=0;j<cd.length;j++){var iss=cd[j];if(iss.pull_request)continue;var lbls=iss.labels.map(function(l){return l.name;});if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))continue;closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,url:iss.html_url,state:'closed',pipeline:null,parent:null});if(++count>=50)break;}
   }
-  S.issues=open;
-  S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
+  S.issues=open;S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
   document.getElementById('dashTitle').textContent='📋 '+(S.activeProfile?S.activeProfile.name+' Issues':'CS Issues Hub');
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
 }
 
-function getAutoClosedItems(issue){
-  if(!issue.labels.some(function(l){return l.toLowerCase()==='cs task item';})||issue.state!=='open')return[];
-  var hits=[];
-  (issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(chk&&/#\d+/.test(chk[1].trim()))hits.push(chk[1].trim());});
-  return hits;
-}
+function getAutoClosedItems(issue){if(!issue.labels.some(function(l){return l.toLowerCase()==='cs task item';})||issue.state!=='open')return[];var hits=[];(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(chk&&/#\d+/.test(chk[1].trim()))hits.push(chk[1].trim());});return hits;}
 function isNIP(issue){return issue.pipeline&&issue.pipeline.pipelineName.toLowerCase()==='new issues';}
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
-function isException(issue){
-  if(issue.state!=='open')return false;
-  if(issue.parent)return false;
-  if(isExempt(issue))return false;
-  if(issue.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';}))return false;
-  if(hasCS(issue))return true;
-  if(getAutoClosedItems(issue).length>0)return true;
-  if(isNIP(issue))return true;
-  return false;
-}
+function isException(issue){if(issue.state!=='open')return false;if(issue.parent)return false;if(isExempt(issue))return false;if(issue.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';}))return false;if(hasCS(issue))return true;if(getAutoClosedItems(issue).length>0)return true;if(isNIP(issue))return true;return false;}
 
-function populateFilters(){
-  var ls={},rs={},ps={};
-  S.issues.concat(S.closedIssues).forEach(function(i){i.labels.forEach(function(l){ls[l]=1;});rs[i.repo]=1;if(i.pipeline)ps[i.pipeline.pipelineName]=1;});
-  var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');
-  fl.innerHTML='<option value="">All labels</option>';Object.keys(ls).sort(lsort).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});
-  fr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});
-  fp.innerHTML='<option value="">All pipelines</option>';Object.keys(ps).sort(lsort).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});
-}
+function populateFilters(){var ls={},rs={},ps={};S.issues.concat(S.closedIssues).forEach(function(i){i.labels.forEach(function(l){ls[l]=1;});rs[i.repo]=1;if(i.pipeline)ps[i.pipeline.pipelineName]=1;});var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');fl.innerHTML='<option value="">All labels</option>';Object.keys(ls).sort(lsort).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});fr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});fp.innerHTML='<option value="">All pipelines</option>';Object.keys(ps).sort(lsort).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});}
 function clearFilters(){['searchInput','filterLabel','filterRepo','filterPipeline'].forEach(function(id){document.getElementById(id).value='';});renderMain();}
 function getExceptions(){return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isException(i);});}
 
@@ -537,62 +482,34 @@ function getTabIssues(tab){
   if(t==='csitems')return base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';});});
   return base;
 }
-
-function applyFilters(list){
-  var q=(document.getElementById('searchInput').value||'').toLowerCase(),fl=(document.getElementById('filterLabel').value||'').toLowerCase(),fr=document.getElementById('filterRepo').value||'',fp=document.getElementById('filterPipeline').value||'';
-  if(q)list=list.filter(function(i){return i.title.toLowerCase().indexOf(q)!==-1||String(i.id).indexOf(q)!==-1||i.labels.join(' ').toLowerCase().indexOf(q)!==-1||i.repo.toLowerCase().indexOf(q)!==-1||i.assignees.join(' ').toLowerCase().indexOf(q)!==-1;});
-  if(fl)list=list.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()===fl;});});
-  if(fr)list=list.filter(function(i){return i.repo===fr;});
-  if(fp)list=list.filter(function(i){return i.pipeline&&i.pipeline.pipelineName===fp;});
-  return list;
-}
-
+function applyFilters(list){var q=(document.getElementById('searchInput').value||'').toLowerCase(),fl=(document.getElementById('filterLabel').value||'').toLowerCase(),fr=document.getElementById('filterRepo').value||'',fp=document.getElementById('filterPipeline').value||'';if(q)list=list.filter(function(i){return i.title.toLowerCase().indexOf(q)!==-1||String(i.id).indexOf(q)!==-1||i.labels.join(' ').toLowerCase().indexOf(q)!==-1||i.repo.toLowerCase().indexOf(q)!==-1||i.assignees.join(' ').toLowerCase().indexOf(q)!==-1;});if(fl)list=list.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()===fl;});});if(fr)list=list.filter(function(i){return i.repo===fr;});if(fp)list=list.filter(function(i){return i.pipeline&&i.pipeline.pipelineName===fp;});return list;}
 function sortIssues(list,tab){
   if(tab==='taskitem')return list.slice().sort(function(a,b){var at=a.title.toLowerCase(),bt=b.title.toLowerCase();var aP=at.indexOf('cs production issues')===0,bP=bt.indexOf('cs production issues')===0;var aF=at.indexOf('cs features')===0,bF=bt.indexOf('cs features')===0;var aCS=at.indexOf('cs ')===0,bCS=bt.indexOf('cs ')===0;if(aP&&!bP)return -1;if(!aP&&bP)return 1;if(aF&&!bF)return -1;if(!aF&&bF)return 1;if(aCS&&!bCS)return -1;if(!aCS&&bCS)return 1;return at.localeCompare(bt);});
   var col=S.sortState.col,dir=S.sortState.dir;
   if(tab==='newitems'&&col==='age')dir=1;
   return list.slice().sort(function(a,b){var av,bv;if(col==='age'||col==='created'){av=new Date(a.createdAt);bv=new Date(b.createdAt);}else if(col==='title'){av=a.title.toLowerCase();bv=b.title.toLowerCase();}else if(col==='repo'){av=a.repo;bv=b.repo;}else if(col==='id'){av=a.id;bv=b.id;}else if(col==='closed'){av=new Date(a.closedAt||0);bv=new Date(b.closedAt||0);}else{av=new Date(a.createdAt);bv=new Date(b.createdAt);}if(av<bv)return -dir;if(av>bv)return dir;return 0;});
 }
-
 function mkTh(col,label){var active=S.sortState.col===col;return '<th class="'+(active?'sorted':'')+'" onclick="doSort(\''+col+'\')">'+label+' <span class="si">'+(active?(S.sortState.dir===1?'▲':'▼'):'▲')+'</span></th>';}
 function doSort(col){if(S.sortState.col===col)S.sortState.dir*=-1;else{S.sortState.col=col;S.sortState.dir=1;}renderMain();}
 
 function renderStats(){
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i);});
   var tN=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length+S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
-  var stats=[
-    {n:base.filter(function(i){return !hasCS(i);}).length,tab:'newitems'},
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length,tab:'prod'},
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,tab:'uat'},
-    {n:base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});}).length,tab:'csitems'},
-    {n:tN,tab:'testing'},
-    {n:S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,tab:'taskitem'},
-    {n:getExceptions().length,tab:'exceptions'},
-    {n:S.closedIssues.length,tab:'closed'}
-  ];
-  var h='';
-  stats.forEach(function(s){if((s.tab==='prod'||s.tab==='uat')&&s.n===0)return;var def=TAB_DEFS.find(function(d){return d.id===s.tab;}),c=tabColor(def),l=def?def.label:s.tab;h+='<div class="sc2" style="border-top-color:'+c+'" onclick="switchTab(\''+s.tab+'\')"><div class="sn" style="color:'+c+'">'+s.n+'</div><div class="sl">'+esc(l)+'</div></div>';});
+  var stats=[{n:base.filter(function(i){return !hasCS(i);}).length,tab:'newitems'},{n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length,tab:'prod'},{n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,tab:'uat'},{n:base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});}).length,tab:'csitems'},{n:tN,tab:'testing'},{n:S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,tab:'taskitem'},{n:getExceptions().length,tab:'exceptions'},{n:S.closedIssues.length,tab:'closed'}];
+  var h='';stats.forEach(function(s){if((s.tab==='prod'||s.tab==='uat')&&s.n===0)return;var def=TAB_DEFS.find(function(d){return d.id===s.tab;}),c=tabColor(def),l=def?def.label:s.tab;h+='<div class="sc2" style="border-top-color:'+c+'" onclick="switchTab(\''+s.tab+'\')"><div class="sn" style="color:'+c+'">'+s.n+'</div><div class="sl">'+esc(l)+'</div></div>';});
   document.getElementById('statGrid').innerHTML=h;
 }
-
 function buildTabs(){
   var pN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length;
   var uN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length;
-  var h='';
-  TAB_DEFS.forEach(function(t){if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0))return;var cnt=getTabIssues(t.id).length,active=S.activeTab===t.id,c=tabColor(t);h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+c:'')+'">'+esc(t.label)+'<span class="tc">'+cnt+'</span></button>';});
+  var h='';TAB_DEFS.forEach(function(t){if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0))return;var cnt=getTabIssues(t.id).length,active=S.activeTab===t.id,c=tabColor(t);h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+c:'')+'">'+esc(t.label)+'<span class="tc">'+cnt+'</span></button>';});
   document.getElementById('tabsWrap').innerHTML=h;
 }
 function switchTab(name){S.activeTab=name;document.getElementById('searchBar').style.display=name==='report'?'none':'flex';buildTabs();renderMain();}
 function ignoreIssue(k){if(S.ignored.indexOf(k)===-1)S.ignored.push(k);saveIgnored();buildTabs();renderMain();}
 function unignoreIssue(k){S.ignored=S.ignored.filter(function(x){return x!==k;});saveIgnored();buildTabs();renderMain();}
 
-function renderExcReason(issue){
-  var parts=[],ai=getAutoClosedItems(issue);
-  if(ai.length){var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';ai.forEach(function(t){h+='<div class="acit">'+esc(t)+'</div>';});parts.push(h+'</div>');}
-  if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
-  if(!parts.length)parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>');
-  return parts.join('<div style="margin-top:4px"></div>');
-}
+function renderExcReason(issue){var parts=[],ai=getAutoClosedItems(issue);if(ai.length){var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';ai.forEach(function(t){h+='<div class="acit">'+esc(t)+'</div>';});parts.push(h+'</div>');}if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');if(!parts.length)parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>');return parts.join('<div style="margin-top:4px"></div>');}
 
 function renderTable(issues,tab,def){
   var isClosed=tab==='closed',isIgnored=tab==='ignored',isTesting=tab==='testing',isExc=tab==='exceptions';
@@ -629,30 +546,12 @@ function renderTable(issues,tab,def){
   });
   return h+'</tbody></table></div>';
 }
-
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed: '+e.message);}}
 async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});if(!list.length){sel.value='';return;}if(!confirm('Move '+list.length+' issues?')){sel.value='';return;}for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}
 
-function renderMain(){
-  renderStats();buildTabs();hideErr('dashErr');
-  if(S.activeTab==='report'){renderReport();return;}
-  var def=TAB_DEFS.find(function(d){return d.id===S.activeTab;});
-  document.getElementById('mainContent').innerHTML=renderTable(applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab)),S.activeTab,def);
-}
+function renderMain(){renderStats();buildTabs();hideErr('dashErr');if(S.activeTab==='report'){renderReport();return;}var def=TAB_DEFS.find(function(d){return d.id===S.activeTab;});document.getElementById('mainContent').innerHTML=renderTable(applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab)),S.activeTab,def);}
 
-// ── REPORT ──────────────────────────────────────────────────────────────────
-function parseSnapshotIssue(issue){
-  var t=0,c=0,o=0,n=0;
-  (issue.body||'').split('\n').forEach(function(line){
-    var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i),unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);
-    if(!chk&&!unk)return;
-    var text=(chk||unk)[1].trim();
-    if(!/#\d+/.test(text)){n++;return;}
-    t++;if(chk)c++;else o++;
-  });
-  return{id:issue.id,title:issue.title,url:issue.url,total:t,closed:c,open:o,noIssue:n};
-}
-
+function parseSnapshotIssue(issue){var t=0,c=0,o=0,n=0;(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i),unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);if(!chk&&!unk)return;var text=(chk||unk)[1].trim();if(!/#\d+/.test(text)){n++;return;}t++;if(chk)c++;else o++;});return{id:issue.id,title:issue.title,url:issue.url,total:t,closed:c,open:o,noIssue:n};}
 function getCurrentSnapshot(){
   var tracking=S.issues.filter(function(i){
     if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
@@ -664,62 +563,14 @@ function getCurrentSnapshot(){
   });
   if(!tracking.length)return null;
   var rows=[],total=0,closed=0,open=0,noIssue=0,nums=[];
-  tracking.forEach(function(issue){
-    nums.push(issue.id);
-    var r=parseSnapshotIssue(issue);
-    rows.push(r);total+=r.total;closed+=r.closed;open+=r.open;noIssue+=r.noIssue;
-  });
-  // Sort rows by issue number ascending
+  tracking.forEach(function(issue){nums.push(issue.id);var r=parseSnapshotIssue(issue);rows.push(r);total+=r.total;closed+=r.closed;open+=r.open;noIssue+=r.noIssue;});
   rows.sort(function(a,b){return a.id-b.id;});
   return{date:todayStr(),tracking:nums.join('/'),total:total,closed:closed,open:open,noIssue:noIssue,rows:rows};
 }
-
-function saveSnap(){
-  var snap=getCurrentSnapshot();
-  if(!snap){alert('No CS Task Item issues found.');return;}
-  var history=loadHistory();
-  if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}
-  else history.push(snap);
-  saveHistory(history);renderReport();
-}
+function saveSnap(){var snap=getCurrentSnapshot();if(!snap){alert('No CS Task Item issues found.');return;}var history=loadHistory();if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}else history.push(snap);saveHistory(history);renderReport();}
 function delRptRow(idx){if(!confirm('Remove this row?'))return;var h=loadHistory();h.splice(idx,1);saveHistory(h);renderReport();}
-
-function importCSV(){
-  var inp=document.createElement('input');inp.type='file';inp.accept='.csv';
-  inp.onchange=function(e){
-    var file=e.target.files[0];if(!file)return;
-    var reader=new FileReader();
-    reader.onload=function(ev){
-      var lines=ev.target.result.split('\n').map(function(l){return l.trim();}).filter(Boolean);
-      if(!lines.length){alert('Empty file.');return;}
-      var start=lines[0].toLowerCase().indexOf('date')!==-1?1:0,imported=[],skipped=0;
-      for(var i=start;i<lines.length;i++){
-        var cols=lines[i].split(',');
-        if(cols.length<5){skipped++;continue;}
-        var row={date:(cols[0]||'').trim(),tracking:(cols[1]||'').trim(),total:parseInt(cols[2])||0,closed:parseInt(cols[3])||0,open:parseInt(cols[4])||0,noIssue:parseInt(cols[5])||0};
-        if(!row.date){skipped++;continue;}
-        imported.push(row);
-      }
-      if(!imported.length){alert('No valid rows found.');return;}
-      var history=loadHistory(),existing={},added=0,dupes=0;
-      history.forEach(function(r){existing[r.date]=1;});
-      imported.forEach(function(r){if(existing[r.date])dupes++;else{history.push(r);added++;}});
-      history.sort(function(a,b){return new Date(a.date)-new Date(b.date);});
-      saveHistory(history);
-      alert('Imported '+added+' row(s).'+(dupes?' Skipped '+dupes+' duplicate(s).':''));
-      renderReport();
-    };
-    reader.readAsText(file);
-  };
-  inp.click();
-}
-
-function exportCSV(){
-  var history=loadHistory(),rows=['Date,Tracking Issues,Total,Closed,Open,No Issue Raised'];
-  history.forEach(function(row){rows.push([row.date,row.tracking,row.total,row.closed,row.open,row.noIssue||0].join(','));});
-  var blob=new Blob([rows.join('\n')],{type:'text/csv'}),a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);a.download='cs_report.csv';a.click();
-}
+function importCSV(){var inp=document.createElement('input');inp.type='file';inp.accept='.csv';inp.onchange=function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){var lines=ev.target.result.split('\n').map(function(l){return l.trim();}).filter(Boolean);if(!lines.length){alert('Empty file.');return;}var start=lines[0].toLowerCase().indexOf('date')!==-1?1:0,imported=[],skipped=0;for(var i=start;i<lines.length;i++){var cols=lines[i].split(',');if(cols.length<5){skipped++;continue;}var row={date:(cols[0]||'').trim(),tracking:(cols[1]||'').trim(),total:parseInt(cols[2])||0,closed:parseInt(cols[3])||0,open:parseInt(cols[4])||0,noIssue:parseInt(cols[5])||0};if(!row.date){skipped++;continue;}imported.push(row);}if(!imported.length){alert('No valid rows found.');return;}var history=loadHistory(),existing={},added=0,dupes=0;history.forEach(function(r){existing[r.date]=1;});imported.forEach(function(r){if(existing[r.date])dupes++;else{history.push(r);added++;}});history.sort(function(a,b){return new Date(a.date)-new Date(b.date);});saveHistory(history);alert('Imported '+added+' row(s).'+(dupes?' Skipped '+dupes+' duplicate(s).':''));renderReport();};reader.readAsText(file);};inp.click();}
+function exportCSV(){var history=loadHistory(),rows=['Date,Tracking Issues,Total,Closed,Open,No Issue Raised'];history.forEach(function(row){rows.push([row.date,row.tracking,row.total,row.closed,row.open,row.noIssue||0].join(','));});var blob=new Blob([rows.join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cs_report.csv';a.click();}
 function clearHistory(){if(!confirm('Clear all report history?'))return;localStorage.removeItem(STORAGE_KEY);renderReport();}
 
 function renderReport(){
@@ -731,33 +582,16 @@ function renderReport(){
   if(excCount>0)h+='<div style="font-size:12px;color:#dc2626;font-weight:600;display:flex;align-items:center;gap:5px">⚠ '+excCount+' unresolved exception'+(excCount>1?'s':'')+' — resolve before saving <button class="btn-sm" style="font-size:11px;padding:3px 9px;border-color:#fca5a5;color:#dc2626" onclick="switchTab(\'exceptions\')">View</button></div>';
   h+='<button class="btn-p" onclick="saveSnap()" style="font-size:13px;padding:8px 18px"'+(canSave?'':' disabled')+'>⬇ Save to Report</button>';
   h+='</div></div>';
-  if(!snap){
-    h+='<div style="color:#9ca3af;font-size:13px">No open issues with the CS Task Item label found.</div>';
-  } else {
-    h+='<div class="rw" style="margin-bottom:0"><table class="rt"><thead><tr>';
-    h+='<th style="text-align:left">#</th><th style="text-align:left">Task Name</th>';
-    ['Total','Closed','Open','No Issue Raised'].forEach(function(x){h+='<th>'+x+'</th>';});    h+='</tr></thead><tbody>';
-    snap.rows.forEach(function(row){
-      h+='<tr>';
-      h+='<td class="tl" style="font-size:12px;color:#6b7280"><a href="'+esc(row.url)+'" target="_blank">#'+row.id+'</a></td>';
-      h+='<td class="tl" style="font-weight:600;color:#1e1b4b;min-width:220px">'+esc(row.title)+'</td>';
-      h+='<td class="num">'+row.total+'</td>';
-      h+='<td class="num" style="color:#059669">'+row.closed+'</td>';
-      h+='<td class="num" style="color:#dc2626">'+row.open+'</td>';
-      h+='<td class="num">'+row.noIssue+'</td>';
-      h+='</tr>';
-    });
-    h+='<tr style="background:#f0f4ff;font-weight:700;border-top:2px solid #e5e7eb">';
-    h+='<td colspan="2" class="tl" style="font-size:13px;color:#374151">Totals</td>';
-    h+='<td class="num">'+(snap.total+snap.noIssue)+'</td>';
-    h+='<td class="num" style="color:#059669">'+snap.closed+'</td>';
-    h+='<td class="num" style="color:#dc2626">'+snap.open+'</td>';
-    h+='<td class="num">'+snap.noIssue+'</td>';
-    h+='</tr>';
+  if(!snap){h+='<div style="color:#9ca3af;font-size:13px">No open CS Task Item issues found.</div>';}
+  else{
+    h+='<div class="rw"><table class="rt"><thead><tr><th style="text-align:left">#</th><th style="text-align:left">Task Name</th>';
+    ['Total','Closed','Open','No Issue Raised'].forEach(function(x){h+='<th>'+x+'</th>';});
+    h+='</tr></thead><tbody>';
+    snap.rows.forEach(function(row){h+='<tr><td class="tl" style="font-size:12px;color:#6b7280"><a href="'+esc(row.url)+'" target="_blank">#'+row.id+'</a></td><td class="tl" style="font-weight:600;color:#1e1b4b;min-width:220px">'+esc(row.title)+'</td><td class="num">'+(row.total+row.noIssue)+'</td><td class="num" style="color:#059669">'+row.closed+'</td><td class="num" style="color:#dc2626">'+row.open+'</td><td class="num">'+row.noIssue+'</td></tr>';});
+    h+='<tr style="background:#f0f4ff;font-weight:700;border-top:2px solid #e5e7eb"><td colspan="2" class="tl" style="font-size:13px;color:#374151">Totals</td><td class="num">'+(snap.total+snap.noIssue)+'</td><td class="num" style="color:#059669">'+snap.closed+'</td><td class="num" style="color:#dc2626">'+snap.open+'</td><td class="num">'+snap.noIssue+'</td></tr>';
     h+='</tbody></table></div>';
   }
   h+='</div>';
-
   h+='<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center"><div style="font-size:14px;font-weight:700;color:#1e1b4b;flex:1">Report History</div>';
   h+='<button class="btn-sm" onclick="importCSV()">⬆ Import CSV</button>';
   if(!history.length)h+='<button class="btn-sm" onclick="loadHistoricalData()" style="border-color:#4338ca;color:#4338ca">📂 Load Historical Data</button>';
@@ -766,22 +600,9 @@ function renderReport(){
   if(!history.length){h+='<div class="es">No saved snapshots yet.</div>';}
   else{
     h+='<div class="rw"><table class="rt"><thead><tr>';
-    ['Date','Tracking Issues','Total','Net Change','Closed','Open','No Issue Raised',''].forEach(function(x){h+='<th>'+x+'</th>';});    h+='</tr></thead><tbody>';
-    history.slice().reverse().forEach(function(row,i){
-      var actualIdx=history.length-1-i;
-      var pv=actualIdx>0?history[actualIdx-1]:null,nt=pv!==null?row.total-pv.total:null;
-      var ns=nt===null?'&mdash;':(nt>0?'<span class="pos">+'+nt+'</span>':(nt<0?'<span class="neg">'+nt+'</span>':'0'));
-      h+='<tr>';
-      h+='<td>'+esc(row.date)+'</td>';
-      h+='<td style="font-size:12px;color:#6b7280">'+esc(row.tracking)+'</td>';
-      h+='<td class="num">'+row.total+'</td>';
-      h+='<td class="num">'+ns+'</td>';
-      h+='<td class="num" style="color:#059669">'+row.closed+'</td>';
-      h+='<td class="num" style="color:#dc2626">'+row.open+'</td>';
-      h+='<td class="num">'+(row.noIssue||0)+'</td>';
-      h+='<td><button class="btn-d" style="font-size:11px;padding:3px 8px" onclick="delRptRow('+actualIdx+')">✕</button></td>';
-      h+='</tr>';
-    });
+    ['Date','Tracking Issues','Total','Net Change','Closed','Open','No Issue Raised',''].forEach(function(x){h+='<th>'+x+'</th>';});
+    h+='</tr></thead><tbody>';
+    history.slice().reverse().forEach(function(row,i){var actualIdx=history.length-1-i;var pv=actualIdx>0?history[actualIdx-1]:null,nt=pv!==null?row.total-pv.total:null;var ns=nt===null?'&mdash;':(nt>0?'<span class="pos">+'+nt+'</span>':(nt<0?'<span class="neg">'+nt+'</span>':'0'));h+='<tr><td>'+esc(row.date)+'</td><td style="font-size:12px;color:#6b7280">'+esc(row.tracking)+'</td><td class="num">'+row.total+'</td><td class="num">'+ns+'</td><td class="num" style="color:#059669">'+row.closed+'</td><td class="num" style="color:#dc2626">'+row.open+'</td><td class="num">'+(row.noIssue||0)+'</td><td><button class="btn-d" style="font-size:11px;padding:3px 8px" onclick="delRptRow('+actualIdx+')">✕</button></td></tr>';});
     h+='</tbody></table></div>';
   }
   document.getElementById('mainContent').innerHTML=h;
@@ -789,13 +610,10 @@ function renderReport(){
 
 function loadHistoricalData(){
   if(!confirm('This will replace all existing history. Continue?'))return;
-  var rows=[
-    {date:'3/3/2023',tracking:'2837',total:80,closed:0,open:80,noIssue:0},{date:'3/10/2023',tracking:'2837',total:131,closed:13,open:118,noIssue:0},{date:'3/19/2023',tracking:'2837',total:131,closed:24,open:107,noIssue:0},{date:'3/24/2023',tracking:'2837',total:131,closed:25,open:106,noIssue:0},{date:'3/30/2023',tracking:'2837/2996',total:152,closed:54,open:98,noIssue:0},{date:'4/7/2023',tracking:'2996',total:105,closed:19,open:86,noIssue:0},{date:'4/14/2023',tracking:'2996',total:112,closed:20,open:92,noIssue:0},{date:'4/21/2023',tracking:'2996',total:123,closed:61,open:62,noIssue:0},{date:'4/28/2023',tracking:'2996/3221',total:130,closed:66,open:64,noIssue:0},{date:'5/5/2023',tracking:'3221',total:82,closed:17,open:65,noIssue:0},{date:'5/12/2023',tracking:'3221',total:83,closed:31,open:52,noIssue:0},{date:'5/19/2023',tracking:'3221',total:101,closed:41,open:60,noIssue:0},{date:'5/26/2023',tracking:'3221',total:108,closed:60,open:48,noIssue:0},{date:'5/31/2023',tracking:'3221/3495',total:127,closed:60,open:67,noIssue:0},{date:'6/2/2023',tracking:'3495',total:68,closed:3,open:65,noIssue:0},{date:'6/9/2023',tracking:'3495',total:76,closed:27,open:49,noIssue:0},{date:'6/16/2023',tracking:'3495/3583',total:77,closed:28,open:49,noIssue:0},{date:'6/23/2023',tracking:'3583',total:49,closed:6,open:43,noIssue:0},{date:'6/30/2023',tracking:'3583',total:49,closed:6,open:43,noIssue:0},{date:'7/7/2023',tracking:'3583',total:51,closed:16,open:35,noIssue:0},{date:'7/14/2023',tracking:'3583',total:57,closed:16,open:41,noIssue:0},{date:'7/21/2023',tracking:'3583',total:59,closed:23,open:36,noIssue:0},{date:'7/28/2023',tracking:'3583',total:118,closed:31,open:87,noIssue:0},{date:'8/4/2023',tracking:'3583/3924',total:98,closed:8,open:90,noIssue:0},{date:'8/11/2023',tracking:'3924/2458/2635',total:346,closed:100,open:246,noIssue:0},{date:'8/18/2023',tracking:'3924/2458/2635',total:346,closed:107,open:239,noIssue:0},{date:'8/25/2023',tracking:'3924/2458/2635',total:349,closed:127,open:72,noIssue:150},{date:'9/1/2023',tracking:'3924/4178/2458/2635',total:375,closed:131,open:89,noIssue:155},{date:'9/8/2023',tracking:'4178/2458/2635',total:309,closed:67,open:107,noIssue:135},{date:'9/15/2023',tracking:'4178/2458/2635',total:320,closed:75,open:107,noIssue:138},{date:'9/22/2023',tracking:'4178/2458/2635',total:324,closed:80,open:114,noIssue:130},{date:'9/29/2023',tracking:'4178/2458/2635',total:324,closed:82,open:127,noIssue:115},{date:'10/5/2023',tracking:'4178/2458/2635',total:316,closed:81,open:131,noIssue:104},{date:'10/10/2023',tracking:'4178/4449/2458/2635',total:329,closed:81,open:150,noIssue:98},{date:'10/13/2023',tracking:'4449/2458/2635',total:317,closed:106,open:126,noIssue:85},{date:'10/20/2023',tracking:'4449/2458/2635',total:321,closed:136,open:121,noIssue:64},{date:'10/27/2023',tracking:'4449/2458/2635',total:346,closed:149,open:131,noIssue:66},{date:'11/3/2023',tracking:'4449/4600/2458/2635',total:350,closed:177,open:108,noIssue:65},{date:'11/10/2023',tracking:'4600/2458/2635',total:310,closed:139,open:106,noIssue:65},{date:'11/17/2023',tracking:'4600/2458/2635',total:329,closed:152,open:130,noIssue:47},{date:'11/22/2023',tracking:'4600/2458/2635',total:330,closed:152,open:131,noIssue:47},{date:'11/30/2023',tracking:'4600/2458/2635',total:337,closed:153,open:139,noIssue:45},{date:'12/8/2023',tracking:'4600/4785/2458/4786/2635',total:348,closed:166,open:134,noIssue:48},{date:'12/15/2023',tracking:'4785/4786/2635',total:219,closed:46,open:124,noIssue:49},{date:'12/22/2023',tracking:'4785/4786/2635',total:221,closed:60,open:122,noIssue:39},{date:'12/29/2023',tracking:'4785/4786/2635',total:223,closed:67,open:117,noIssue:39},{date:'1/5/2024',tracking:'4785/4878/4786/2635',total:223,closed:74,open:112,noIssue:37},{date:'1/12/2024',tracking:'4878/4786/2635',total:197,closed:50,open:108,noIssue:39},{date:'1/19/2024',tracking:'4878/4786/2635',total:197,closed:57,open:107,noIssue:33},{date:'1/26/2024',tracking:'4878/4786/2635',total:194,closed:72,open:100,noIssue:22},{date:'2/2/2024',tracking:'4878/5034/4786/2635',total:194,closed:73,open:112,noIssue:9},{date:'2/9/2024',tracking:'5034/4786/2635',total:231,closed:59,open:164,noIssue:8},{date:'2/16/2024',tracking:'5034/4786/2635',total:237,closed:83,open:146,noIssue:8},{date:'2/23/2024',tracking:'5034/4786/2635',total:260,closed:102,open:136,noIssue:22},{date:'3/1/2024',tracking:'5034/5390/4786/2635',total:278,closed:131,open:139,noIssue:8},{date:'3/8/2024',tracking:'5390/4786/2635',total:225,closed:96,open:121,noIssue:8},{date:'3/15/2024',tracking:'5390/4786/2635',total:230,closed:98,open:124,noIssue:8},{date:'3/22/2024',tracking:'5390/4786/2635',total:245,closed:106,open:128,noIssue:11},{date:'3/29/2024',tracking:'5390/4786/2635',total:251,closed:131,open:109,noIssue:11},{date:'4/5/2024',tracking:'5390/5728/4786/2635',total:276,closed:152,open:116,noIssue:8},{date:'4/12/2024',tracking:'5728/4786/2635',total:207,closed:97,open:101,noIssue:9},{date:'4/19/2024',tracking:'5728/4786/2635',total:217,closed:101,open:107,noIssue:9},{date:'4/26/2024',tracking:'5728/4786/2635',total:238,closed:133,open:95,noIssue:10},{date:'5/3/2024',tracking:'5728/6010/4786/2635',total:249,closed:134,open:103,noIssue:12},{date:'5/10/2024',tracking:'6010/4786/2635',total:203,closed:130,open:61,noIssue:12},{date:'5/17/2024',tracking:'6010/4786/2635',total:212,closed:135,open:65,noIssue:12},{date:'5/24/2024',tracking:'6232/6010/4786/2635',total:232,closed:151,open:69,noIssue:12},{date:'5/31/2024',tracking:'6232/6308/6010/4786/2635',total:246,closed:174,open:60,noIssue:12},{date:'6/7/2024',tracking:'6232/6317/6308/4786/2635',total:194,closed:98,open:83,noIssue:13},{date:'6/14/2024',tracking:'2635/4786/6308/6317/6428',total:202,closed:110,open:78,noIssue:14},{date:'6/21/2024',tracking:'2635/4786/6308/6428',total:214,closed:121,open:78,noIssue:15},{date:'6/28/2024',tracking:'2635/4786/6308/6428/6568',total:238,closed:156,open:66,noIssue:16},{date:'7/5/2024',tracking:'2635/4786/6428/6568/6596',total:193,closed:117,open:59,noIssue:17},{date:'7/12/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6596/6706',total:293,closed:121,open:94,noIssue:78},{date:'7/19/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6596/6706',total:294,closed:122,open:94,noIssue:78},{date:'7/26/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6706/6745',total:300,closed:129,open:92,noIssue:79},{date:'8/2/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6706/6745/6833',total:308,closed:143,open:86,noIssue:79},{date:'8/9/2024',tracking:'2424/2613/2614/2615/2635/4786/6745/6833/6846',total:282,closed:143,open:59,noIssue:80},{date:'8/16/2024',tracking:'2424/2613/2614/2615/2635/4786/6745/6833/6846',total:289,closed:145,open:64,noIssue:80},{date:'8/23/2024',tracking:'2424/2613/2614/2615/2635/4786/6745/6833/6846/6935',total:314,closed:165,open:64,noIssue:85},{date:'8/30/2024',tracking:'2424/2613/2614/2615/2635/4786/6833/6846/6935',total:310,closed:161,open:63,noIssue:86},{date:'9/2/2024',tracking:'2424/2613/2614/2615/2635/4786/6935/7033',total:271,closed:119,open:66,noIssue:86},{date:'9/6/2024',tracking:'2424/2613/2614/2615/2635/4786/6935/7033',total:275,closed:136,open:53,noIssue:86},{date:'9/13/2024',tracking:'2424/2613/2614/2615/2635/4786/6935/7033/7117',total:287,closed:145,open:60,noIssue:82},{date:'9/20/2024',tracking:'2424/2613/2614/2615/2635/4786/7033/7117/7172',total:291,closed:143,open:66,noIssue:82},{date:'9/27/2024',tracking:'2424/2613/2614/2615/2635/7033/7172',total:250,closed:85,open:83,noIssue:82},{date:'10/4/2024',tracking:'2424/2613/2614/2615/2635/7172/7265',total:269,closed:111,open:76,noIssue:82},{date:'10/11/2024',tracking:'2424/2613/2614/2615/7172/7265/7358',total:210,closed:52,open:76,noIssue:82},{date:'10/25/2024',tracking:'2424/2613/2614/2615/7265/7358/7486',total:216,closed:62,open:72,noIssue:82},{date:'11/1/2024',tracking:'2424/2613/2614/2615/7265/7486',total:204,closed:65,open:57,noIssue:82},{date:'11/8/2024',tracking:'2424/2613/2614/2615/7265/7486/7583',total:215,closed:75,open:58,noIssue:82},{date:'11/15/2024',tracking:'2424/2613/2614/2615/7583/7612',total:172,closed:38,open:50,noIssue:84},{date:'11/22/2024',tracking:'2424/2613/2614/2615/7583/7612',total:177,closed:42,open:50,noIssue:85},{date:'11/29/2024',tracking:'2424/2613/2614/2615/7612/7672/7714/7715',total:169,closed:33,open:51,noIssue:85},{date:'12/6/2024',tracking:'2424/2613/2614/2615/7672/7714/7715',total:204,closed:38,open:65,noIssue:101},{date:'12/13/2024',tracking:'2424/2613/2614/2615/7714/7715',total:201,closed:33,open:67,noIssue:101},{date:'12/19/2024',tracking:'2424/2613/2614/2615/7714/7715',total:206,closed:48,open:57,noIssue:101},{date:'12/27/2024',tracking:'2424/2613/2614/2615/7714/7715',total:208,closed:49,open:58,noIssue:101},{date:'1/3/2025',tracking:'2424/2613/2614/2615/7714/7715/7865',total:210,closed:49,open:60,noIssue:101},{date:'1/10/2025',tracking:'2424/2613/2614/2615/7865/7887',total:195,closed:28,open:64,noIssue:103},{date:'1/17/2025',tracking:'2424/2613/2614/2615/7865/7887',total:205,closed:52,open:59,noIssue:94},{date:'1/24/2025',tracking:'2424/2613/2614/2615/7865/7887/7947',total:212,closed:55,open:65,noIssue:92},{date:'1/31/2025',tracking:'2424/2613/2614/2615/7865/7887/7947',total:223,closed:72,open:58,noIssue:93},{date:'2/7/2025',tracking:'2424/2613/2614/2615/8029/8030',total:202,closed:52,open:59,noIssue:91},{date:'2/14/2025',tracking:'2424/2613/2614/2615/8029/8030',total:205,closed:66,open:47,noIssue:92},{date:'2/21/2025',tracking:'2424/2613/2614/2615/8030/8164',total:196,closed:57,open:60,noIssue:79},{date:'2/28/2025',tracking:'2424/2613/2614/2615/8030/8164',total:204,closed:68,open:55,noIssue:81},{date:'3/7/2025',tracking:'2424/2613/2614/2615/8247/8255',total:193,closed:63,open:50,noIssue:80},{date:'3/14/2025',tracking:'2424/2613/2614/2615/8247/8255',total:204,closed:68,open:56,noIssue:80},{date:'3/21/2025',tracking:'2424/2613/2614/2615/8247/8255/8352',total:222,closed:75,open:66,noIssue:81},{date:'3/28/2025',tracking:'2424/2613/2614/2615/8255/8352',total:227,closed:79,open:68,noIssue:80},{date:'3/29/2025',tracking:'2424/2613/2614/2615/8433/8434',total:203,closed:55,open:68,noIssue:80},{date:'4/4/2025',tracking:'2424/2613/2614/2615/8433/8434',total:217,closed:66,open:69,noIssue:82},{date:'4/11/2025',tracking:'2424/2613/2614/2615/8433/8434',total:234,closed:90,open:65,noIssue:79},{date:'4/18/2025',tracking:'2424/2613/2614/2615/8433/8434/8552',total:246,closed:100,open:62,noIssue:84},{date:'4/25/2025',tracking:'2424/2613/2614/2615/8434/8552',total:240,closed:93,open:68,noIssue:79},{date:'5/2/2025',tracking:'2424/2613/2614/2615/8434/8552/8705',total:255,closed:115,open:61,noIssue:79},{date:'5/9/2025',tracking:'2424/2613/2614/2615/8434/8705/8761',total:251,closed:108,open:64,noIssue:79},{date:'5/14/2025',tracking:'2424/2613/2614/2615/8705/8761/8847',total:237,closed:85,open:74,noIssue:78},{date:'5/23/2025',tracking:'2424/2613/2614/2615/8761/8847',total:239,closed:93,open:68,noIssue:78},{date:'5/31/2025',tracking:'2424/2613/2614/2615/8761/8847/8952/8978',total:254,closed:108,open:66,noIssue:80},{date:'6/1/2025',tracking:'2424/2613/2614/2615/8952/8978',total:230,closed:84,open:66,noIssue:80},{date:'6/6/2025',tracking:'2424/2613/2614/2615/8952/8978',total:251,closed:96,open:74,noIssue:81},{date:'6/13/2025',tracking:'2424/2613/2614/2615/8952/8978/9042',total:261,closed:108,open:72,noIssue:81},{date:'6/20/2025',tracking:'2424/2613/2614/2615/8978/9042',total:249,closed:97,open:71,noIssue:81},{date:'6/27/2025',tracking:'2424/2613/2614/2615/8978/9042',total:250,closed:97,open:72,noIssue:81},{date:'7/4/2025',tracking:'2424/2613/2614/2615/8978/9042',total:258,closed:121,open:56,noIssue:81},{date:'7/5/2025',tracking:'2424/2613/2614/2615/8978/9042/9158',total:259,closed:121,open:56,noIssue:82},{date:'7/10/2025',tracking:'2424/2613/2614/2615/8978/9042/9158/9192',total:269,closed:135,open:52,noIssue:82},{date:'7/11/2025',tracking:'2424/2613/2614/2615/8978/9158/9192',total:231,closed:91,open:58,noIssue:82},{date:'7/17/2025',tracking:'2424/2613/2614/2615/8978/9158/9192',total:270,closed:84,open:65,noIssue:121},{date:'7/25/2025',tracking:'2424/2613/2614/2615/9158/9192/9280',total:293,closed:93,open:82,noIssue:118},{date:'8/1/2025',tracking:'2424/2615/9158/9280',total:286,closed:97,open:71,noIssue:118},{date:'8/2/2025',tracking:'2424/2615/9380/9381',total:255,closed:69,open:68,noIssue:118},{date:'8/8/2025',tracking:'2424/2615/9380/9381',total:258,closed:69,open:71,noIssue:118},{date:'8/15/2025',tracking:'2424/2615/9380/9381',total:272,closed:86,open:68,noIssue:118},{date:'8/21/2025',tracking:'2424/2615/9380/9381/9532',total:283,closed:93,open:72,noIssue:118},{date:'8/22/2025',tracking:'2424/2615/9380/9532',total:277,closed:85,open:74,noIssue:118},{date:'8/29/2025',tracking:'2424/2615/9380/9532',total:287,closed:94,open:75,noIssue:118},{date:'9/1/2025',tracking:'2424/2615/2617/9380/9532/9621',total:302,closed:94,open:90,noIssue:118},{date:'9/5/2025',tracking:'2424/2615/2617/9611/9627',total:285,closed:73,open:94,noIssue:118},{date:'9/12/2025',tracking:'2424/2615/2617/9611/9627',total:297,closed:84,open:95,noIssue:118},{date:'9/18/2025',tracking:'2424/2615/2617/9611/9627/9748',total:321,closed:97,open:106,noIssue:118},{date:'9/26/2025',tracking:'2424/2615/2617/9611/9748',total:335,closed:99,open:115,noIssue:121},{date:'10/3/2025',tracking:'2424/2615/2617/9611/9748/9852/9853',total:359,closed:124,open:109,noIssue:126},{date:'10/10/2025',tracking:'2424/2615/2617/9852/9853',total:326,closed:95,open:105,noIssue:126},{date:'10/17/2025',tracking:'2424/2615/2617/9852/9853/9945',total:328,closed:102,open:100,noIssue:126},{date:'10/24/2025',tracking:'2424/2615/2617/9853/9945',total:359,closed:108,open:125,noIssue:126},{date:'10/31/2025',tracking:'2424/2615/2617/9853/9945/10067',total:369,closed:130,open:113,noIssue:126},{date:'11/7/2025',tracking:'2424/2615/2617/9853/10067/10011',total:349,closed:117,open:105,noIssue:127},{date:'11/14/2025',tracking:'2424/2615/2617/10067/10011/10147',total:341,closed:104,open:110,noIssue:127},{date:'11/21/2025',tracking:'2424/2615/2617/10011/10147',total:343,closed:105,open:111,noIssue:127},{date:'11/28/2025',tracking:'2424/2615/2617/10011/10147',total:370,closed:106,open:137,noIssue:127},{date:'12/5/2025',tracking:'2424/2615/2617/10011/10147/10301',total:376,closed:121,open:128,noIssue:127},{date:'12/12/2025',tracking:'2424/2615/2617/10147/10301/10320',total:390,closed:130,open:137,noIssue:123},{date:'12/19/2025',tracking:'2424/2615/2617/10301/10320',total:374,closed:98,open:156,noIssue:120},{date:'12/24/2025',tracking:'2424/2615/2617/10301/10320/10394',total:374,closed:105,open:150,noIssue:119},{date:'12/31/2025',tracking:'2615/2617/10301/10320/10394',total:300,closed:35,open:146,noIssue:119},{date:'1/9/2026',tracking:'2615/2617/10301/10320/10394/10445/10468',total:311,closed:53,open:139,noIssue:119},{date:'1/16/2026',tracking:'2615/2617/2622/10394/10445/10468',total:324,closed:51,open:152,noIssue:121},{date:'1/25/2026',tracking:'2615/2617/2622/10394/10445/10468/10640',total:340,closed:71,open:148,noIssue:121},{date:'1/30/2026',tracking:'2615/2617/2622/10394/10445/10640',total:310,closed:39,open:150,noIssue:121},{date:'2/6/2026',tracking:'2615/2617/2622/10394/10445/10640/10713/10714',total:323,closed:44,open:158,noIssue:121},{date:'2/16/2026',tracking:'2615/2617/2622/10394/10713/10714',total:317,closed:48,open:148,noIssue:121},{date:'2/20/2026',tracking:'2615/2617/2622/10394/10713/10714/10826',total:326,closed:47,open:161,noIssue:118},{date:'2/27/2026',tracking:'2615/2617/2622/10394/10713/10826',total:318,closed:36,open:164,noIssue:118},{date:'3/6/2026',tracking:'2615/2617/2622/10394/10713/10826/10917/10958',total:349,closed:63,open:168,noIssue:118},{date:'3/13/2026',tracking:'2615/2617/2622/10394/10917/10958',total:343,closed:50,open:175,noIssue:118},{date:'3/20/2026',tracking:'2615/2617/2622/10394/10917/10958/11113',total:360,closed:72,open:170,noIssue:118},{date:'3/27/2026',tracking:'2615/2617/2622/10394/10917/11113',total:361,closed:71,open:172,noIssue:118}
-  ];
+  var rows=[{date:'3/3/2023',tracking:'2837',total:80,closed:0,open:80,noIssue:0},{date:'3/10/2023',tracking:'2837',total:131,closed:13,open:118,noIssue:0},{date:'3/19/2023',tracking:'2837',total:131,closed:24,open:107,noIssue:0},{date:'3/24/2023',tracking:'2837',total:131,closed:25,open:106,noIssue:0},{date:'3/30/2023',tracking:'2837/2996',total:152,closed:54,open:98,noIssue:0},{date:'4/7/2023',tracking:'2996',total:105,closed:19,open:86,noIssue:0},{date:'4/14/2023',tracking:'2996',total:112,closed:20,open:92,noIssue:0},{date:'4/21/2023',tracking:'2996',total:123,closed:61,open:62,noIssue:0},{date:'4/28/2023',tracking:'2996/3221',total:130,closed:66,open:64,noIssue:0},{date:'5/5/2023',tracking:'3221',total:82,closed:17,open:65,noIssue:0},{date:'5/12/2023',tracking:'3221',total:83,closed:31,open:52,noIssue:0},{date:'5/19/2023',tracking:'3221',total:101,closed:41,open:60,noIssue:0},{date:'5/26/2023',tracking:'3221',total:108,closed:60,open:48,noIssue:0},{date:'5/31/2023',tracking:'3221/3495',total:127,closed:60,open:67,noIssue:0},{date:'6/2/2023',tracking:'3495',total:68,closed:3,open:65,noIssue:0},{date:'6/9/2023',tracking:'3495',total:76,closed:27,open:49,noIssue:0},{date:'6/16/2023',tracking:'3495/3583',total:77,closed:28,open:49,noIssue:0},{date:'6/23/2023',tracking:'3583',total:49,closed:6,open:43,noIssue:0},{date:'6/30/2023',tracking:'3583',total:49,closed:6,open:43,noIssue:0},{date:'7/7/2023',tracking:'3583',total:51,closed:16,open:35,noIssue:0},{date:'7/14/2023',tracking:'3583',total:57,closed:16,open:41,noIssue:0},{date:'7/21/2023',tracking:'3583',total:59,closed:23,open:36,noIssue:0},{date:'7/28/2023',tracking:'3583',total:118,closed:31,open:87,noIssue:0},{date:'8/4/2023',tracking:'3583/3924',total:98,closed:8,open:90,noIssue:0},{date:'8/11/2023',tracking:'3924/2458/2635',total:346,closed:100,open:246,noIssue:0},{date:'8/18/2023',tracking:'3924/2458/2635',total:346,closed:107,open:239,noIssue:0},{date:'8/25/2023',tracking:'3924/2458/2635',total:349,closed:127,open:72,noIssue:150},{date:'9/1/2023',tracking:'3924/4178/2458/2635',total:375,closed:131,open:89,noIssue:155},{date:'9/8/2023',tracking:'4178/2458/2635',total:309,closed:67,open:107,noIssue:135},{date:'9/15/2023',tracking:'4178/2458/2635',total:320,closed:75,open:107,noIssue:138},{date:'9/22/2023',tracking:'4178/2458/2635',total:324,closed:80,open:114,noIssue:130},{date:'9/29/2023',tracking:'4178/2458/2635',total:324,closed:82,open:127,noIssue:115},{date:'10/5/2023',tracking:'4178/2458/2635',total:316,closed:81,open:131,noIssue:104},{date:'10/10/2023',tracking:'4178/4449/2458/2635',total:329,closed:81,open:150,noIssue:98},{date:'10/13/2023',tracking:'4449/2458/2635',total:317,closed:106,open:126,noIssue:85},{date:'10/20/2023',tracking:'4449/2458/2635',total:321,closed:136,open:121,noIssue:64},{date:'10/27/2023',tracking:'4449/2458/2635',total:346,closed:149,open:131,noIssue:66},{date:'11/3/2023',tracking:'4449/4600/2458/2635',total:350,closed:177,open:108,noIssue:65},{date:'11/10/2023',tracking:'4600/2458/2635',total:310,closed:139,open:106,noIssue:65},{date:'11/17/2023',tracking:'4600/2458/2635',total:329,closed:152,open:130,noIssue:47},{date:'11/22/2023',tracking:'4600/2458/2635',total:330,closed:152,open:131,noIssue:47},{date:'11/30/2023',tracking:'4600/2458/2635',total:337,closed:153,open:139,noIssue:45},{date:'12/8/2023',tracking:'4600/4785/2458/4786/2635',total:348,closed:166,open:134,noIssue:48},{date:'12/15/2023',tracking:'4785/4786/2635',total:219,closed:46,open:124,noIssue:49},{date:'12/22/2023',tracking:'4785/4786/2635',total:221,closed:60,open:122,noIssue:39},{date:'12/29/2023',tracking:'4785/4786/2635',total:223,closed:67,open:117,noIssue:39},{date:'1/5/2024',tracking:'4785/4878/4786/2635',total:223,closed:74,open:112,noIssue:37},{date:'1/12/2024',tracking:'4878/4786/2635',total:197,closed:50,open:108,noIssue:39},{date:'1/19/2024',tracking:'4878/4786/2635',total:197,closed:57,open:107,noIssue:33},{date:'1/26/2024',tracking:'4878/4786/2635',total:194,closed:72,open:100,noIssue:22},{date:'2/2/2024',tracking:'4878/5034/4786/2635',total:194,closed:73,open:112,noIssue:9},{date:'2/9/2024',tracking:'5034/4786/2635',total:231,closed:59,open:164,noIssue:8},{date:'2/16/2024',tracking:'5034/4786/2635',total:237,closed:83,open:146,noIssue:8},{date:'2/23/2024',tracking:'5034/4786/2635',total:260,closed:102,open:136,noIssue:22},{date:'3/1/2024',tracking:'5034/5390/4786/2635',total:278,closed:131,open:139,noIssue:8},{date:'3/8/2024',tracking:'5390/4786/2635',total:225,closed:96,open:121,noIssue:8},{date:'3/15/2024',tracking:'5390/4786/2635',total:230,closed:98,open:124,noIssue:8},{date:'3/22/2024',tracking:'5390/4786/2635',total:245,closed:106,open:128,noIssue:11},{date:'3/29/2024',tracking:'5390/4786/2635',total:251,closed:131,open:109,noIssue:11},{date:'4/5/2024',tracking:'5390/5728/4786/2635',total:276,closed:152,open:116,noIssue:8},{date:'4/12/2024',tracking:'5728/4786/2635',total:207,closed:97,open:101,noIssue:9},{date:'4/19/2024',tracking:'5728/4786/2635',total:217,closed:101,open:107,noIssue:9},{date:'4/26/2024',tracking:'5728/4786/2635',total:238,closed:133,open:95,noIssue:10},{date:'5/3/2024',tracking:'5728/6010/4786/2635',total:249,closed:134,open:103,noIssue:12},{date:'5/10/2024',tracking:'6010/4786/2635',total:203,closed:130,open:61,noIssue:12},{date:'5/17/2024',tracking:'6010/4786/2635',total:212,closed:135,open:65,noIssue:12},{date:'5/24/2024',tracking:'6232/6010/4786/2635',total:232,closed:151,open:69,noIssue:12},{date:'5/31/2024',tracking:'6232/6308/6010/4786/2635',total:246,closed:174,open:60,noIssue:12},{date:'6/7/2024',tracking:'6232/6317/6308/4786/2635',total:194,closed:98,open:83,noIssue:13},{date:'6/14/2024',tracking:'2635/4786/6308/6317/6428',total:202,closed:110,open:78,noIssue:14},{date:'6/21/2024',tracking:'2635/4786/6308/6428',total:214,closed:121,open:78,noIssue:15},{date:'6/28/2024',tracking:'2635/4786/6308/6428/6568',total:238,closed:156,open:66,noIssue:16},{date:'7/5/2024',tracking:'2635/4786/6428/6568/6596',total:193,closed:117,open:59,noIssue:17},{date:'7/12/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6596/6706',total:293,closed:121,open:94,noIssue:78},{date:'7/19/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6596/6706',total:294,closed:122,open:94,noIssue:78},{date:'7/26/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6706/6745',total:300,closed:129,open:92,noIssue:79},{date:'8/2/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6706/6745/6833',total:308,closed:143,open:86,noIssue:79},{date:'8/9/2024',tracking:'2424/2613/2614/2615/2635/4786/6745/6833/6846',total:282,closed:143,open:59,noIssue:80},{date:'8/16/2024',tracking:'2424/2613/2614/2615/2635/4786/6745/6833/6846',total:289,closed:145,open:64,noIssue:80},{date:'8/23/2024',tracking:'2424/2613/2614/2615/2635/4786/6745/6833/6846/6935',total:314,closed:165,open:64,noIssue:85},{date:'8/30/2024',tracking:'2424/2613/2614/2615/2635/4786/6833/6846/6935',total:310,closed:161,open:63,noIssue:86},{date:'9/2/2024',tracking:'2424/2613/2614/2615/2635/4786/6935/7033',total:271,closed:119,open:66,noIssue:86},{date:'9/6/2024',tracking:'2424/2613/2614/2615/2635/4786/6935/7033',total:275,closed:136,open:53,noIssue:86},{date:'9/13/2024',tracking:'2424/2613/2614/2615/2635/4786/6935/7033/7117',total:287,closed:145,open:60,noIssue:82},{date:'9/20/2024',tracking:'2424/2613/2614/2615/2635/4786/7033/7117/7172',total:291,closed:143,open:66,noIssue:82},{date:'9/27/2024',tracking:'2424/2613/2614/2615/2635/7033/7172',total:250,closed:85,open:83,noIssue:82},{date:'10/4/2024',tracking:'2424/2613/2614/2615/2635/7172/7265',total:269,closed:111,open:76,noIssue:82},{date:'10/11/2024',tracking:'2424/2613/2614/2615/7172/7265/7358',total:210,closed:52,open:76,noIssue:82},{date:'10/25/2024',tracking:'2424/2613/2614/2615/7265/7358/7486',total:216,closed:62,open:72,noIssue:82},{date:'11/1/2024',tracking:'2424/2613/2614/2615/7265/7486',total:204,closed:65,open:57,noIssue:82},{date:'11/8/2024',tracking:'2424/2613/2614/2615/7265/7486/7583',total:215,closed:75,open:58,noIssue:82},{date:'11/15/2024',tracking:'2424/2613/2614/2615/7583/7612',total:172,closed:38,open:50,noIssue:84},{date:'11/22/2024',tracking:'2424/2613/2614/2615/7583/7612',total:177,closed:42,open:50,noIssue:85},{date:'11/29/2024',tracking:'2424/2613/2614/2615/7612/7672/7714/7715',total:169,closed:33,open:51,noIssue:85},{date:'12/6/2024',tracking:'2424/2613/2614/2615/7672/7714/7715',total:204,closed:38,open:65,noIssue:101},{date:'12/13/2024',tracking:'2424/2613/2614/2615/7714/7715',total:201,closed:33,open:67,noIssue:101},{date:'12/19/2024',tracking:'2424/2613/2614/2615/7714/7715',total:206,closed:48,open:57,noIssue:101},{date:'12/27/2024',tracking:'2424/2613/2614/2615/7714/7715',total:208,closed:49,open:58,noIssue:101},{date:'1/3/2025',tracking:'2424/2613/2614/2615/7714/7715/7865',total:210,closed:49,open:60,noIssue:101},{date:'1/10/2025',tracking:'2424/2613/2614/2615/7865/7887',total:195,closed:28,open:64,noIssue:103},{date:'1/17/2025',tracking:'2424/2613/2614/2615/7865/7887',total:205,closed:52,open:59,noIssue:94},{date:'1/24/2025',tracking:'2424/2613/2614/2615/7865/7887/7947',total:212,closed:55,open:65,noIssue:92},{date:'1/31/2025',tracking:'2424/2613/2614/2615/7865/7887/7947',total:223,closed:72,open:58,noIssue:93},{date:'2/7/2025',tracking:'2424/2613/2614/2615/8029/8030',total:202,closed:52,open:59,noIssue:91},{date:'2/14/2025',tracking:'2424/2613/2614/2615/8029/8030',total:205,closed:66,open:47,noIssue:92},{date:'2/21/2025',tracking:'2424/2613/2614/2615/8030/8164',total:196,closed:57,open:60,noIssue:79},{date:'2/28/2025',tracking:'2424/2613/2614/2615/8030/8164',total:204,closed:68,open:55,noIssue:81},{date:'3/7/2025',tracking:'2424/2613/2614/2615/8247/8255',total:193,closed:63,open:50,noIssue:80},{date:'3/14/2025',tracking:'2424/2613/2614/2615/8247/8255',total:204,closed:68,open:56,noIssue:80},{date:'3/21/2025',tracking:'2424/2613/2614/2615/8247/8255/8352',total:222,closed:75,open:66,noIssue:81},{date:'3/28/2025',tracking:'2424/2613/2614/2615/8255/8352',total:227,closed:79,open:68,noIssue:80},{date:'3/29/2025',tracking:'2424/2613/2614/2615/8433/8434',total:203,closed:55,open:68,noIssue:80},{date:'4/4/2025',tracking:'2424/2613/2614/2615/8433/8434',total:217,closed:66,open:69,noIssue:82},{date:'4/11/2025',tracking:'2424/2613/2614/2615/8433/8434',total:234,closed:90,open:65,noIssue:79},{date:'4/18/2025',tracking:'2424/2613/2614/2615/8433/8434/8552',total:246,closed:100,open:62,noIssue:84},{date:'4/25/2025',tracking:'2424/2613/2614/2615/8434/8552',total:240,closed:93,open:68,noIssue:79},{date:'5/2/2025',tracking:'2424/2613/2614/2615/8434/8552/8705',total:255,closed:115,open:61,noIssue:79},{date:'5/9/2025',tracking:'2424/2613/2614/2615/8434/8705/8761',total:251,closed:108,open:64,noIssue:79},{date:'5/14/2025',tracking:'2424/2613/2614/2615/8705/8761/8847',total:237,closed:85,open:74,noIssue:78},{date:'5/23/2025',tracking:'2424/2613/2614/2615/8761/8847',total:239,closed:93,open:68,noIssue:78},{date:'5/31/2025',tracking:'2424/2613/2614/2615/8761/8847/8952/8978',total:254,closed:108,open:66,noIssue:80},{date:'6/1/2025',tracking:'2424/2613/2614/2615/8952/8978',total:230,closed:84,open:66,noIssue:80},{date:'6/6/2025',tracking:'2424/2613/2614/2615/8952/8978',total:251,closed:96,open:74,noIssue:81},{date:'6/13/2025',tracking:'2424/2613/2614/2615/8952/8978/9042',total:261,closed:108,open:72,noIssue:81},{date:'6/20/2025',tracking:'2424/2613/2614/2615/8978/9042',total:249,closed:97,open:71,noIssue:81},{date:'6/27/2025',tracking:'2424/2613/2614/2615/8978/9042',total:250,closed:97,open:72,noIssue:81},{date:'7/4/2025',tracking:'2424/2613/2614/2615/8978/9042',total:258,closed:121,open:56,noIssue:81},{date:'7/5/2025',tracking:'2424/2613/2614/2615/8978/9042/9158',total:259,closed:121,open:56,noIssue:82},{date:'7/10/2025',tracking:'2424/2613/2614/2615/8978/9042/9158/9192',total:269,closed:135,open:52,noIssue:82},{date:'7/11/2025',tracking:'2424/2613/2614/2615/8978/9158/9192',total:231,closed:91,open:58,noIssue:82},{date:'7/17/2025',tracking:'2424/2613/2614/2615/8978/9158/9192',total:270,closed:84,open:65,noIssue:121},{date:'7/25/2025',tracking:'2424/2613/2614/2615/9158/9192/9280',total:293,closed:93,open:82,noIssue:118},{date:'8/1/2025',tracking:'2424/2615/9158/9280',total:286,closed:97,open:71,noIssue:118},{date:'8/2/2025',tracking:'2424/2615/9380/9381',total:255,closed:69,open:68,noIssue:118},{date:'8/8/2025',tracking:'2424/2615/9380/9381',total:258,closed:69,open:71,noIssue:118},{date:'8/15/2025',tracking:'2424/2615/9380/9381',total:272,closed:86,open:68,noIssue:118},{date:'8/21/2025',tracking:'2424/2615/9380/9381/9532',total:283,closed:93,open:72,noIssue:118},{date:'8/22/2025',tracking:'2424/2615/9380/9532',total:277,closed:85,open:74,noIssue:118},{date:'8/29/2025',tracking:'2424/2615/9380/9532',total:287,closed:94,open:75,noIssue:118},{date:'9/1/2025',tracking:'2424/2615/2617/9380/9532/9621',total:302,closed:94,open:90,noIssue:118},{date:'9/5/2025',tracking:'2424/2615/2617/9611/9627',total:285,closed:73,open:94,noIssue:118},{date:'9/12/2025',tracking:'2424/2615/2617/9611/9627',total:297,closed:84,open:95,noIssue:118},{date:'9/18/2025',tracking:'2424/2615/2617/9611/9627/9748',total:321,closed:97,open:106,noIssue:118},{date:'9/26/2025',tracking:'2424/2615/2617/9611/9748',total:335,closed:99,open:115,noIssue:121},{date:'10/3/2025',tracking:'2424/2615/2617/9611/9748/9852/9853',total:359,closed:124,open:109,noIssue:126},{date:'10/10/2025',tracking:'2424/2615/2617/9852/9853',total:326,closed:95,open:105,noIssue:126},{date:'10/17/2025',tracking:'2424/2615/2617/9852/9853/9945',total:328,closed:102,open:100,noIssue:126},{date:'10/24/2025',tracking:'2424/2615/2617/9853/9945',total:359,closed:108,open:125,noIssue:126},{date:'10/31/2025',tracking:'2424/2615/2617/9853/9945/10067',total:369,closed:130,open:113,noIssue:126},{date:'11/7/2025',tracking:'2424/2615/2617/9853/10067/10011',total:349,closed:117,open:105,noIssue:127},{date:'11/14/2025',tracking:'2424/2615/2617/10067/10011/10147',total:341,closed:104,open:110,noIssue:127},{date:'11/21/2025',tracking:'2424/2615/2617/10011/10147',total:343,closed:105,open:111,noIssue:127},{date:'11/28/2025',tracking:'2424/2615/2617/10011/10147',total:370,closed:106,open:137,noIssue:127},{date:'12/5/2025',tracking:'2424/2615/2617/10011/10147/10301',total:376,closed:121,open:128,noIssue:127},{date:'12/12/2025',tracking:'2424/2615/2617/10147/10301/10320',total:390,closed:130,open:137,noIssue:123},{date:'12/19/2025',tracking:'2424/2615/2617/10301/10320',total:374,closed:98,open:156,noIssue:120},{date:'12/24/2025',tracking:'2424/2615/2617/10301/10320/10394',total:374,closed:105,open:150,noIssue:119},{date:'12/31/2025',tracking:'2615/2617/10301/10320/10394',total:300,closed:35,open:146,noIssue:119},{date:'1/9/2026',tracking:'2615/2617/10301/10320/10394/10445/10468',total:311,closed:53,open:139,noIssue:119},{date:'1/16/2026',tracking:'2615/2617/2622/10394/10445/10468',total:324,closed:51,open:152,noIssue:121},{date:'1/25/2026',tracking:'2615/2617/2622/10394/10445/10468/10640',total:340,closed:71,open:148,noIssue:121},{date:'1/30/2026',tracking:'2615/2617/2622/10394/10445/10640',total:310,closed:39,open:150,noIssue:121},{date:'2/6/2026',tracking:'2615/2617/2622/10394/10445/10640/10713/10714',total:323,closed:44,open:158,noIssue:121},{date:'2/16/2026',tracking:'2615/2617/2622/10394/10713/10714',total:317,closed:48,open:148,noIssue:121},{date:'2/20/2026',tracking:'2615/2617/2622/10394/10713/10714/10826',total:326,closed:47,open:161,noIssue:118},{date:'2/27/2026',tracking:'2615/2617/2622/10394/10713/10826',total:318,closed:36,open:164,noIssue:118},{date:'3/6/2026',tracking:'2615/2617/2622/10394/10713/10826/10917/10958',total:349,closed:63,open:168,noIssue:118},{date:'3/13/2026',tracking:'2615/2617/2622/10394/10917/10958',total:343,closed:50,open:175,noIssue:118},{date:'3/20/2026',tracking:'2615/2617/2622/10394/10917/10958/11113',total:360,closed:72,open:170,noIssue:118},{date:'3/27/2026',tracking:'2615/2617/2622/10394/10917/11113',total:361,closed:71,open:172,noIssue:118}];
   saveHistory(rows);alert('Loaded '+rows.length+' historical rows.');renderReport();
 }
 
-// ── SETTINGS ─────────────────────────────────────────────────────────────────
 function toggleSettings(){S.showSettings=!S.showSettings;renderSettings();}
 function renderSettings(){
   var el=document.getElementById('settingsPanel');
@@ -806,29 +624,19 @@ function renderSettings(){
   h+='<div style="margin-bottom:16px"><button class="btn-p" style="justify-content:center;width:100%" onclick="toggleSettings();showSetup()">💻 Reconnect GitHub</button></div>';
   h+='<div style="font-size:13px;font-weight:700;color:#1e1b4b;margin-bottom:10px;padding-top:10px;border-top:1px solid #e5e7eb">ZenHub</div>';
   h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">ZenHub API Token</label>';
-  h+='<input type="text" id="zhTI" value="" placeholder="Paste from app.zenhub.com → API Tokens" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhToken?'<div style="font-size:11px;color:#059669;margin-top:3px">✓ Token saved</div>':'')+'</div>';
+  h+='<input type="text" id="zhTI" value="" placeholder="Paste token" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhToken?'<div style="font-size:11px;color:#059669;margin-top:3px">✓ Token saved</div>':'')+'</div>';
   h+='<div class="fg" style="margin-top:10px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Workspace ID</label>';
-  h+='<input type="text" id="zhWI" value="'+esc(S.zhWorkspace)+'" placeholder="Numeric ID from ZenHub workspace settings" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhWorkspace?'<div style="font-size:11px;color:#059669;margin-top:3px">✓ Workspace saved: '+esc(S.zhWorkspace)+'</div>':'<div style="font-size:11px;color:#dc2626;margin-top:3px">⚠ No workspace ID — check your project in Manage Projects</div>')+'</div>';
+  h+='<input type="text" id="zhWI" value="'+esc(S.zhWorkspace)+'" placeholder="Numeric ID" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhWorkspace?'<div style="font-size:11px;color:#059669;margin-top:3px">✓ '+esc(S.zhWorkspace)+'</div>':'<div style="font-size:11px;color:#dc2626;margin-top:3px">⚠ No workspace ID set</div>')+'</div>';
   h+='<div id="zhErr" style="display:none;margin-top:8px"></div>';
   h+='<div style="margin-top:14px;display:flex;gap:8px"><button class="btn-p" id="zhSaveBtn" onclick="saveZH()">Save &amp; Connect</button>';
   if(S.zhToken)h+='<button class="btn-sm" onclick="disconnectZH()">Disconnect</button>';
   h+='</div>';
   if(S.zhConnected)h+='<div style="margin-top:8px;font-size:12px;color:#059669;font-weight:600">✓ ZenHub connected</div>';
-  else if(S.zhToken)h+='<div style="margin-top:8px;font-size:12px;color:#d97706;font-weight:600">⚠ Token saved but not connected — click Save &amp; Connect</div>';
+  else if(S.zhToken)h+='<div style="margin-top:8px;font-size:12px;color:#d97706;font-weight:600">⚠ Token saved but not connected</div>';
   h+='</div>';
   el.innerHTML=h;
 }
-async function saveZH(){
-  var token=document.getElementById('zhTI').value.trim(),ws=document.getElementById('zhWI').value.trim();
-  if(!token)token=S.zhToken;if(!ws)ws=S.zhWorkspace;
-  if(!token||!ws){showErr('zhErr','Both ZenHub token and workspace ID are required.');return;}
-  S.zhToken=token;S.zhWorkspace=ws;saveZHCreds();
-  S.repos.forEach(function(r){S.repoWorkspaceMap[r]=ws;});
-  var btn=document.getElementById('zhSaveBtn');btn.disabled=true;btn.innerHTML='<span class="spin spd"></span>Connecting...';
-  try{await loadZHData();S.zhConnected=true;populateFilters();renderMain();var e=document.getElementById('zhErr');e.style.cssText='display:block;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;margin-top:8px';e.textContent='Connected successfully!';}
-  catch(e){S.zhConnected=false;showErr('zhErr','ZenHub error: '+e.message);}
-  btn.disabled=false;btn.textContent='Save & Connect';
-}
+async function saveZH(){var token=document.getElementById('zhTI').value.trim(),ws=document.getElementById('zhWI').value.trim();if(!token)token=S.zhToken;if(!ws)ws=S.zhWorkspace;if(!token||!ws){showErr('zhErr','Both ZenHub token and workspace ID are required.');return;}S.zhToken=token;S.zhWorkspace=ws;saveZHCreds();S.repos.forEach(function(r){S.repoWorkspaceMap[r]=ws;});var btn=document.getElementById('zhSaveBtn');btn.disabled=true;btn.innerHTML='<span class="spin spd"></span>Connecting...';try{await loadZHData();S.zhConnected=true;populateFilters();renderMain();var e=document.getElementById('zhErr');e.style.cssText='display:block;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;margin-top:8px';e.textContent='Connected successfully!';}catch(e){S.zhConnected=false;showErr('zhErr','ZenHub error: '+e.message);}btn.disabled=false;btn.textContent='Save & Connect';}
 function disconnectZH(){S.zhToken='';S.zhWorkspace='';S.repoIds={};S.zhPipelines={};S.zhIssueMap={};S.zhConnected=false;S.issues.forEach(function(i){i.pipeline=null;});saveZHCreds();renderMain();toggleSettings();}
 
 showEl('setup');
