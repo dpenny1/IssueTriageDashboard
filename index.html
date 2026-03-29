@@ -237,8 +237,11 @@ function isException(issue){
   if(issue.state!=='open') return false;
   if(issue.parent) return false;
   if(isExceptionExempt(issue)) return false;
-  // CS In Testing issues are never exceptions — they belong to the testing tab
-  if(issue.labels.some(function(l){ return l.toLowerCase()==='cs in testing'; })) return false;
+  // These label types have their own tabs — never treat as exceptions
+  if(issue.labels.some(function(l){
+    var ll=l.toLowerCase();
+    return ll==='cs in testing'||ll==='cs task item';
+  })) return false;
   if(hasCSLabel(issue)) return true;
   if(getAutoClosedItems(issue).length>0) return true;
   if(isNewIssuesPipeline(issue)) return true;
@@ -635,8 +638,8 @@ function getTabIssues(tab){
   if(t==='newitems') return base.filter(function(i){ return !hasCSLabel(i); });
   if(t==='prod')     return base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='production patch'; }); });
   if(t==='uat')      return base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='uat patch'; }); });
-  if(t==='csitems')  return base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs task item'; }); });
-  if(t==='taskitem') return base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='cs task item'; }); });
+  if(t==='csitems')  return base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs task item'&&l.toLowerCase()!=='cs in testing'; }); });
+  if(t==='taskitem') return S.issues.filter(function(i){ return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){ return l.toLowerCase()==='cs task item'; }); });
   return base;
 }
 
