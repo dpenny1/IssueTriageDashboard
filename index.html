@@ -102,17 +102,17 @@ tr:hover td{background:#f9fafb}
       <div class="hint">Don't see your project? <a href="#" onclick="showCfg();return false">Configure projects</a></div>
     </div>
     <div class="fg">
-      <label style="display:flex;align-items:center;justify-content:space-between">
+      <label style="display:flex;align-items:center;gap:6px">
         <span>GitHub Personal Access Token</span>
-        <button class="btn-sm" onclick="toggleVault('gh')" id="vaultBtnGH" style="font-size:11px;padding:3px 9px">🔒 Use Vault</button>
+        <button onclick="toggleVault('gh')" id="vaultBtnGH" title="Use Token Vault" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;line-height:1;opacity:0.6" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">🔒</button>
       </label>
       <input type="password" id="ghToken" placeholder="ghp_..." onkeydown="if(event.key==='Enter')connect()"/>
       <div id="vaultPanelGH" style="display:none"><div class="vault-panel" id="vaultInnerGH"></div></div>
     </div>
     <div class="fg">
-      <label style="display:flex;align-items:center;justify-content:space-between">
+      <label style="display:flex;align-items:center;gap:6px">
         <span>ZenHub API Token <span style="font-size:11px;color:#9ca3af;font-weight:400">(optional)</span></span>
-        <button class="btn-sm" onclick="toggleVault('zh')" id="vaultBtnZH" style="font-size:11px;padding:3px 9px">🔒 Use Vault</button>
+        <button onclick="toggleVault('zh')" id="vaultBtnZH" title="Use Token Vault" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;line-height:1;opacity:0.6" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">🔒</button>
       </label>
       <input type="text" id="zhTokenInput" placeholder="Paste from app.zenhub.com → API Tokens" autocomplete="off"/>
       <div id="vaultPanelZH" style="display:none"><div class="vault-panel" id="vaultInnerZH"></div></div>
@@ -200,21 +200,19 @@ var Vault=(function(){
 var _activeVaultTarget=null;
 
 function toggleVault(target){
-  // If same target already open, close it
   if(_activeVaultTarget===target){
     _activeVaultTarget=null;
     document.getElementById('vaultPanel'+target.toUpperCase()).style.display='none';
-    document.getElementById('vaultBtn'+target.toUpperCase()).textContent='🔒 Use Vault';
+    document.getElementById('vaultBtn'+target.toUpperCase()).textContent='🔒';
     return;
   }
-  // Close any open panel
   ['GH','ZH'].forEach(function(t){
     document.getElementById('vaultPanel'+t).style.display='none';
-    document.getElementById('vaultBtn'+t).textContent='🔒 Use Vault';
+    document.getElementById('vaultBtn'+t).textContent='🔒';
   });
   _activeVaultTarget=target;
   document.getElementById('vaultPanel'+target.toUpperCase()).style.display='block';
-  document.getElementById('vaultBtn'+target.toUpperCase()).textContent='✖ Close';
+  document.getElementById('vaultBtn'+target.toUpperCase()).textContent='🔓';
   renderVaultPanel(target);
 }
 
