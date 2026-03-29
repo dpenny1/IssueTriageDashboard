@@ -460,6 +460,10 @@ async function loadLabelColors(){
 
 async function loadZHData(){
   S.zhIssueMap={};
+  // Ensure repoWorkspaceMap is populated for all repos
+  S.repos.forEach(function(repo){
+    if(!S.repoWorkspaceMap[repo]&&S.zhWorkspace) S.repoWorkspaceMap[repo]=S.zhWorkspace;
+  });
   for(var i=0;i<S.repos.length;i++){
     var repo=S.repos[i];
     var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;
@@ -471,11 +475,9 @@ async function loadZHData(){
       (bd.pipelines||[]).forEach(function(p){
         (p.issues||[]).forEach(function(iss){ S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws}; });
       });
-    } catch(e){}
+    } catch(e){ console.error('ZH board error for '+repo+':',e.message); }
   }
-  // Apply pipeline data
   S.issues.forEach(function(i){ var m=S.zhIssueMap[i.id+'_'+i.repo]; if(m) i.pipeline=m; });
-  // Load parent/child relationships for each repo
   await loadZHDependencies();
 }
 
