@@ -211,6 +211,7 @@ var TAB_DEFS=[
   {id:'csitems',  label:'CS Items',         color:'#4338ca'},
   {id:'testing',  label:'CS In Testing',    color:'#7c3aed'},
   {id:'taskitem', label:'CS Task Items',    color:'#059669'},
+  {id:'exceptions',label:'Exceptions',       color:'#b91c1c'},
   {id:'closed',   label:'Recently Closed',  color:'#374151'},
   {id:'ignored',  label:'Ignored',          color:'#6b7280'},
   {id:'report',   label:'Weekly Report',    color:'#1e1b4b'},
@@ -369,11 +370,10 @@ async function loadIssues(){
     var od=await ghFetch('/repos/'+repo+'/issues?state=open&per_page=100');
     od.forEach(function(i){if(i.pull_request)return;open.push({id:i.number,repo:repo,title:i.title,body:i.body||'',labels:i.labels.map(function(l){return l.name;}),assignees:i.assignees.map(function(a){return a.login;}),createdAt:i.created_at,url:i.html_url,state:'open',pipeline:null});});
     var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&per_page=50&sort=updated&direction=desc');
-    cd.forEach(function(i){if(i.pull_request)return;var lbls=i.labels.map(function(l){return l.name;});if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))return;closed.push({id:i.number,repo:repo,title:i.title,body:i.body||'',labels:lbls,assignees:i.assignees.map(function(a){return a.login;}),createdAt:i.created_at,closedAt:i.closed_at,url:i.html_url,state:'closed',pipeline:null});});
+    cd.forEach(function(i){if(i.pull_request)return;var lbls=i.labels.map(function(l){return l.name;});if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))return;if(lbls.some(function(l){return l.toLowerCase()==='cs in testing';}))return;closed.push({id:i.number,repo:repo,title:i.title,body:i.body||'',labels:lbls,assignees:i.assignees.map(function(a){return a.login;}),createdAt:i.created_at,closedAt:i.closed_at,url:i.html_url,state:'closed',pipeline:null});});
   }
   S.issues=open;
   S.closedIssues=closed.sort(function(a,b){return new Date(a.closedAt)-new Date(b.closedAt);});
-  captureWeeklySnapshot();
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
   document.getElementById('loadedAt').textContent='Loaded '+new Date().toLocaleTimeString();
 }
@@ -404,15 +404,26 @@ function clearFilters(){document.getElementById('searchInput').value='';document
 function parseChecklists(body){var sections=[],cur=null;(body||'').split('\n').forEach(function(line){var hm=line.match(/^#{1,3}\s+(.+)/);if(hm){if(cur)sections.push(cur);cur={title:hm[1].trim(),items:[]};return;}var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i),unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);if(chk||unk){if(!cur)cur={title:'General',items:[]};var text=(chk||unk)[1].trim();cur.items.push({text:text,checked:!!chk,hasIssue:/#\d+/.test(text),hasPR:!!text.match(/\bpr\b|\bpull request\b|merged|closes|closed via/i)});}});if(cur)sections.push(cur);return sections.filter(function(s){return s.items.length>0;});}
 function checklistStats(sections){var t=0,cPR=0,cM=0,wi=0,fu=0;sections.forEach(function(s){s.items.forEach(function(i){t++;if(i.checked){if(i.hasPR)cPR++;else cM++;}if(i.hasIssue)wi++;if(!i.hasIssue&&!i.checked)fu++;});});return{total:t,checked:cPR+cM,checkedPR:cPR,checkedManual:cM,withIssue:wi,future:fu,open:t-cPR-cM};}
 
-function captureWeeklySnapshot(){
+function getCurrentSnapshot(){
   var tracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';})&&isReportTracking(i.title);});
-  if(!tracking.length)return;
+  if(!tracking.length)return null;
   var total=0,cPR=0,cM=0,fut=0,nums=[];
   tracking.forEach(function(issue){nums.push(issue.id);var st=checklistStats(parseChecklists(issue.body));total+=st.total;cPR+=st.checkedPR;cM+=st.checkedManual;fut+=st.future;});
-  var history=loadHistory(),today=todayStr();
-  var row={date:today,tracking:nums.join('/'),total:total,closed:cPR+cM,closedPR:cPR,closedManual:cM,noIssue:fut,open:total-cPR-cM};
-  if(history.length>0&&history[history.length-1].date===today)history[history.length-1]=row;else history.push(row);
+  return{date:todayStr(),tracking:nums.join('/'),total:total,closed:cPR+cM,closedPR:cPR,closedManual:cM,noIssue:fut,open:total-cPR-cM};
+}
+
+function saveSnapshotToReport(){
+  var snap=getCurrentSnapshot();
+  if(!snap){alert('No CS Tracking issues found to snapshot.');return;}
+  var history=loadHistory();
+  if(history.length>0&&history[history.length-1].date===snap.date){
+    if(!confirm('A snapshot for today already exists. Replace it?'))return;
+    history[history.length-1]=snap;
+  } else {
+    history.push(snap);
+  }
   saveHistory(history);
+  renderReport();
 }
 
 function getTabIssues(tab){
@@ -428,8 +439,8 @@ function getTabIssues(tab){
     var closedT=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
     return openT.concat(closedT);
   }
-  if(t==='taskitem')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
   if(t==='newitems')return base.filter(function(i){return !hasCSLabel(i);});
+  if(t==='exceptions')return getExceptions();
   if(t==='qa')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs tracking';})&&isQATracking(i.title);});
   return base;
 }
@@ -446,8 +457,17 @@ function applyFilters(list){
   return list;
 }
 
-function sortIssues(list){
+function sortIssues(list,tab){
   var col=S.sortState.col,dir=S.sortState.dir;
+  if(tab==='taskitem'){
+    return list.slice().sort(function(a,b){
+      var aCS=a.title.toLowerCase().indexOf('cs ')===0;
+      var bCS=b.title.toLowerCase().indexOf('cs ')===0;
+      if(aCS&&!bCS)return-1;
+      if(!aCS&&bCS)return 1;
+      return a.title.toLowerCase().localeCompare(b.title.toLowerCase());
+    });
+  }
   return list.slice().sort(function(a,b){
     var av,bv;
     if(col==='age'){av=new Date(a.createdAt);bv=new Date(b.createdAt);}
@@ -467,7 +487,17 @@ function thHtml(col,label){
 }
 function doSort(col){if(S.sortState.col===col)S.sortState.dir*=-1;else{S.sortState.col=col;S.sortState.dir=1;}renderMain();}
 
+function getExceptions(){
+  var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.state==='open';});
+  return base.filter(function(i){return hasCSLabel(i)&&!i.parent;});
+}
+
 function renderStats(){
+  var csItem=labels.filter(function(l){return l.toLowerCase()==='cs item';});
+  var csOther=labels.filter(function(l){return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs item';}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+  var rest=labels.filter(function(l){return l.toLowerCase().indexOf('cs ')!==0;}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+  return csItem.concat(csOther).concat(rest);
+}
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
   var testingCount=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length+S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
   var stats=[
@@ -478,7 +508,8 @@ function renderStats(){
     {n:testingCount,l:'CS In Testing',c:'#7c3aed',tab:'testing'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,l:'CS Task Items',c:'#059669',tab:'taskitem'},
     {n:base.filter(function(i){return !hasCSLabel(i);}).length,l:'New Issues',c:'#0891b2',tab:'newitems'},
-    {n:S.closedIssues.length,l:'Recently Closed',c:'#374151',tab:'closed'}
+    {n:S.closedIssues.length,l:'Recently Closed',c:'#374151',tab:'closed'},
+    {n:getExceptions().length,l:'Exceptions',c:'#b91c1c',tab:'exceptions'}
   ];
   var html='';
   stats.forEach(function(s){
@@ -551,7 +582,7 @@ function renderTable(issues,tab,def){
     html+='<td style="color:#6b7280;font-size:12px">#'+issue.id+'</td>';
     html+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
     html+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';
-    issue.labels.forEach(function(l){html+=labelBadge(l);});
+    sortLabels(issue.labels).forEach(function(l){html+=labelBadge(l);});
     html+='</div></td>';
     if(S.repos.length>1)html+='<td style="font-size:12px;color:#6b7280">'+esc(issue.repo.split('/')[1])+'</td>';
     html+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
@@ -602,24 +633,121 @@ function renderMain(){
   renderStats();buildTabs();hideErr('dashErr');
   var t=S.activeTab;
   if(t==='report'){renderReport();return;}
+  if(t==='exceptions'){renderExceptions();return;}
   var def=TAB_DEFS.find(function(d){return d.id===t;});
-  var list=applyFilters(sortIssues(getTabIssues(t)));
+  var list=applyFilters(sortIssues(getTabIssues(t),t));
   document.getElementById('mainContent').innerHTML=renderTable(list,t,def);
 }
 
-function renderReport(){
-  var history=loadHistory();
-  if(!history.length){document.getElementById('mainContent').innerHTML='<div class="empty-state">No history yet — captured automatically on each load.</div>';return;}
-  var html='<div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn-sm" onclick="exportCSV()">&#x2B07; Export CSV</button><button class="btn-danger-sm" onclick="clearHistory()">Clear history</button></div>';
-  html+='<div class="report-wrap"><table class="report-table"><thead><tr>';
-  ['Date','Tracking issues','Total tasks','Net change','Closed','Via PR','Manual approval','No issue raised','Open'].forEach(function(h){html+='<th>'+h+'</th>';});
-  html+='</tr></thead><tbody>';
-  history.forEach(function(row,i){
-    var prev=i>0?history[i-1]:null;var net=prev!==null?row.total-prev.total:null;
-    var ns=net===null?'&mdash;':(net>0?'<span class="pos">+'+net+'</span>':(net<0?'<span class="neg">'+net+'</span>':'0'));
-    html+='<tr><td>'+esc(row.date)+'</td><td style="font-size:12px;color:#6b7280">'+esc(row.tracking)+'</td><td class="num">'+row.total+'</td><td class="num">'+ns+'</td><td class="num">'+row.closed+'</td><td class="num" style="color:#059669">'+(row.closedPR||0)+'</td><td class="num" style="color:#d97706">'+(row.closedManual||0)+'</td><td class="num">'+row.noIssue+'</td><td class="num">'+row.open+'</td></tr>';
+function renderExceptions(){
+  var list=applyFilters(sortIssues(getExceptions(),'exceptions'));
+  var html='<div class="group-hdr" style="background:#b91c1c"><span class="gtitle">Exceptions<span class="gcnt">'+list.length+'</span></span></div>';
+  html+='<div class="tbl-wrap"><table><thead><tr>';
+  html+=thHtml('id','#');
+  html+=thHtml('title','Title');
+  html+='<th>Labels</th>';
+  if(S.repos.length>1)html+=thHtml('repo','Repo');
+  html+='<th>Assignee</th><th>Exception reason</th>';
+  html+=thHtml('age','Age');
+  html+='<th></th></tr></thead><tbody>';
+  if(!list.length){html+='<tr><td colspan="99" class="empty-row">No exceptions found.</td></tr>';}
+  list.forEach(function(issue){
+    var ikey=issue.id+'_'+issue.repo;
+    var days=ageInDays(issue.createdAt);
+    html+='<tr style="background:#fff5f5">';
+    html+='<td style="color:#6b7280;font-size:12px">#'+issue.id+'</td>';
+    html+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
+    html+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';
+    sortLabels(issue.labels).forEach(function(l){html+=labelBadge(l);});
+    html+='</div></td>';
+    if(S.repos.length>1)html+='<td style="font-size:12px;color:#6b7280">'+esc(issue.repo.split('/')[1])+'</td>';
+    html+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
+    html+='<td><span class="badge" style="background:#fee2e2;color:#991b1b">&#9888; No parent relationship</span></td>';
+    html+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td>';
+    html+='<td><button class="btn-ignore" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
+    html+='</tr>';
   });
   html+='</tbody></table></div>';
+  document.getElementById('mainContent').innerHTML=html;
+}
+
+function renderReport(){
+  var snap=getCurrentSnapshot();
+  var history=loadHistory();
+  var COLS=['Date','Tracking issues','Total tasks','Net change','Closed','Via PR','Manual approval','No issue raised','Open'];
+
+  var html='';
+
+  // Live preview grid
+  html+='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
+  html+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">Today\'s snapshot</div><div style="font-size:12px;color:#9ca3af;margin-top:2px">'+todayStr()+'</div></div>';
+  html+='<button class="btn-primary" onclick="saveSnapshotToReport()" style="font-size:13px;padding:8px 18px">&#x2B07; Save to report</button>';
+  html+='</div>';
+
+  if(!snap){
+    html+='<div style="color:#9ca3af;font-size:13px">No CS Tracking issues found.</div>';
+  } else {
+    var prevRow=history.length>0?history[history.length-1]:null;
+    var net=prevRow!==null?snap.total-prevRow.total:null;
+    var netColor=net===null?'#6b7280':net>0?'#059669':net<0?'#dc2626':'#6b7280';
+    var netStr=net===null?'—':(net>0?'+'+net:String(net));
+    var tiles=[
+      {l:'Tracking issues',v:snap.tracking,c:'#4338ca',small:true},
+      {l:'Total tasks',v:snap.total,c:'#1e1b4b'},
+      {l:'Net change',v:netStr,c:netColor},
+      {l:'Closed',v:snap.closed,c:'#059669'},
+      {l:'Via PR',v:snap.closedPR,c:'#059669'},
+      {l:'Manual approval',v:snap.closedManual,c:'#d97706'},
+      {l:'No issue raised',v:snap.noIssue,c:'#6b7280'},
+      {l:'Open',v:snap.open,c:'#dc2626'}
+    ];
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px">';
+    tiles.forEach(function(t){
+      html+='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;text-align:center">';
+      html+='<div style="font-size:'+(t.small?'13px':'1.6rem')+';font-weight:'+(t.small?'600':'800')+';color:'+t.c+';word-break:break-all">'+esc(String(t.v))+'</div>';
+      html+='<div style="font-size:11px;font-weight:600;color:#9ca3af;margin-top:4px;text-transform:uppercase;letter-spacing:0.04em">'+esc(t.l)+'</div>';
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+
+  // History table
+  html+='<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">';
+  html+='<div style="font-size:14px;font-weight:700;color:#1e1b4b;flex:1">Report history</div>';
+  if(history.length){
+    html+='<button class="btn-sm" onclick="exportCSV()">&#x2B07; Export CSV</button>';
+    html+='<button class="btn-danger-sm" onclick="clearHistory()">Clear history</button>';
+  }
+  html+='</div>';
+
+  if(!history.length){
+    html+='<div class="empty-state">No saved snapshots yet. Click "Save to report" above to add one.</div>';
+  } else {
+    html+='<div class="report-wrap"><table class="report-table"><thead><tr>';
+    COLS.forEach(function(h){html+='<th>'+h+'</th>';});
+    html+='<th></th>';
+    html+='</tr></thead><tbody>';
+    history.forEach(function(row,i){
+      var prev=i>0?history[i-1]:null;
+      var net=prev!==null?row.total-prev.total:null;
+      var ns=net===null?'&mdash;':(net>0?'<span class="pos">+'+net+'</span>':(net<0?'<span class="neg">'+net+'</span>':'0'));
+      html+='<tr>';
+      html+='<td>'+esc(row.date)+'</td>';
+      html+='<td style="font-size:12px;color:#6b7280">'+esc(row.tracking)+'</td>';
+      html+='<td class="num">'+row.total+'</td>';
+      html+='<td class="num">'+ns+'</td>';
+      html+='<td class="num">'+row.closed+'</td>';
+      html+='<td class="num" style="color:#059669">'+(row.closedPR||0)+'</td>';
+      html+='<td class="num" style="color:#d97706">'+(row.closedManual||0)+'</td>';
+      html+='<td class="num">'+row.noIssue+'</td>';
+      html+='<td class="num">'+row.open+'</td>';
+      html+='<td><button class="btn-danger-sm" style="font-size:11px;padding:3px 8px" onclick="deleteReportRow('+i+')">&#x2715;</button></td>';
+      html+='</tr>';
+    });
+    html+='</tbody></table></div>';
+  }
   document.getElementById('mainContent').innerHTML=html;
 }
 
@@ -669,6 +797,10 @@ async function saveZHSettings(){
 }
 function disconnectZH(){S.zhToken='';S.zhWorkspace='';S.repoIds={};S.zhPipelines={};S.zhIssueMap={};S.issues.forEach(function(i){i.pipeline=null;});saveZHCreds();renderMain();toggleSettings();}
 
+function deleteReportRow(idx){
+  if(!confirm('Remove this row from the report?'))return;
+  var history=loadHistory();history.splice(idx,1);saveHistory(history);renderReport();
+}
 function exportCSV(){var history=loadHistory();var rows=['Date,Tracking Issues,Total Tasks,Net Change,Closed,Via PR,Manual Approval,No Issue Raised,Open'];history.forEach(function(row,i){var prev=i>0?history[i-1]:null;var net=prev!==null?row.total-prev.total:'';rows.push([row.date,row.tracking,row.total,net,row.closed,row.closedPR||0,row.closedManual||0,row.noIssue,row.open].join(','));});var blob=new Blob([rows.join('\n')],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cis_cs_report.csv';a.click();}
 function clearHistory(){if(!confirm('Clear all report history? This cannot be undone.'))return;localStorage.removeItem(STORAGE_KEY);renderReport();}
 
