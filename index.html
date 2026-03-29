@@ -313,9 +313,13 @@ async function connect(){
   }
   var btn=document.getElementById('connectBtn');btn.disabled=true;btn.innerHTML='<span class="spin spin-dark"></span>Loading...';
   try{
-    await loadLabelColors();await loadIssues();
-    if(S.zhToken&&S.zhWorkspace)await loadZHData();
+    await loadLabelColors();
+    await loadIssues();
     populateFilters();showDash();buildTabs();renderMain();
+    // Load ZenHub in background after dashboard is visible
+    if(S.zhToken&&S.zhWorkspace){
+      loadZHData().then(function(){populateFilters();renderMain();}).catch(function(e){console.warn('ZenHub load failed:',e.message);});
+    }
   }catch(e){showErr('setupErr',e.message);}
   btn.disabled=false;btn.textContent='▶ Load Dashboard';
 }
@@ -419,8 +423,11 @@ async function doRefresh(){
   var btn=document.getElementById('refreshBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
     await loadLabelColors();await loadIssues();
-    if(S.zhToken&&S.zhWorkspace){S.zhIssueMap={};await loadZHData();}
     populateFilters();buildTabs();renderMain();
+    if(S.zhToken&&S.zhWorkspace){
+      S.zhIssueMap={};
+      loadZHData().then(function(){populateFilters();renderMain();}).catch(function(e){console.warn('ZenHub refresh failed:',e.message);});
+    }
   }catch(e){showErr('dashErr',e.message);}
   btn.disabled=false;btn.innerHTML='&#x21BB; Refresh';
 }
@@ -789,9 +796,8 @@ function renderSettingsPanel(){
   h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">ZenHub API Token</label>';
   h+='<input type="password" id="zhTokenInput" value="'+esc(S.zhToken)+'" placeholder="ZenHub token..." style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/></div>';
   h+='<div class="fg" style="margin-top:10px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Workspace ID</label>';
-  h+='<div style="display:flex;gap:6px"><input type="text" id="zhWorkspaceInput" value="'+esc(S.zhWorkspace)+'" placeholder="e.g. 5e8f9c..." style="flex:1;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>';
-  h+='<button class="btn-sm" onclick="lookupWorkspaces()" style="white-space:nowrap">&#x1F50D; Look up</button></div></div>';
-  h+='<div id="zhWorkspaceList" style="display:none;margin-top:8px"></div>';
+  h+='<input type="text" id="zhWorkspaceInput" value="'+esc(S.zhWorkspace)+'" placeholder="e.g. 5e8f9c..." style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>';
+  h+='<div style="font-size:11px;color:#9ca3af;margin-top:4px">Find in ZenHub: Settings &rarr; Organizations &rarr; your org &rarr; Workspace ID</div></div>';
   h+='<div id="zhSettingsErr" style="display:none;margin-top:8px"></div>';
   h+='<div style="margin-top:14px;display:flex;gap:8px"><button class="btn-primary" id="saveZHBtn" onclick="saveZHSettings()">Save &amp; Connect</button>';
   if(S.zhToken)h+='<button class="btn-sm" onclick="disconnectZH()">Disconnect</button>';
