@@ -142,6 +142,7 @@ tr:hover td{background:#f9fafb}
         <button class="btn btn-white" onclick="showSetup()">&#x21BA; Reconnect</button>
         <button class="btn btn-white" id="refreshBtn" onclick="doRefresh()">&#x21BB; Refresh</button>
         <button class="btn btn-white" onclick="toggleSettings()">&#x2699;&#xFE0F; ZenHub</button>
+        <button class="btn btn-white" onclick="showZHDebug()" style="background:rgba(255,200,0,0.25);border-color:rgba(255,200,0,0.6)">&#x1F50D; ZH Debug</button>
       </div>
     </div>
   </div>
@@ -511,6 +512,42 @@ async function loadZHDependencies(){
 function repoForId(repoId){
   var match=Object.keys(S.repoIds).find(function(r){ return S.repoIds[r]===repoId; });
   return match||null;
+}
+
+async function showZHDebug(){
+  var issueNum=prompt('Enter an issue number to inspect (one that should have a parent):');
+  if(!issueNum) return;
+  issueNum=parseInt(issueNum);
+  var repo=S.repos[0];
+  var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;
+  var repoId=S.repoIds[repo];
+  if(!ws||!repoId){ alert('ZenHub not connected.'); return; }
+  var out={};
+  var paths=[
+    '/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueNum,
+    '/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueNum+'/relationships',
+    '/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics',
+  ];
+  for(var i=0;i<paths.length;i++){
+    try{ out[paths[i]]=await zhGet(paths[i]); }
+    catch(e){ out[paths[i]]='ERROR: '+e.message; }
+  }
+  // Check if this issue is in any epic
+  try{
+    var epicsData=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');
+    var foundInEpics=[];
+    for(var j=0;j<(epicsData.epic_issues||[]).length;j++){
+      var ep=epicsData.epic_issues[j];
+      try{
+        var ed=await zhGet('/p2/workspaces/'+(S.repoWorkspaceMap[repoForId(ep.repo_id)||repo]||ws)+'/repositories/'+ep.repo_id+'/epics/'+ep.issue_number);
+        var match=(ed.issues||[]).find(function(x){ return x.issue_number===issueNum; });
+        if(match) foundInEpics.push({epicNum:ep.issue_number,epicRepoId:ep.repo_id,childEntry:match});
+      } catch(e){}
+    }
+    out['foundInEpics']=foundInEpics;
+  } catch(e){ out['epicSearch']='ERROR: '+e.message; }
+  var win=window.open('','_blank');
+  win.document.write('<pre style="font-size:12px;padding:16px;white-space:pre-wrap">'+JSON.stringify(out,null,2)+'</pre>');
 }
 
 async function loadIssues(){
