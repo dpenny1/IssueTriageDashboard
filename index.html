@@ -65,7 +65,7 @@ tr:hover td{background:#f9fafb}
 .of{font-size:11px;padding:2px 8px;border-radius:6px;background:#fee2e2;color:#991b1b;font-weight:600}
 .rw{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.07);overflow-x:auto}
 .rt{width:100%;border-collapse:collapse;font-size:13px}
-.rt th{text-align:center;padding:10px 14px;border-bottom:2px solid #e5e7eb;font-weight:700;color:#374151;font-size:12px;white-space:nowrap;background:#f9fafb}
+.rt th{text-align:center;padding:10px 14px;border-bottom:2px solid #e5e7eb;font-weight:700;color:#374151;font-size:12px;white-space:nowrap;background:#f9fafb;text-transform:none;letter-spacing:normal;cursor:default}
 .rt td{padding:9px 14px;border-bottom:1px solid #f3f4f6;vertical-align:middle;text-align:center}
 .rt tr:last-child td{border-bottom:none}
 .rt tr:hover td{background:#f9fafb}
@@ -523,17 +523,8 @@ function getCurrentSnapshot(){
     var r=parseSnapshotIssue(issue);
     rows.push(r);total+=r.total;closed+=r.closed;open+=r.open;noIssue+=r.noIssue;
   });
-  // Sort rows: CS Production Issues first, CS Features second, other CS* third, rest alpha
-  rows.sort(function(a,b){
-    var at=a.title.toLowerCase(),bt=b.title.toLowerCase();
-    var aP=at.indexOf('cs production issues')===0,bP=bt.indexOf('cs production issues')===0;
-    var aF=at.indexOf('cs features')===0,bF=bt.indexOf('cs features')===0;
-    var aCS=at.indexOf('cs ')===0,bCS=bt.indexOf('cs ')===0;
-    if(aP&&!bP)return -1;if(!aP&&bP)return 1;
-    if(aF&&!bF)return -1;if(!aF&&bF)return 1;
-    if(aCS&&!bCS)return -1;if(!aCS&&bCS)return 1;
-    return at.localeCompare(bt);
-  });
+  // Sort rows by issue number ascending
+  rows.sort(function(a,b){return a.id-b.id;});
   return{date:todayStr(),tracking:nums.join('/'),total:total,closed:closed,open:open,noIssue:noIssue,rows:rows};
 }
 
@@ -599,8 +590,7 @@ function renderReport(){
   } else {
     h+='<div class="rw" style="margin-bottom:0"><table class="rt"><thead><tr>';
     h+='<th style="text-align:left">#</th><th style="text-align:left">Task Name</th>';
-    ['Total','Closed','Open','No Issue Raised'].forEach(function(x){h+='<th>'+x+'</th>';});
-    h+='</tr></thead><tbody>';
+    ['Total','Closed','Open','No Issue Raised'].forEach(function(x){h+='<th>'+x+'</th>';});    h+='</tr></thead><tbody>';
     snap.rows.forEach(function(row){
       h+='<tr>';
       h+='<td class="tl" style="font-size:12px;color:#6b7280"><a href="'+esc(row.url)+'" target="_blank">#'+row.id+'</a></td>';
@@ -613,7 +603,7 @@ function renderReport(){
     });
     h+='<tr style="background:#f0f4ff;font-weight:700;border-top:2px solid #e5e7eb">';
     h+='<td colspan="2" class="tl" style="font-size:13px;color:#374151">Totals</td>';
-    h+='<td class="num">'+snap.total+'</td>';
+    h+='<td class="num">'+(snap.total+snap.noIssue)+'</td>';
     h+='<td class="num" style="color:#059669">'+snap.closed+'</td>';
     h+='<td class="num" style="color:#dc2626">'+snap.open+'</td>';
     h+='<td class="num">'+snap.noIssue+'</td>';
@@ -630,8 +620,7 @@ function renderReport(){
   if(!history.length){h+='<div class="es">No saved snapshots yet.</div>';}
   else{
     h+='<div class="rw"><table class="rt"><thead><tr>';
-    ['Date','Tracking Issues','Total','Net Change','Closed','Open','No Issue Raised',''].forEach(function(x){h+='<th>'+x+'</th>';});
-    h+='</tr></thead><tbody>';
+    ['Date','Tracking Issues','Total','Net Change','Closed','Open','No Issue Raised',''].forEach(function(x){h+='<th>'+x+'</th>';});    h+='</tr></thead><tbody>';
     history.slice().reverse().forEach(function(row,i){
       var actualIdx=history.length-1-i;
       var pv=actualIdx>0?history[actualIdx-1]:null,nt=pv!==null?row.total-pv.total:null;
