@@ -1024,8 +1024,27 @@ async function saveZHSettings(){
   var token=document.getElementById('zhTokenInput').value.trim(), ws=document.getElementById('zhWorkspaceInput').value.trim();
   if(!token||!ws){ showErr('zhSettingsErr','Both fields are required.'); return; }
   S.zhToken=token; S.zhWorkspace=ws; saveZHCreds();
+  S.repos.forEach(function(repo){ S.repoWorkspaceMap[repo]=ws; });
   var btn=document.getElementById('saveZHBtn'); btn.disabled=true; btn.innerHTML='<span class="spin spin-dark"></span>Connecting...';
-  try{ await loadZHData(); populateFilters(); renderMain(); toggleSettings(); }
+  try{
+    // Debug: test the board endpoint directly and show result
+    var repo=S.repos[0];
+    var rd=await ghFetch('/repos/'+repo);
+    var repoId=rd.id;
+    var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/board');
+    var errEl=document.getElementById('zhSettingsErr');
+    errEl.className='';
+    errEl.style.display='block';
+    errEl.style.background='#f0fdf4';
+    errEl.style.border='1px solid #86efac';
+    errEl.style.borderRadius='8px';
+    errEl.style.padding='10px 14px';
+    errEl.style.fontSize='12px';
+    errEl.style.color='#166534';
+    errEl.innerHTML='<b>ZH Board response:</b> repoId='+repoId+' | pipelines='+(bd.pipelines?bd.pipelines.length:'none')+'<br>'
+      +(bd.pipelines||[]).map(function(p){ return '&bull; '+p.name+' ('+( p.issues?p.issues.length:0)+' issues)'; }).join('<br>');
+    await loadZHData(); populateFilters(); renderMain();
+  }
   catch(e){ showErr('zhSettingsErr','ZenHub error: '+e.message); }
   btn.disabled=false; btn.textContent='Save & Connect';
 }
