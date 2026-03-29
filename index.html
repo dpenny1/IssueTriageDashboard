@@ -130,6 +130,7 @@ tr:hover td{background:#f9fafb}
   </div></div>
   <div class="main">
     <div id="settingsPanel" style="display:none"></div>
+    <div id="zhBanner"></div>
     <div class="sgrid" id="statGrid"></div>
     <div class="tw" id="tabsWrap"></div>
     <div class="sb" id="searchBar">
@@ -139,7 +140,6 @@ tr:hover td{background:#f9fafb}
       <select id="filterPipeline" onchange="renderMain()"><option value="">All pipelines</option></select>
       <button onclick="clearFilters()" style="font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;text-decoration:underline;font-weight:600">Clear</button>
     </div>
-    <div id="zhBanner"></div>
     <div id="dashErr" style="display:none;margin-bottom:12px"></div>
     <div id="mainContent"></div>
   </div>
@@ -557,6 +557,7 @@ function sortIssues(list,tab){
     return at.localeCompare(bt);
   });
   var col=S.sortState.col,dir=S.sortState.dir;
+  if(tab==='newitems'&&col==='age')dir=1;
   return list.slice().sort(function(a,b){
     var av,bv;
     if(col==='age'||col==='created'){av=new Date(a.createdAt);bv=new Date(b.createdAt);}
@@ -786,7 +787,13 @@ function renderReport(){
   h+='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
   if(excCount>0)h+='<div style="font-size:12px;color:#dc2626;font-weight:600;display:flex;align-items:center;gap:5px"><span>⚠</span><span>'+excCount+' unresolved exception'+(excCount>1?'s':'')+' — resolve before saving</span><button class="btn-sm" style="font-size:11px;padding:3px 9px;border-color:#fca5a5;color:#dc2626" onclick="switchTab(\'exceptions\')">View</button></div>';
   h+='<button class="btn-p" onclick="saveSnap()" style="font-size:13px;padding:8px 18px"'+(canSave?'':' disabled')+'>⬇ Save to report</button></div></div>';
-  if(!snap){h+='<div style="color:#9ca3af;font-size:13px">No CS Tracking issues found.</div>';}
+  if(!snap){
+    var anyTracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
+    var msg=anyTracking.length
+      ?'Found '+anyTracking.length+' CS Task Item issue(s) but none match the title filter (must start with "CS " and not contain "research"). Titles: '+anyTracking.map(function(i){return '"'+i.title+'"';}).join(', ')
+      :'No open issues with the "CS Task Item" label found.';
+    h+='<div style="color:#9ca3af;font-size:13px">'+esc(msg)+'</div>';
+  }
   else{
     var prev=history.length>0?history[history.length-1]:null,net=prev!==null?snap.total-prev.total:null;
     var nc=net===null?'#6b7280':net>0?'#059669':net<0?'#dc2626':'#6b7280',ns=net===null?'—':(net>0?'+'+net:String(net));
@@ -855,7 +862,8 @@ function renderSettings(){
   h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">ZenHub API Token</label>';
   h+='<input type="text" id="zhTI" value="" placeholder="Paste token from app.zenhub.com → API Tokens" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhToken?'<div style="font-size:11px;color:#059669;margin-top:3px">✓ Token saved</div>':'')+'</div>';
   h+='<div class="fg" style="margin-top:10px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Workspace ID</label>';
-  h+='<input type="text" id="zhWI" value="'+esc(S.zhWorkspace)+'" placeholder="Numeric ID from ZenHub workspace settings" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhWorkspace?'<div style="font-size:11px;color:#6b7280;margin-top:3px">Current: '+esc(S.zhWorkspace)+'</div>':'')+'</div>';
+  h+='<input type="text" id="zhWI" value="'+esc(S.zhWorkspace)+'" placeholder="Numeric ID from ZenHub workspace settings" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'
+    +(S.zhWorkspace?'<div style="font-size:11px;color:#059669;margin-top:3px">✓ Workspace saved: '+esc(S.zhWorkspace)+'</div>':'<div style="font-size:11px;color:#dc2626;margin-top:3px">⚠ No workspace ID — check your project settings in Manage Projects</div>')+'</div>';
   h+='<div id="zhErr" style="display:none;margin-top:8px"></div>';
   h+='<div style="margin-top:14px;display:flex;gap:8px"><button class="btn-p" id="zhSaveBtn" onclick="saveZH()">Save &amp; Connect</button>';
   if(S.zhToken)h+='<button class="btn-sm" onclick="disconnectZH()">Disconnect</button>';
