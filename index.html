@@ -91,7 +91,7 @@ tr:hover td{background:#f9fafb}
 <div id="setup">
   <div class="header">
     <div class="header-inner">
-      <div><h1>&#x1F4CB; CS GitHub Issues Hub</h1><p>Select a project to get started</p></div>
+      <div><h1>&#x1F4CB; CS Issues Hub</h1><p>Select a project to get started</p></div>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-white">&#x1F6E0; PM Tools</a>
     </div>
   </div>
@@ -135,14 +135,12 @@ tr:hover td{background:#f9fafb}
 <div id="dash">
   <div class="header">
     <div class="header-inner">
-      <div><h1>&#x1F4CB; CS GitHub Issues Hub</h1><p id="dashMeta">Loading...</p></div>
+      <div><h1>&#x1F4CB; CS Issues Hub</h1><p id="dashMeta">Loading...</p></div>
       <div class="header-btns">
         <span id="loadedAt" style="color:#c7d2fe;font-size:12px"></span>
         <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-white">&#x1F6E0; PM Tools</a>
-        <button class="btn btn-white" onclick="showSetup()">&#x21BA; Reconnect</button>
         <button class="btn btn-white" id="refreshBtn" onclick="doRefresh()">&#x21BB; Refresh</button>
-        <button class="btn btn-white" onclick="toggleSettings()">&#x2699;&#xFE0F; ZenHub</button>
-        <button class="btn btn-white" onclick="showZHDebug()" style="background:rgba(255,200,0,0.25);border-color:rgba(255,200,0,0.6)">&#x1F50D; ZH Debug</button>
+        <button class="btn btn-white" onclick="toggleSettings()">&#x2699;&#xFE0F; Settings</button>
       </div>
     </div>
   </div>
@@ -181,8 +179,8 @@ var TAB_DEFS = [
   {id:'prod',       label:'Production Patch', color:'#dc2626'},
   {id:'uat',        label:'UAT Patch',        color:'#d97706'},
   {id:'csitems',    label:'CS Items',         color:'#4338ca'},
-  {id:'testing',    label:'CS In Testing',    color:'#7c3aed'},
-  {id:'taskitem',   label:'CS Task Items',    color:'#059669'},
+  {id:'testing',    label:'CS In Testing',    color:'#059669'},
+  {id:'taskitem',   label:'CS Task Items',    color:'#7c3aed'},
   {id:'exceptions', label:'Exceptions',       color:'#b91c1c'},
   {id:'closed',     label:'Recently Closed',  color:'#374151'},
   {id:'ignored',    label:'Ignored',          color:'#6b7280'},
@@ -234,6 +232,8 @@ function isException(issue){
   if(issue.state!=='open') return false;
   if(issue.parent) return false;
   if(isExceptionExempt(issue)) return false;
+  // CS In Testing issues are never exceptions — they belong to the testing tab
+  if(issue.labels.some(function(l){ return l.toLowerCase()==='cs in testing'; })) return false;
   if(hasCSLabel(issue)) return true;
   if(getAutoClosedItems(issue).length>0) return true;
   if(isNewIssuesPipeline(issue)) return true;
@@ -992,7 +992,11 @@ function renderSettingsPanel(){
   var el=document.getElementById('settingsPanel');
   if(!S.showSettings){ el.style.display='none'; return; }
   el.style.display='block';
-  el.innerHTML='<div class="settings-panel"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font-size:14px;font-weight:700;color:#1e1b4b">&#x2699; ZenHub Settings</span><button class="btn-sm" onclick="toggleSettings()">Close</button></div>'
+  el.innerHTML='<div class="settings-panel"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font-size:14px;font-weight:700;color:#1e1b4b">&#x2699; Settings</span><button class="btn-sm" onclick="toggleSettings()">Close</button></div>'
+    +'<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'
+    +'<button class="btn-primary" style="justify-content:center" onclick="toggleSettings();showSetup()">&#x1F4BB; Reconnect GitHub</button>'
+    +'</div>'
+    +'<div style="font-size:13px;font-weight:700;color:#1e1b4b;margin-bottom:10px;padding-top:10px;border-top:1px solid #e5e7eb">ZenHub</div>'
     +'<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">ZenHub API Token</label><input type="password" id="zhTokenInput" value="'+esc(S.zhToken)+'" placeholder="ZenHub token..." style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/></div>'
     +'<div class="fg" style="margin-top:10px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Workspace ID</label><input type="text" id="zhWorkspaceInput" value="'+esc(S.zhWorkspace)+'" placeholder="e.g. 5e8f9c..." style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/></div>'
     +'<div id="zhSettingsErr" style="display:none;margin-top:8px"></div>'
