@@ -212,8 +212,10 @@ function getAutoClosedItems(issue){
 }
 
 function isException(issue){
+  // Never flag issues that have a parent
+  if(issue.parent) return false;
   // Original rule: open CS-labelled issue with no parent
-  if(issue.state==='open'&&hasCSLabel(issue)&&!issue.parent) return true;
+  if(issue.state==='open'&&hasCSLabel(issue)) return true;
   // New rule: open CS Task Item with any checklist item auto-closed via PR
   if(issue.state==='open'){
     var autoItems=getAutoClosedItems(issue);
@@ -742,13 +744,63 @@ function saveSnapshotToReport(){
 
 function deleteReportRow(idx){ if(!confirm('Remove this row?')) return; var h=loadHistory(); h.splice(idx,1); saveHistory(h); renderReport(); }
 
+function importCSV(){
+  var inp=document.createElement('input'); inp.type='file'; inp.accept='.csv';
+  inp.onchange=function(e){
+    var file=e.target.files[0]; if(!file) return;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var lines=ev.target.result.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+      if(!lines.length){ alert('Empty file.'); return; }
+      var start=lines[0].toLowerCase().indexOf('date')!==-1?1:0;
+      var imported=[], skipped=0;
+      for(var i=start;i<lines.length;i++){
+        var cols=lines[i].split(',');
+        if(cols.length<9){ skipped++; continue; }
+        var row={date:(cols[0]||'').trim(),tracking:(cols[1]||'').trim(),
+          total:parseInt(cols[2])||0,closed:parseInt(cols[4])||0,
+          closedPR:parseInt(cols[5])||0,closedManual:parseInt(cols[6])||0,
+          noIssue:parseInt(cols[7])||0,open:parseInt(cols[8])||0};
+        if(!row.date){ skipped++; continue; }
+        imported.push(row);
+      }
+      if(!imported.length){ alert('No valid rows found.'); return; }
+      var history=loadHistory();
+      var existingDates={};
+      history.forEach(function(r){ existingDates[r.date]=1; });
+      var added=0, dupes=0;
+      imported.forEach(function(r){ if(existingDates[r.date]){ dupes++; } else { history.push(r); added++; } });
+      history.sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
+      saveHistory(history);
+      alert('Imported '+added+' row(s).'+(dupes?' Skipped '+dupes+' duplicate date(s).':''));
+      renderReport();
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+}
+
 function renderReport(){
   var snap=getCurrentSnapshot(), history=loadHistory();
+  var excCount=getExceptions().length;
+  var canSave=snap&&excCount===0;
   var html='';
+
+  // Snapshot card
   html+='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px">';
   html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
   html+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">Today\'s snapshot</div><div style="font-size:12px;color:#9ca3af;margin-top:2px">'+todayStr()+'</div></div>';
-  html+='<button class="btn-primary" onclick="saveSnapshotToReport()" style="font-size:13px;padding:8px 18px">&#x2B07; Save to report</button></div>';
+
+  // Save button area
+  html+='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
+  if(excCount>0){
+    html+='<div style="font-size:12px;color:#dc2626;font-weight:600;display:flex;align-items:center;gap:5px">'
+      +'<span>&#9888;</span><span>'+excCount+' unresolved exception'+(excCount>1?'s':'')+' — resolve before saving</span>'
+      +'<button class="btn-sm" style="font-size:11px;padding:3px 9px;border-color:#fca5a5;color:#dc2626" onclick="switchTab(\'exceptions\')">View</button></div>';
+  }
+  html+='<button class="btn-primary" onclick="saveSnapshotToReport()" style="font-size:13px;padding:8px 18px"'+(canSave?'':' disabled title="'+(excCount>0?'Resolve exceptions first':'No snapshot available')+'"')+'>&#x2B07; Save to report</button>';
+  html+='</div></div>';
+
   if(!snap){
     html+='<div style="color:#9ca3af;font-size:13px">No CS Tracking issues found.</div>';
   } else {
@@ -775,9 +827,13 @@ function renderReport(){
     html+='</div>';
   }
   html+='</div>';
+
+  // History header
   html+='<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center"><div style="font-size:14px;font-weight:700;color:#1e1b4b;flex:1">Report history</div>';
+  html+='<button class="btn-sm" onclick="importCSV()">&#x2B06; Import CSV</button>';
   if(history.length){ html+='<button class="btn-sm" onclick="exportCSV()">&#x2B07; Export CSV</button><button class="btn-danger-sm" onclick="clearHistory()">Clear history</button>'; }
   html+='</div>';
+
   if(!history.length){
     html+='<div class="empty-state">No saved snapshots yet. Click "Save to report" above to add one.</div>';
   } else {
