@@ -143,7 +143,7 @@ tr:hover td{background:#f9fafb}
 </div>
 
 <script>
-var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],activeTab:'newitems',labelColors:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},showSettings:false,activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{}};
+var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],activeTab:'newitems',labelColors:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},showSettings:false,activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null};
 var STORAGE_KEY='cis_hub_report_v6',IGNORED_KEY='cis_hub_ignored_v6',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2';
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
 var TAB_DEFS=[
@@ -188,7 +188,7 @@ function showErr(id,msg){var el=document.getElementById(id);el.className='err-bo
 function hideErr(id){document.getElementById(id).style.display='none';}
 function showEl(id){document.getElementById(id).style.display='block';}
 function hideEl(id){document.getElementById(id).style.display='none';}
-function showSetup(){['dash','configureScreen'].forEach(hideEl);showEl('setup');renderProfileDropdown();}
+function showSetup(){stopAutoRefresh();['dash','configureScreen'].forEach(hideEl);showEl('setup');renderProfileDropdown();}
 function showDash(){['setup','configureScreen'].forEach(hideEl);showEl('dash');}
 function showConfigureScreen(){['setup','dash'].forEach(hideEl);showEl('configureScreen');renderConfigureScreen();}
 function backToSetup(){['configureScreen','dash'].forEach(hideEl);showEl('setup');renderProfileDropdown();}
@@ -316,9 +316,19 @@ async function connect(){
     await loadLabelColors();
     await loadIssues();
     populateFilters();showDash();buildTabs();renderMain();
+    startAutoRefresh();
     // Load ZenHub in background after dashboard is visible
     if(S.zhToken&&S.zhWorkspace){
-      loadZHData().then(function(){populateFilters();renderMain();}).catch(function(e){console.warn('ZenHub load failed:',e.message);});
+      document.getElementById('loadedAt').innerHTML='<span style="color:#fbbf24">&#x29D7; ZenHub loading...</span>';
+      loadZHData().then(function(){
+        populateFilters();renderMain();
+        document.getElementById('loadedAt').innerHTML='<span style="color:#6ee7b7">&#10003; ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>';
+      }).catch(function(e){
+        document.getElementById('loadedAt').innerHTML='<span style="color:#fca5a5">&#x2715; ZenHub failed: '+esc(e.message)+'</span>';
+        console.warn('ZenHub load failed:',e.message);
+      });
+    } else {
+      document.getElementById('loadedAt').textContent=new Date().toLocaleTimeString();
     }
   }catch(e){showErr('setupErr',e.message);}
   btn.disabled=false;btn.textContent='▶ Load Dashboard';
@@ -419,6 +429,15 @@ async function loadIssues(){
   document.getElementById('loadedAt').textContent='Loaded '+new Date().toLocaleTimeString();
 }
 
+function startAutoRefresh(){
+  if(S.autoRefreshTimer)clearInterval(S.autoRefreshTimer);
+  S.autoRefreshTimer=setInterval(function(){doRefresh();},15*60*1000);
+}
+
+function stopAutoRefresh(){
+  if(S.autoRefreshTimer){clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=null;}
+}
+
 async function doRefresh(){
   var btn=document.getElementById('refreshBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{
@@ -426,7 +445,15 @@ async function doRefresh(){
     populateFilters();buildTabs();renderMain();
     if(S.zhToken&&S.zhWorkspace){
       S.zhIssueMap={};
-      loadZHData().then(function(){populateFilters();renderMain();}).catch(function(e){console.warn('ZenHub refresh failed:',e.message);});
+      document.getElementById('loadedAt').innerHTML='<span style="color:#fbbf24">&#x29D7; ZenHub loading...</span>';
+      loadZHData().then(function(){
+        populateFilters();renderMain();
+        document.getElementById('loadedAt').innerHTML='<span style="color:#6ee7b7">&#10003; ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>';
+      }).catch(function(e){
+        document.getElementById('loadedAt').innerHTML='<span style="color:#fca5a5">&#x2715; ZenHub failed: '+esc(e.message)+'</span>';
+      });
+    } else {
+      document.getElementById('loadedAt').textContent=new Date().toLocaleTimeString();
     }
   }catch(e){showErr('dashErr',e.message);}
   btn.disabled=false;btn.innerHTML='&#x21BB; Refresh';
@@ -607,7 +634,7 @@ function renderTable(issues,tab,def){
     var isOpenTesting=isTesting&&issue.state==='open';
     h+='<tr'+(isOpenTesting||isExc?' style="background:#fff5f5"':'')+'>';
     h+='<td style="color:#6b7280;font-size:12px">#'+issue.id+'</td>';
-    h+='<td style="min-width:200px"><a href="'+esc(zhIssueUrl(issue))+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
+    h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
     h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';
     sortLabels(issue.labels).forEach(function(l){h+=labelBadge(l);});
     h+='</div></td>';
@@ -794,7 +821,7 @@ function renderSettingsPanel(){
   h+='<div style="margin-bottom:16px"><button class="btn-primary" style="justify-content:center;width:100%" onclick="toggleSettings();showSetup()">&#x1F4BB; Reconnect GitHub</button></div>';
   h+='<div style="font-size:13px;font-weight:700;color:#1e1b4b;margin-bottom:10px;padding-top:10px;border-top:1px solid #e5e7eb">ZenHub</div>';
   h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">ZenHub API Token</label>';
-  h+='<input type="password" id="zhTokenInput" value="'+esc(S.zhToken)+'" placeholder="ZenHub token..." style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/></div>';
+  h+='<input type="text" id="zhTokenInput" value="'+esc(S.zhToken)+'" placeholder="ZenHub token..." autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/></div>';
   h+='<div class="fg" style="margin-top:10px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Workspace ID</label>';
   h+='<input type="text" id="zhWorkspaceInput" value="'+esc(S.zhWorkspace)+'" placeholder="e.g. 5e8f9c..." style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>';
   h+='<div style="font-size:11px;color:#9ca3af;margin-top:4px">Find in ZenHub: Settings &rarr; Organizations &rarr; your org &rarr; Workspace ID</div></div>';
