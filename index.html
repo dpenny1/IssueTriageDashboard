@@ -239,25 +239,106 @@ function renderConfigureScreen(){
   if(profiles.length){
     html+='<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">';
     profiles.forEach(function(p){
-      html+='<div style="display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.05)">';
-      html+='<div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1e1b4b">'+esc(p.name)+'</div>';
-      html+='<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(p.repo)+'</div>';
-      html+='<div style="font-size:11px;color:#9ca3af">ZenHub: '+esc(p.zhWorkspace||'not set')+'</div></div>';
+      html+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.05)">';
+      html+='<div style="display:flex;align-items:center;gap:10px">';
+      html+='<div style="flex:1">';
+      html+='<div style="display:flex;align-items:center;gap:8px"><div style="font-size:14px;font-weight:700;color:#1e1b4b">'+esc(p.name)+'</div>';
+      if(p.type==='group') html+='<span class="badge" style="background:#e0e7ff;color:#3730a3">Group</span>';
+      html+='</div>';
+      if(p.type==='group'){
+        (p.repos||[]).forEach(function(r){
+          html+='<div style="font-size:12px;color:#6b7280;margin-top:3px">&#x2022; '+esc(r.repo)+(r.zhWorkspace?' <span style="color:#9ca3af">(ws: '+esc(r.zhWorkspace)+')</span>':'')+'</div>';
+        });
+      } else {
+        html+='<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(p.repo)+'</div>';
+        html+='<div style="font-size:11px;color:#9ca3af">ZenHub: '+esc(p.zhWorkspace||'not set')+'</div>';
+      }
+      html+='</div>';
       html+='<button class="btn-sm" onclick="editProfile(\''+p.id+'\')">Edit</button> ';
-      html+='<button class="btn-danger-sm" onclick="deleteProfile(\''+p.id+'\')">Delete</button></div>';
+      html+='<button class="btn-danger-sm" onclick="deleteProfile(\''+p.id+'\')">Delete</button>';
+      html+='</div></div>';
     });
     html+='</div>';
   } else {
     html+='<div class="empty-state" style="margin-bottom:20px">No projects yet.</div>';
   }
+
+  // Add forms — tabbed
   html+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">';
-  html+='<div style="font-size:14px;font-weight:700;color:#1e1b4b;margin-bottom:14px">Add new project</div>';
+  html+='<div style="display:flex;gap:8px;margin-bottom:16px">';
+  html+='<button class="btn-sm" id="cfgTabSingle" onclick="showCfgTab(\'single\')" style="background:#4338ca;color:#fff;border-color:#4338ca">Individual project</button>';
+  html+='<button class="btn-sm" id="cfgTabGroup" onclick="showCfgTab(\'group\')">Group project</button>';
+  html+='</div>';
+
+  // Single
+  html+='<div id="cfgSingle">';
+  html+='<div style="font-size:13px;font-weight:700;color:#1e1b4b;margin-bottom:12px">Add individual project</div>';
   html+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Display name</label><input type="text" id="pName" placeholder="e.g. Phoenix" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
   html+='<div class="fg" style="margin-top:8px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">GitHub repo (owner/repo)</label><input type="text" id="pRepo" placeholder="e.g. myorg/phoenix" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
   html+='<div class="fg" style="margin-top:8px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">ZenHub workspace ID</label><input type="text" id="pWorkspace" placeholder="e.g. 5e8f9c..." style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
   html+='<div id="profileFormErr" style="display:none;margin-top:8px"></div>';
   html+='<div style="margin-top:14px"><button class="btn-primary" onclick="saveNewProfile()">Add project</button></div></div>';
+
+  // Group
+  html+='<div id="cfgGroup" style="display:none">';
+  html+='<div style="font-size:13px;font-weight:700;color:#1e1b4b;margin-bottom:12px">Add group project</div>';
+  html+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Group name</label><input type="text" id="gName" placeholder="e.g. All Products" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
+  html+='<div style="font-size:13px;font-weight:600;color:#374151;margin:12px 0 8px">Repos in this group</div>';
+  html+='<div id="gRepoList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>';
+  html+='<div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap">';
+  html+='<div style="flex:1;min-width:160px"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Repo (owner/repo)</label><input type="text" id="gRepoInput" placeholder="myorg/repo" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/></div>';
+  html+='<div style="flex:1;min-width:140px"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">ZenHub workspace ID</label><input type="text" id="gWsInput" placeholder="5e8f9c..." style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/></div>';
+  html+='<button class="btn-sm" onclick="addGroupRepo()" style="margin-bottom:1px">+ Add repo</button>';
+  html+='</div>';
+  html+='<div id="groupFormErr" style="display:none;margin-top:8px"></div>';
+  html+='<div style="margin-top:14px"><button class="btn-primary" onclick="saveGroupProfile()">Save group</button></div></div>';
+  html+='</div>';
   document.getElementById('configureList').innerHTML=html;
+  window._groupRepos=[];
+}
+
+function showCfgTab(tab){
+  document.getElementById('cfgSingle').style.display=tab==='single'?'block':'none';
+  document.getElementById('cfgGroup').style.display=tab==='group'?'block':'none';
+  document.getElementById('cfgTabSingle').style.background=tab==='single'?'#4338ca':'';
+  document.getElementById('cfgTabSingle').style.color=tab==='single'?'#fff':'';
+  document.getElementById('cfgTabSingle').style.borderColor=tab==='single'?'#4338ca':'';
+  document.getElementById('cfgTabGroup').style.background=tab==='group'?'#4338ca':'';
+  document.getElementById('cfgTabGroup').style.color=tab==='group'?'#fff':'';
+  document.getElementById('cfgTabGroup').style.borderColor=tab==='group'?'#4338ca':'';
+}
+
+function addGroupRepo(){
+  var repo=document.getElementById('gRepoInput').value.trim();
+  var ws=document.getElementById('gWsInput').value.trim();
+  if(!repo){ showErr('groupFormErr','Repo is required.'); return; }
+  if(!window._groupRepos) window._groupRepos=[];
+  window._groupRepos.push({repo:repo,zhWorkspace:ws});
+  document.getElementById('gRepoInput').value='';
+  document.getElementById('gWsInput').value='';
+  renderGroupRepoList();
+}
+
+function renderGroupRepoList(){
+  var el=document.getElementById('gRepoList'); if(!el) return;
+  if(!window._groupRepos||!window._groupRepos.length){ el.innerHTML='<div style="font-size:12px;color:#9ca3af">No repos added yet.</div>'; return; }
+  el.innerHTML=window._groupRepos.map(function(r,i){
+    return '<div style="display:flex;align-items:center;gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:7px 10px;font-size:12px">'
+      +'<span style="flex:1;color:#374151;font-weight:600">'+esc(r.repo)+'</span>'
+      +'<span style="color:#9ca3af">'+esc(r.zhWorkspace||'no workspace')+'</span>'
+      +'<button class="btn-danger-sm" style="padding:2px 8px;font-size:11px" onclick="removeGroupRepo('+i+')">&#x2715;</button></div>';
+  }).join('');
+}
+
+function removeGroupRepo(i){ window._groupRepos.splice(i,1); renderGroupRepoList(); }
+
+function saveGroupProfile(){
+  var name=document.getElementById('gName').value.trim();
+  if(!name){ showErr('groupFormErr','Group name is required.'); return; }
+  if(!window._groupRepos||!window._groupRepos.length){ showErr('groupFormErr','Add at least one repo.'); return; }
+  var profiles=loadProfiles();
+  profiles.push({id:'p_'+Date.now(),name:name,type:'group',repos:window._groupRepos.slice()});
+  saveProfiles(profiles); window._groupRepos=[]; renderConfigureScreen();
 }
 
 function saveNewProfile(){
@@ -302,7 +383,16 @@ async function connect(){
   S.ghToken=gh;
   S.repos=rp.split(',').map(function(r){ return r.trim(); }).filter(Boolean);
   S.ignored=loadIgnored(); loadZHCreds();
-  if(S.activeProfile&&S.activeProfile.zhWorkspace) S.zhWorkspace=S.activeProfile.zhWorkspace;
+  // For group profiles, store per-repo workspace mapping
+  S.repoWorkspaceMap={};
+  if(S.activeProfile){
+    if(S.activeProfile.type==='group'){
+      (S.activeProfile.repos||[]).forEach(function(r){ if(r.zhWorkspace) S.repoWorkspaceMap[r.repo]=r.zhWorkspace; });
+    } else if(S.activeProfile.zhWorkspace){
+      S.zhWorkspace=S.activeProfile.zhWorkspace;
+      if(S.repos[0]) S.repoWorkspaceMap[S.repos[0]]=S.activeProfile.zhWorkspace;
+    }
+  }
   var btn=document.getElementById('connectBtn');
   btn.disabled=true; btn.innerHTML='<span class="spin spin-dark"></span>Loading...';
   try{
@@ -324,12 +414,14 @@ async function loadZHData(){
   S.zhIssueMap={};
   for(var i=0;i<S.repos.length;i++){
     var repo=S.repos[i];
+    var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;
+    if(!S.zhToken||!ws) continue;
     try{
       var rd=await ghFetch('/repos/'+repo); S.repoIds[repo]=rd.id;
-      var bd=await zhGet('/p2/workspaces/'+S.zhWorkspace+'/repositories/'+rd.id+'/board');
+      var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');
       S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){ return {id:p.id,name:p.name}; });
       (bd.pipelines||[]).forEach(function(p){
-        (p.issues||[]).forEach(function(iss){ S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name}; });
+        (p.issues||[]).forEach(function(iss){ S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws}; });
       });
     } catch(e){}
   }
@@ -561,8 +653,9 @@ function renderTable(issues,tab,def){
 async function movePipeline(issueId,repo,pipelineId){
   if(!pipelineId) return;
   var repoId=S.repoIds[repo]; if(!repoId) return;
+  var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace; if(!ws) return;
   try{
-    await zhPost('/p2/workspaces/'+S.zhWorkspace+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});
+    await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});
     var issue=S.issues.find(function(i){ return i.id===issueId&&i.repo===repo; });
     if(issue){ var pipes=S.zhPipelines[repo]||[], pipe=pipes.find(function(p){ return p.id===pipelineId; }); if(pipe) issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name}; }
     renderMain();
