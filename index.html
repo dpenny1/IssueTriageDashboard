@@ -141,7 +141,7 @@ tr:hover td{background:#f9fafb}
 </div>
 
 <script>
-var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],activeTab:'newitems',labelColors:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},showSettings:false,activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null};
+var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],activeTab:'newitems',labelColors:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},showSettings:false,activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v6',IGNORED_KEY='cis_hub_ignored_v6',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
 var TAB_DEFS=[
@@ -338,11 +338,14 @@ async function connect(){
 
 function zhLoad(){
   if(!S.zhToken||!S.zhWorkspace)return;
+  S.zhConnected=false;
   setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');
   loadZHData().then(function(){
+    S.zhConnected=true;
     populateFilters();renderMain();
     setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
   }).catch(function(e){
+    S.zhConnected=false;
     setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');
   });
 }
@@ -522,8 +525,10 @@ function sortIssues(list,tab){
     var at=a.title.toLowerCase(),bt=b.title.toLowerCase();
     var aP=at.indexOf('cs production issues')===0,bP=bt.indexOf('cs production issues')===0;
     var aF=at.indexOf('cs features')===0,bF=bt.indexOf('cs features')===0;
+    var aCS=at.indexOf('cs ')===0,bCS=bt.indexOf('cs ')===0;
     if(aP&&!bP)return -1;if(!aP&&bP)return 1;
     if(aF&&!bF)return -1;if(!aF&&bF)return 1;
+    if(aCS&&!bCS)return -1;if(!aCS&&bCS)return 1;
     return at.localeCompare(bt);
   });
   var col=S.sortState.col,dir=S.sortState.dir;
@@ -807,12 +812,13 @@ function renderSettings(){
   h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">ZenHub API Token</label>';
   h+='<input type="text" id="zhTI" value="" placeholder="Paste token from app.zenhub.com → API Tokens" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhToken?'<div style="font-size:11px;color:#059669;margin-top:3px">✓ Token saved</div>':'')+'</div>';
   h+='<div class="fg" style="margin-top:10px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Workspace ID</label>';
-  h+='<input type="text" id="zhWI" value="" placeholder="Numeric ID from ZenHub workspace settings" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhWorkspace?'<div style="font-size:11px;color:#6b7280;margin-top:3px">Current: '+esc(S.zhWorkspace)+'</div>':'')+'</div>';
+  h+='<input type="text" id="zhWI" value="'+esc(S.zhWorkspace)+'" placeholder="Numeric ID from ZenHub workspace settings" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhWorkspace?'<div style="font-size:11px;color:#6b7280;margin-top:3px">Current: '+esc(S.zhWorkspace)+'</div>':'')+'</div>';
   h+='<div id="zhErr" style="display:none;margin-top:8px"></div>';
   h+='<div style="margin-top:14px;display:flex;gap:8px"><button class="btn-p" id="zhSaveBtn" onclick="saveZH()">Save &amp; Connect</button>';
   if(S.zhToken)h+='<button class="btn-sm" onclick="disconnectZH()">Disconnect</button>';
   h+='</div>';
-  if(S.zhToken)h+='<div style="margin-top:8px;font-size:12px;color:#059669;font-weight:600">✓ ZenHub connected</div>';
+  if(S.zhConnected)h+='<div style="margin-top:8px;font-size:12px;color:#059669;font-weight:600">✓ ZenHub connected</div>';
+  else if(S.zhToken)h+='<div style="margin-top:8px;font-size:12px;color:#d97706;font-weight:600">⚠ Token saved but not connected — click Save &amp; Connect</div>';
   h+='</div>';
   el.innerHTML=h;
 }
