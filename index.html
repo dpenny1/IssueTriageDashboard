@@ -521,38 +521,39 @@ async function showZHDebug(){
   var repoId=S.repoIds[repo];
   var out={};
 
-  // Always fetch workspaces so user can verify the correct ID
-  try{
-    var wsList=await zhGet('/p2/workspaces');
-    out['YOUR_WORKSPACES']=wsList;
-  } catch(e){ out['YOUR_WORKSPACES']='ERROR: '+e.message; }
+  // Always fetch workspaces
+  try{ out['YOUR_WORKSPACES']=await zhGet('/p2/workspaces'); }
+  catch(e){ out['YOUR_WORKSPACES']='ERROR: '+e.message; }
 
   if(!issueNum){ var win=window.open('','_blank'); win.document.write('<pre style="font-size:12px;padding:16px;white-space:pre-wrap">'+JSON.stringify(out,null,2)+'</pre>'); return; }
 
   issueNum=parseInt(issueNum);
-  if(!ws||!repoId){ alert('ZenHub not connected.'); return; }
-  var paths=[
-    '/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueNum,
-    '/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueNum+'/relationships',
-    '/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics',
-  ];
-  for(var i=0;i<paths.length;i++){
-    try{ out[paths[i]]=await zhGet(paths[i]); }
-    catch(e){ out[paths[i]]='ERROR: '+e.message; }
-  }
+  if(!repo){ alert('No repo loaded.'); return; }
+
+  // GitHub native endpoints
+  try{ out['gh_issue']=await ghFetch('/repos/'+repo+'/issues/'+issueNum); } catch(e){ out['gh_issue']='ERROR: '+e.message; }
+  try{ out['gh_sub_issues']=await ghFetch('/repos/'+repo+'/issues/'+issueNum+'/sub_issues'); } catch(e){ out['gh_sub_issues']='ERROR: '+e.message; }
+  // Check if this issue appears as a sub-issue of any open issue
   try{
-    var epicsData=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');
-    var foundInEpics=[];
-    for(var j=0;j<(epicsData.epic_issues||[]).length;j++){
-      var ep=epicsData.epic_issues[j];
+    var parentSearch=[];
+    for(var k=0;k<S.issues.length;k++){
+      var candidate=S.issues[k];
+      if(candidate.id===issueNum) continue;
       try{
-        var ed=await zhGet('/p2/workspaces/'+(S.repoWorkspaceMap[repoForId(ep.repo_id)||repo]||ws)+'/repositories/'+ep.repo_id+'/epics/'+ep.issue_number);
-        var match=(ed.issues||[]).find(function(x){ return x.issue_number===issueNum; });
-        if(match) foundInEpics.push({epicNum:ep.issue_number,epicRepoId:ep.repo_id,childEntry:match});
+        var subs=await ghFetch('/repos/'+repo+'/issues/'+candidate.id+'/sub_issues');
+        if(Array.isArray(subs)&&subs.some(function(s){ return s.number===issueNum; })){
+          parentSearch.push({parentIssue:candidate.id,parentTitle:candidate.title});
+        }
       } catch(e){}
     }
-    out['foundInEpics']=foundInEpics;
-  } catch(e){ out['epicSearch']='ERROR: '+e.message; }
+    out['gh_found_as_sub_issue_of']=parentSearch.length?parentSearch:'not found as sub-issue of any loaded issue';
+  } catch(e){ out['gh_parent_search']='ERROR: '+e.message; }
+
+  // ZenHub endpoints if connected
+  if(ws&&repoId){
+    try{ out['zh_issue']=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueNum); } catch(e){ out['zh_issue']='ERROR: '+e.message; }
+    try{ out['zh_relationships']=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueNum+'/relationships'); } catch(e){ out['zh_relationships']='ERROR: '+e.message; }
+  }
 
   var win=window.open('','_blank');
   win.document.write('<pre style="font-size:12px;padding:16px;white-space:pre-wrap">'+JSON.stringify(out,null,2)+'</pre>');
