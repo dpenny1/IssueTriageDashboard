@@ -475,16 +475,22 @@ async function loadZHDependencies(){
     var repoId=S.repoIds[repo];
     if(!S.zhToken||!ws||!repoId) continue;
     try{
-      var deps=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/dependencies');
-      (deps.dependencies||[]).forEach(function(dep){
-        // ZenHub dependency: { blocking: {issue_number, repo_id}, blocked: {issue_number, repo_id} }
-        // "blocking" = parent, "blocked" = child
-        var parentNum=dep.blocking.issue_number;
-        var childNum=dep.blocked.issue_number;
-        var childRepo=repoForId(dep.blocked.repo_id)||repo;
-        var child=S.issues.find(function(iss){ return iss.id===childNum&&iss.repo===childRepo; });
-        if(child) child.parent={issueNumber:parentNum, repoId:dep.blocking.repo_id};
-      });
+      // Fetch all epics for this repo
+      var epicsData=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');
+      var epics=epicsData.epic_issues||[];
+      // For each epic, fetch its issues (children)
+      for(var j=0;j<epics.length;j++){
+        var epicNum=epics[j].issue_number;
+        var epicRepoId=epics[j].repo_id||repoId;
+        try{
+          var epicDetail=await zhGet('/p2/workspaces/'+ws+'/repositories/'+epicRepoId+'/epics/'+epicNum);
+          (epicDetail.issues||[]).forEach(function(child){
+            var childRepo=repoForId(child.repo_id)||repo;
+            var childIssue=S.issues.find(function(iss){ return iss.id===child.issue_number&&iss.repo===childRepo; });
+            if(childIssue) childIssue.parent={issueNumber:epicNum,repoId:epicRepoId};
+          });
+        } catch(e){}
+      }
     } catch(e){}
   }
 }
