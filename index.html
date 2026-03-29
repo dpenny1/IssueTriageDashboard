@@ -509,7 +509,12 @@ function parseSnapshotIssue(issue){
 
 function getCurrentSnapshot(){
   var tracking=S.issues.filter(function(i){
-    return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});
+    if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
+    var t=i.title.trim().toLowerCase();
+    if(t.indexOf('cs ')!==0)return false;
+    if(t.indexOf('research items')!==-1)return false;
+    if(t.indexOf('cs ba ')===0)return false;
+    return true;
   });
   if(!tracking.length)return null;
   var rows=[],total=0,closed=0,open=0,noIssue=0,nums=[];
