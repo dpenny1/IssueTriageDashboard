@@ -617,16 +617,20 @@ function getTabIssues(tab){
   if(t==='exceptions') return getExceptions();
   if(t==='ignored') return S.issues.filter(function(i){ return S.ignored.indexOf(i.id+'_'+i.repo)!==-1; });
   if(t==='closed') return S.closedIssues;
-  var base=S.issues.filter(function(i){ return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i); });
+  if(t==='testing'){
+    var openT=S.issues.filter(function(i){ return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){ return l.toLowerCase()==='cs in testing'; }); });
+    var closedT=S.closedIssues.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='cs in testing'; }); });
+    return openT.concat(closedT);
+  }
+  var base=S.issues.filter(function(i){
+    return S.ignored.indexOf(i.id+'_'+i.repo)===-1
+      &&!isException(i)
+      &&!i.labels.some(function(l){ return l.toLowerCase()==='cs in testing'; });
+  });
   if(t==='newitems') return base.filter(function(i){ return !hasCSLabel(i); });
   if(t==='prod')     return base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='production patch'; }); });
   if(t==='uat')      return base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='uat patch'; }); });
   if(t==='csitems')  return base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs task item'; }); });
-  if(t==='testing'){
-    var openT=base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='cs in testing'; }); });
-    var closedT=S.closedIssues.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='cs in testing'; }); });
-    return openT.concat(closedT);
-  }
   if(t==='taskitem') return base.filter(function(i){ return i.labels.some(function(l){ return l.toLowerCase()==='cs task item'; }); });
   return base;
 }
