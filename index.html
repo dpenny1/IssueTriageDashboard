@@ -324,7 +324,7 @@ async function connect(){
     S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};
     var age=Math.round((Date.now()-cache.savedAt)/60000);
     populateFilters();showDash();buildTabs();renderMain();
-    setStatus('<span style="color:#fbbf24">⏳ Cached ('+age+'m ago) — refreshing...</span>');
+    setStatus('<span style="color:#fbbf24;font-size:14px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
     btn.disabled=false;btn.textContent='▶ Load Dashboard';
     bgRefresh();return;
   }
@@ -679,6 +679,27 @@ async function bulkMove(tab,pipelineId,sel){
 
 function renderMain(){
   renderStats();buildTabs();hideErr('dashErr');
+  // ZenHub warning banner
+  var zhBanner=document.getElementById('zhBanner');
+  if(!zhBanner){
+    zhBanner=document.createElement('div');
+    zhBanner.id='zhBanner';
+    var mc=document.getElementById('mainContent');
+    mc.parentNode.insertBefore(zhBanner,mc);
+  }
+  if(S.zhToken&&!S.zhConnected){
+    zhBanner.innerHTML='<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px">'
+      +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">⚠️</span><span style="font-size:14px;font-weight:700;color:#92400e">ZenHub is not connected — pipelines and parent data unavailable</span></div>'
+      +'<button class="btn-sm" style="border-color:#f59e0b;color:#92400e;white-space:nowrap" onclick="toggleSettings()">Connect ZenHub</button>'
+      +'</div>';
+  } else if(!S.zhToken){
+    zhBanner.innerHTML='<div style="background:#f3f4f6;border:1px solid #d1d5db;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px">'
+      +'<span style="font-size:13px;color:#6b7280">ZenHub not configured — pipeline data unavailable</span>'
+      +'<button class="btn-sm" style="white-space:nowrap" onclick="toggleSettings()">Set up ZenHub</button>'
+      +'</div>';
+  } else {
+    zhBanner.innerHTML='';
+  }
   if(S.activeTab==='report'){renderReport();return;}
   var def=TAB_DEFS.find(function(d){return d.id===S.activeTab;});
   document.getElementById('mainContent').innerHTML=renderTable(applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab)),S.activeTab,def);
