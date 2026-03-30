@@ -420,9 +420,64 @@ async function loadIssues(){
 
 // ── Issue logic ───────────────────────────────────────────────────────────────
 function getAutoClosedItems(issue){if(!issue.labels.some(function(l){return l.toLowerCase()==='cs task item';})||issue.state!=='open')return[];var hits=[];(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(chk&&/#\d+/.test(chk[1].trim()))hits.push(chk[1].trim());});return hits;}
+
+// Find which CS Task Item tracking issues have a checked box referencing this issue number
+function findAutoCheckedParents(issueId){
+  var parents=[];
+  S.issues.forEach(function(ti){
+    if(!ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return;
+    if(ti.state!=='open')return;
+    (ti.body||'').split('\n').forEach(function(line){
+      var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
+      if(!chk)return;
+      var ref=chk[1].trim();
+      var m=ref.match(/#(\d+)/);
+      if(m&&parseInt(m[1])===issueId){
+        parents.push({trackingIssue:ti,lineText:ref,fullLine:line.trim()});
+      }
+    });
+  });
+  return parents;
+}
+
+async function uncheckInParent(trackingIssueId,trackingRepo,childIssueId){
+  var ti=S.issues.find(function(i){return i.id===trackingIssueId&&i.repo===trackingRepo;});
+  if(!ti){alert('Tracking issue not found in local state.');return;}
+  var lines=(ti.body||'').split('\n');
+  var changed=false;
+  var newLines=lines.map(function(line){
+    var chk=line.match(/^(\s*-\s*)\[x\](\s*.+)/i);
+    if(!chk)return line;
+    var ref=chk[2];
+    var m=ref.match(/#(\d+)/);
+    if(m&&parseInt(m[1])===childIssueId){
+      changed=true;
+      return chk[1]+'[ ]'+chk[2];
+    }
+    return line;
+  });
+  if(!changed){alert('Could not find the checked line to uncheck.');return;}
+  try{
+    await ghPatch('/repos/'+trackingRepo+'/issues/'+trackingIssueId,{body:newLines.join('\n')});
+    ti.body=newLines.join('\n');
+    renderMain();
+  }catch(e){alert('Failed to uncheck: '+e.message);}
+}
 function isNIP(issue){return issue.pipeline&&issue.pipeline.pipelineName.toLowerCase()==='new issues';}
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
-function isException(issue){if(issue.state!=='open')return false;if(issue.parent)return false;if(isExempt(issue))return false;if(issue.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';}))return false;if(hasCS(issue))return true;if(getAutoClosedItems(issue).length>0)return true;if(isNIP(issue))return true;return false;}
+function isException(issue){
+  if(issue.state!=='open')return false;
+  if(isExempt(issue))return false;
+  if(issue.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';}))return false;
+  // Auto-checked in a tracking issue is always an exception, even if the issue has a parent
+  if(findAutoCheckedParents(issue.id).length>0)return true;
+  // The remaining checks only apply to parentless issues
+  if(issue.parent)return false;
+  if(hasCS(issue))return true;
+  if(getAutoClosedItems(issue).length>0)return true;
+  if(isNIP(issue))return true;
+  return false;
+}
 function populateFilters(){var ls={},rs={},ps={};S.issues.concat(S.closedIssues).forEach(function(i){i.labels.forEach(function(l){ls[l]=1;});rs[i.repo]=1;if(i.pipeline)ps[i.pipeline.pipelineName]=1;});var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');fl.innerHTML='<option value="">All labels</option>';Object.keys(ls).sort(lsort).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});fr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});fp.innerHTML='<option value="">All pipelines</option>';Object.keys(ps).sort(lsort).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});}
 function clearFilters(){['searchInput','filterLabel','filterRepo','filterPipeline'].forEach(function(id){document.getElementById(id).value='';});renderMain();}
 function getExceptions(){return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isException(i);});}
@@ -531,8 +586,28 @@ async function deleteLabel(lk){var display=S.labelNames[lk]||lk;if(!confirm('Del
 
 // ── Parent search & linking ───────────────────────────────────────────────────
 function renderExcReason(issue){
-  var parts=[],ai=getAutoClosedItems(issue);
-  if(ai.length){var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';ai.forEach(function(t){h+='<div class="acit">'+esc(t)+'</div>';});parts.push(h+'</div>');}
+  var parts=[];
+
+  // Auto-checked box in a tracking issue
+  var autoParents=findAutoCheckedParents(issue.id);
+  if(autoParents.length){
+    autoParents.forEach(function(ap){
+      var key=issue.id+'_'+issue.repo;
+      var h='<div class="aci">';
+      h+='<div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:4px">⚠ Auto-checked in tracking issue <a href="'+esc(ap.trackingIssue.url)+'" target="_blank" style="color:#7a4f00;text-decoration:underline">#'+ap.trackingIssue.id+'</a></div>';
+      h+='<div class="acit" style="margin-bottom:6px">'+esc(ap.lineText)+'</div>';
+      h+='<div style="display:flex;gap:6px;align-items:center">';
+      h+='<a href="'+esc(ap.trackingIssue.url)+'" target="_blank" class="btn-sm" style="font-size:11px;padding:3px 9px;text-decoration:none;display:inline-block">👁 Review #'+ap.trackingIssue.id+'</a>';
+      h+='<button class="btn-sm" style="font-size:11px;padding:3px 9px;border-color:#f59e0b;color:#92400e;background:#fffbeb" onclick="uncheckInParent('+ap.trackingIssue.id+',\''+esc(ap.trackingIssue.repo)+'\','+issue.id+')">☐ Uncheck in #'+ap.trackingIssue.id+'</button>';
+      h+='</div></div>';
+      parts.push(h);
+    });
+  }
+
+  // Legacy: auto-closed items detected on the issue itself (CS Task Item with checked refs)
+  var ai=getAutoClosedItems(issue);
+  if(ai.length&&!autoParents.length){var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';ai.forEach(function(t){h+='<div class="acit">'+esc(t)+'</div>';});parts.push(h+'</div>');}
+
   if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
   if(!parts.length){
     var key=issue.id+'_'+issue.repo;
