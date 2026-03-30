@@ -176,12 +176,12 @@ var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',PROFILES_KE
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
 var TAB_DEFS=[
   {id:'newitems',label:'New Issues',color:'#0891b2'},
+  {id:'exceptions',label:'Exceptions',color:'#b91c1c'},
   {id:'prod',label:'Production Patch',color:'#dc2626'},
   {id:'uat',label:'UAT Patch',color:'#d97706'},
   {id:'csitems',label:'CS Items',color:'#4338ca'},
   {id:'testing',label:'CS In Testing',color:'#059669'},
   {id:'taskitem',label:'CS Task Items',color:'#7c3aed',labelKey:'cs task item'},
-  {id:'exceptions',label:'Exceptions',color:'#b91c1c'},
   {id:'closed',label:'Recently Closed',color:'#374151'},
   {id:'ignored',label:'Ignored',color:'#6b7280'},
   {id:'report',label:'Weekly Report',color:'#1e1b4b'}
@@ -446,12 +446,12 @@ function renderStats(){
   var tN=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length+S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
   var stats=[
     {n:base.filter(function(i){return !hasCS(i);}).length,tab:'newitems'},
+    {n:getExceptions().length,tab:'exceptions'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length,tab:'prod'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,tab:'uat'},
     {n:base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});}).length,tab:'csitems'},
     {n:tN,tab:'testing'},
     {n:S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,tab:'taskitem'},
-    {n:getExceptions().length,tab:'exceptions'},
     {n:S.closedIssues.length,tab:'closed'},
     {n:S.ignored.length,tab:'ignored'},
     {n:'',tab:'report'}
