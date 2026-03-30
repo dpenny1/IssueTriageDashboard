@@ -563,8 +563,66 @@ function renderTable(issues,tab,def){
   return h+'</tbody></table></div>';
 }
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed: '+e.message);}}
+
+function pipelineOrder(name){var n=(name||'').trim();if(n==='In Progress')return 0;if(n==='On Deck Priorities')return 1;if(n==='Icebox')return 3;return 2;}
+
+function renderCSItemsGrouped(issues,def){
+  var color=tabColor(def),label=def.label;
+  var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
+  var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+  // group issues by pipeline name
+  var groups={},order=[];
+  issues.forEach(function(i){
+    var pn=i.pipeline?i.pipeline.pipelineName:'No Pipeline';
+    if(!groups[pn]){groups[pn]=[];order.push(pn);}
+    groups[pn].push(i);
+  });
+  // sort groups: In Progress > On Deck Priorities > alpha > Icebox
+  var sortedKeys=Object.keys(groups).sort(function(a,b){
+    var ao=pipelineOrder(a),bo=pipelineOrder(b);
+    if(ao!==bo)return ao-bo;
+    return a.toLowerCase().localeCompare(b.toLowerCase());
+  });
+  // sort issues within each group by age desc (oldest first)
+  sortedKeys.forEach(function(pn){
+    groups[pn].sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+  });
+  var h='<div class="gh" style="background:'+color+'"><span class="gt">'+esc(label)+'<span class="gc">'+issues.length+'</span></span>';
+  if(S.zhToken&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\'csitems\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
+  h+='</div>';
+  sortedKeys.forEach(function(pn){
+    var grpIssues=groups[pn];
+    h+='<div style="margin-bottom:16px"><div style="padding:7px 14px;background:#f0f4ff;border:1px solid #e5e7eb;border-bottom:none;font-size:12px;font-weight:700;color:#4338ca;display:flex;align-items:center;gap:8px">';
+    h+=esc(pn)+'<span style="background:#e0e7ff;color:#3730a3;font-size:11px;padding:1px 8px;border-radius:999px;font-weight:700">'+grpIssues.length+'</span></div>';
+    h+='<div class="tw2" style="margin-bottom:0"><table><thead><tr>';
+    h+=mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th>';
+    if(S.repos.length>1)h+=mkTh('repo','Repo');
+    h+='<th>Assignee</th>';
+    if(S.zhToken)h+='<th>Pipeline</th>';
+    h+=mkTh('age','Age')+'<th></th></tr></thead><tbody>';
+    if(!grpIssues.length)h+='<tr><td colspan="99" class="er">No issues.</td></tr>';
+    grpIssues.forEach(function(issue){
+      var ikey=issue.id+'_'+issue.repo,days=ageDays(issue.createdAt);
+      h+='<tr>';
+      h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
+      h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
+      h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
+      sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
+      h+='<button onclick="toggleLabelEdit('+issue.id+',\''+esc(issue.repo)+'\')" title="Edit labels" style="background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;color:#9ca3af;border-radius:4px;line-height:1" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">✏️</button>';
+      h+='</div><div id="lblpanel_'+issue.id+'_'+esc(issue.repo)+'" style="display:none"></div></td>';
+      if(S.repos.length>1)h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.repo.split('/')[1])+'</td>';
+      h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
+      if(S.zhToken){var rp=S.zhPipelines[issue.repo]||[],cur=issue.pipeline?issue.pipeline.pipelineId:'',curN=issue.pipeline?issue.pipeline.pipelineName:'—';var srp=rp.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});if(srp.length){h+='<td><select class="ps" onchange="movePipeline('+issue.id+',\''+esc(issue.repo)+'\',this.value)"><option value="">'+esc(curN)+'</option>';srp.forEach(function(p){h+='<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>';});h+='</select></td>';}else h+='<td style="font-size:12px;color:#6b7280">'+esc(curN)+'</td>';}
+      h+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td>';
+      h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
+      h+='</tr>';
+    });
+    h+='</tbody></table></div></div>';
+  });
+  return h;
+}
 async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});if(!list.length){sel.value='';return;}if(!confirm('Move '+list.length+' issues?')){sel.value='';return;}for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}
-function renderMain(){renderStats();buildTabs();hideErr('dashErr');if(S.activeTab==='report'){renderReport();return;}var def=TAB_DEFS.find(function(d){return d.id===S.activeTab;});document.getElementById('mainContent').innerHTML=renderTable(applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab)),S.activeTab,def);}
+function renderMain(){renderStats();buildTabs();hideErr('dashErr');if(S.activeTab==='report'){renderReport();return;}var def=TAB_DEFS.find(function(d){return d.id===S.activeTab;});var issues=applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab));var filterPipeline=document.getElementById('filterPipeline').value||'';if(S.activeTab==='csitems'&&S.zhToken&&!filterPipeline){document.getElementById('mainContent').innerHTML=renderCSItemsGrouped(applyFilters(getTabIssues('csitems')),def);}else{document.getElementById('mainContent').innerHTML=renderTable(issues,S.activeTab,def);}}
 
 // ── Report ────────────────────────────────────────────────────────────────────
 function parseSnapshotIssue(issue){var t=0,c=0,o=0,n=0;(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i),unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);if(!chk&&!unk)return;var text=(chk||unk)[1].trim();if(!/#\d+/.test(text)){n++;return;}t++;if(chk)c++;else o++;});return{id:issue.id,title:issue.title,url:issue.url,total:t,closed:c,open:o,noIssue:n};}
