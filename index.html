@@ -423,7 +423,7 @@ async function loadIssues(){
     for(var j=0;j<cd.length;j++){var iss=cd[j];if(iss.pull_request)continue;var lbls=iss.labels.map(function(l){return l.name;});if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))continue;closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,url:iss.html_url,state:'closed',pipeline:null,parent:null});if(++count>=50)break;}
   }
   S.issues=open;S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
-  document.getElementById('dashTitle').textContent='📋 CentralView — '+(S.activeProfile?S.activeProfile.name:'Dashboard');
+  document.getElementById('dashTitle').textContent='📋 CentralView '+(S.activeProfile?S.activeProfile.name+' Issues Hub':'Issues Hub');
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
 }
 
