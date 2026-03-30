@@ -129,12 +129,14 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
   async function deriveKey(pw,salt){var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
   async function decrypt(b64,pw){var buf=Uint8Array.from(atob(b64),function(c){return c.charCodeAt(0);});var key=await deriveKey(pw,buf.slice(0,16));var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(16,28)},key,buf.slice(28));return new TextDecoder().decode(plain);}
   function load(){try{var v=localStorage.getItem(KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+  function save(d){localStorage.setItem(KEY,JSON.stringify(d));_data=d;}
   return{
     isUnlocked:function(){return _pw!==null;},
     unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}}  _pw=pw;_data=data;},
     lock:function(){_pw=null;_data=[];},
     list:function(){return _data.map(function(e){return {name:e.name,type:e.type||''};});},
-    get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);}
+    get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
+    setType:function(name,type){var d=_data.map(function(e){return e.name===name?{name:e.name,enc:e.enc,type:type}:e;});save(d);}
   };
 })();
 
