@@ -522,7 +522,69 @@ async function updateLabel(oldKey){var newName=document.getElementById('leName_'
 async function deleteLabel(lk){var display=S.labelNames[lk]||lk;if(!confirm('Delete label "'+display+'"? This cannot be undone.'))return;try{await ghDel('/repos/'+S.repos[0]+'/labels/'+encodeURIComponent(display));delete S.labelColors[lk];delete S.labelNames[lk];S.issues.concat(S.closedIssues).forEach(function(i){i.labels=i.labels.filter(function(l){return l.toLowerCase()!==lk;});});renderLabelManager();renderMain();}catch(e){alert('Failed: '+e.message);}}
 
 // ── Render ────────────────────────────────────────────────────────────────────
-function renderExcReason(issue){var parts=[],ai=getAutoClosedItems(issue);if(ai.length){var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';ai.forEach(function(t){h+='<div class="acit">'+esc(t)+'</div>';});parts.push(h+'</div>');}if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');if(!parts.length)parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>');return parts.join('<div style="margin-top:4px"></div>');}
+function renderExcReason(issue){
+  var parts=[],ai=getAutoClosedItems(issue);
+  if(ai.length){var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';ai.forEach(function(t){h+='<div class="acit">'+esc(t)+'</div>';});parts.push(h+'</div>');}
+  if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
+  if(!parts.length){
+    var key=issue.id+'_'+issue.repo;
+    parts.push(
+      '<div style="display:flex;flex-direction:column;gap:6px">'+
+      '<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>'+
+      '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'+
+      '<input type="text" id="psearch_'+key+'" placeholder="# or title..." style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:160px" oninput="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')"/>'+
+      '<button class="btn-sm" style="font-size:11px;padding:3px 9px" onclick="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')">🔍</button>'+
+      '</div>'+
+      '<div id="presults_'+key+'" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:320px"></div>'+
+      '</div>'
+    );
+  }
+  return parts.join('<div style="margin-top:4px"></div>');
+}
+
+var _parentSearchCache={};
+async function searchParent(issueId,repo){
+  var key=issueId+'_'+repo;
+  var q=(document.getElementById('psearch_'+key)||{}).value||'';
+  var el=document.getElementById('presults_'+key);
+  if(!el)return;
+  if(!q){el.style.display='none';return;}
+  el.style.display='block';
+  el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">Searching...</div>';
+  try{
+    var num=parseInt(q);
+    var results;
+    if(!isNaN(num)&&String(num)===q.trim()){
+      // exact issue number lookup
+      try{var single=await ghFetch('/repos/'+repo+'/issues/'+num);results=[single];}catch(e){results=[];}
+    } else {
+      var data=await ghFetch('/repos/'+repo+'/issues?state=open&per_page=20&q='+encodeURIComponent(q));
+      results=Array.isArray(data)?data.filter(function(i){return !i.pull_request&&i.title.toLowerCase().indexOf(q.toLowerCase())!==-1;}):[];
+    }
+    if(!results.length){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">No issues found.</div>';return;}
+    var h='';
+    results.slice(0,8).forEach(function(r){
+      h+='<div style="padding:8px 12px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="setParent('+issueId+',\''+esc(repo)+'\','+r.number+',\''+esc(r.title.replace(/'/g,"\\'"))+'\')">'+
+      '<span style="color:#6b7280;font-weight:600">#'+r.number+'</span> <span style="color:#1e1b4b;font-weight:500">'+esc(r.title)+'</span>'+
+      '</div>';
+    });
+    el.innerHTML=h;
+  }catch(e){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#dc2626">Error: '+esc(e.message)+'</div>';}
+}
+
+async function setParent(issueId,repo,parentId,parentTitle){
+  try{
+    await fetch('https://api.github.com/repos/'+repo+'/issues/'+parentId+'/sub_issues',{
+      method:'POST',
+      headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
+      body:JSON.stringify({sub_issue_id:issueId})
+    });
+    // update local state so it clears exception immediately
+    var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});
+    if(issue)issue.parent={issueNumber:parentId};
+    renderMain();
+  }catch(e){alert('Failed to set parent: '+e.message);}
+}
 
 function renderTable(issues,tab,def){
   var isClosed=tab==='closed',isIgnored=tab==='ignored',isTesting=tab==='testing',isExc=tab==='exceptions';
@@ -670,7 +732,7 @@ function renderReport(){
     h+='<div class="rw"><table class="rt"><thead><tr><th style="text-align:left">#</th><th style="text-align:left">Task Name</th>';
     ['Total','Closed','Open','No Issue Raised'].forEach(function(x){h+='<th>'+x+'</th>';});
     h+='</tr></thead><tbody>';
-    snap.rows.forEach(function(row){h+='<tr><td class="tl" style="font-size:12px;color:#6b7280"><a href="'+esc(row.url)+'" target="_blank">#'+row.id+'</a></td><td class="tl" style="font-weight:600;color:#1e1b4b;min-width:220px">'+esc(row.title)+'</td><td class="num">'+(row.total+row.noIssue)+'</td><td class="num" style="color:#059669">'+row.closed+'</td><td class="num" style="color:#dc2626">'+row.open+'</td><td class="num">'+row.noIssue+'</td></tr>';});
+    snap.rows.forEach(function(row){h+='<tr><td class="tl" style="font-size:12px;color:#6b7280"><a href="'+esc(row.url)+'" target="_blank">#'+row.id+'</a></td><td class="tl" style="font-weight:600;min-width:220px"><a href="'+esc(row.url)+'" target="_blank" style="color:#1e1b4b;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">'+esc(row.title)+'</a></td><td class="num">'+(row.total+row.noIssue)+'</td><td class="num" style="color:#059669">'+row.closed+'</td><td class="num" style="color:#dc2626">'+row.open+'</td><td class="num">'+row.noIssue+'</td></tr>';});
     h+='<tr style="background:#f0f4ff;font-weight:700;border-top:2px solid #e5e7eb"><td colspan="2" class="tl" style="font-size:13px;color:#374151">Totals</td><td class="num">'+(snap.total+snap.noIssue)+'</td><td class="num" style="color:#059669">'+snap.closed+'</td><td class="num" style="color:#dc2626">'+snap.open+'</td><td class="num">'+snap.noIssue+'</td></tr>';
     h+='</tbody></table></div>';
   }
