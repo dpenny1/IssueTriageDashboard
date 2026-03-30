@@ -80,11 +80,12 @@ tr:hover td{background:#f9fafb}
 .ps{font-size:11px;padding:3px 7px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#374151;cursor:pointer}
 .aci{display:flex;flex-direction:column;gap:3px}
 .acit{font-size:11px;background:#fff3cd;border:1px solid #ffc107;border-radius:5px;padding:3px 7px;color:#7a4f00;max-width:280px;word-break:break-word}
-/* Vault */
-.vault-panel{background:#f8f7ff;border:1px solid #c7d2fe;border-radius:10px;padding:16px;margin-top:10px}
-.vault-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.vault-row input{flex:1;min-width:160px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace}
-.vault-chip{display:inline-flex;align-items:center;gap:6px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3}
+.lbl-edit-panel{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-top:6px}
+.vault-panel{background:#f8f7ff;border:1px solid #c7d2fe;border-radius:10px;padding:14px;margin-top:8px}
+.vault-chip{display:inline-flex;align-items:center;gap:4px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3;cursor:pointer;border:none}
+.vault-chip:hover{background:#c7d2fe}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;overflow-y:auto}
+.modal-box{background:#fff;border-radius:14px;max-width:580px;margin:40px auto;padding:24px 28px;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
 #setup,#cfgScr,#dash{display:none}
 </style>
 </head>
@@ -102,19 +103,18 @@ tr:hover td{background:#f9fafb}
       <div class="hint">Don't see your project? <a href="#" onclick="showCfg();return false">Configure projects</a></div>
     </div>
     <div class="fg">
-      <label style="display:flex;align-items:center;gap:6px">
-        <span>GitHub Personal Access Token</span>
-        <button onclick="toggleVault('gh')" id="vaultBtnGH" title="Use Token Vault" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;line-height:1;opacity:0.6" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">🔒</button>
+      <label style="display:flex;align-items:center;gap:6px">GitHub Personal Access Token
+        <button onclick="toggleVault('gh')" id="vaultBtnGH" title="Token Vault" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;opacity:0.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">🔒</button>
       </label>
-      <input type="password" id="ghToken" placeholder="ghp_..." onkeydown="if(event.key==='Enter')connect()"/>
+      <input type="password" id="ghToken" placeholder="ghp_..." autocomplete="new-password" onkeydown="if(event.key==='Enter')connect()"/>
       <div id="vaultPanelGH" style="display:none"><div class="vault-panel" id="vaultInnerGH"></div></div>
     </div>
     <div class="fg">
       <label style="display:flex;align-items:center;gap:6px">
-        <span>ZenHub API Token <span style="font-size:11px;color:#9ca3af;font-weight:400">(optional)</span></span>
-        <button onclick="toggleVault('zh')" id="vaultBtnZH" title="Use Token Vault" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;line-height:1;opacity:0.6" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">🔒</button>
+        ZenHub API Token <span style="font-size:11px;color:#9ca3af;font-weight:400">(optional)</span>
+        <button onclick="toggleVault('zh')" id="vaultBtnZH" title="Token Vault" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;opacity:0.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">🔒</button>
       </label>
-      <input type="text" id="zhTokenInput" placeholder="Paste from app.zenhub.com → API Tokens" autocomplete="off"/>
+      <input type="password" id="zhTokenInput" placeholder="ZenHub token..." autocomplete="new-password"/>
       <div id="vaultPanelZH" style="display:none"><div class="vault-panel" id="vaultInnerZH"></div></div>
     </div>
     <input type="hidden" id="reposInput"/>
@@ -141,6 +141,7 @@ tr:hover td{background:#f9fafb}
       <span id="loadedAt" style="font-size:12px"></span>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-w">🛠 PM Tools</a>
       <button class="btn btn-w" id="refreshBtn" onclick="doRefresh()">↻ Refresh</button>
+      <button class="btn btn-w" onclick="showLabelManager()">🏷️ Labels</button>
       <button class="btn btn-w" onclick="toggleSettings()">⚙️ Settings</button>
     </div>
   </div></div>
@@ -157,6 +158,17 @@ tr:hover td{background:#f9fafb}
     </div>
     <div id="dashErr" style="display:none;margin-bottom:12px"></div>
     <div id="mainContent"></div>
+  </div>
+</div>
+
+<!-- Label Manager Modal -->
+<div class="modal-overlay" id="labelModal">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-size:15px;font-weight:700;color:#1e1b4b">🏷️ Manage Repo Labels</span>
+      <button class="btn-sm" onclick="hideLabelManager()">✕ Close</button>
+    </div>
+    <div id="labelModalContent"></div>
   </div>
 </div>
 
@@ -177,7 +189,7 @@ var TAB_DEFS=[
   {id:'report',label:'Weekly Report',color:'#1e1b4b'}
 ];
 
-// ── Token Vault (single shared vault) ───────────────────────────────────────
+// ── Token Vault ───────────────────────────────────────────────────────────────
 var Vault=(function(){
   var KEY='cis_vault_v1',_pw=null,_data=[];
   async function deriveKey(pw,salt){var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
@@ -187,7 +199,7 @@ var Vault=(function(){
   function save(d){localStorage.setItem(KEY,JSON.stringify(d));_data=d;}
   return{
     isUnlocked:function(){return _pw!==null;},
-    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}}; _pw=pw;_data=data;},
+    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}} _pw=pw;_data=data;},
     lock:function(){_pw=null;_data=[];},
     list:function(){return _data.map(function(e){return e.name;});},
     get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
@@ -196,7 +208,6 @@ var Vault=(function(){
   };
 })();
 
-// ── Vault UI ─────────────────────────────────────────────────────────────────
 var _activeVaultTarget=null;
 
 function toggleVault(target){
@@ -206,10 +217,7 @@ function toggleVault(target){
     document.getElementById('vaultBtn'+target.toUpperCase()).textContent='🔒';
     return;
   }
-  ['GH','ZH'].forEach(function(t){
-    document.getElementById('vaultPanel'+t).style.display='none';
-    document.getElementById('vaultBtn'+t).textContent='🔒';
-  });
+  ['GH','ZH'].forEach(function(t){document.getElementById('vaultPanel'+t).style.display='none';document.getElementById('vaultBtn'+t).textContent='🔒';});
   _activeVaultTarget=target;
   document.getElementById('vaultPanel'+target.toUpperCase()).style.display='block';
   document.getElementById('vaultBtn'+target.toUpperCase()).textContent='🔓';
@@ -222,43 +230,39 @@ function renderVaultPanel(target){
   if(!Vault.isUnlocked()){
     h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">🔒 Unlock Vault</div>';
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
-    h+='<input type="password" id="vaultPw" placeholder="Master password..." style="flex:1;min-width:160px;padding:8px 12px;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')vaultUnlock(\''+target+'\')"/>';
+    h+='<input type="password" id="vaultPw" placeholder="Master password..." autocomplete="new-password" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')vaultUnlock(\''+target+'\')"/>';
     h+='<button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="vaultUnlock(\''+target+'\')">Unlock</button>';
     h+='</div>';
     h+='<div id="vaultErr" style="font-size:12px;color:#dc2626;margin-top:6px;min-height:16px"></div>';
-    h+='<div class="hint">New vault? Enter any password to create one.</div>';
+    h+='<div class="hint" style="margin-top:4px">New vault? Enter any password to create one.</div>';
   } else {
     var tokens=Vault.list();
     h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
-    h+='<span style="font-size:13px;font-weight:600;color:#374151">🔓 Select a token to use</span>';
-    h+='<div style="display:flex;gap:6px"><button class="btn-sm" onclick="vaultManageToggle()">⚙ Manage</button><button class="btn-sm" onclick="vaultLockAll()">🔒 Lock</button></div>';
+    h+='<span style="font-size:13px;font-weight:600;color:#374151">🔓 Select a token</span>';
+    h+='<button class="btn-sm" onclick="vaultLockAll()">🔒 Lock</button>';
     h+='</div>';
     if(tokens.length){
-      h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">';
-      tokens.forEach(function(name){
-        h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(name)+'\')" title="Click to use this token">'+esc(name)+' ▶</button>';
-      });
+      h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
+      tokens.forEach(function(name){h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(name)+'\')">'+esc(name)+' ▶</button>';});
       h+='</div>';
     } else {
-      h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">No tokens saved yet — add one below.</div>';
+      h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">No tokens saved yet.</div>';
     }
-    // Always show add form
-    h+='<div id="vaultManage">';
-    h+='<div style="border-top:1px solid #e0e7ff;padding-top:10px;margin-top:6px">';
-    h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Add New Token</div>';
+    h+='<div style="border-top:1px solid #e0e7ff;padding-top:10px">';
+    h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Save New Token</div>';
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
-    h+='<input type="text" id="vaultNewName_'+target+'" placeholder="Name (e.g. GitHub Prod)" style="width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>';
-    h+='<input type="password" id="vaultNewTok_'+target+'" placeholder="Token value" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>';
+    h+='<input type="text" id="vaultNewName_'+target+'" placeholder="Name" style="width:130px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>';
+    h+='<input type="password" id="vaultNewTok_'+target+'" placeholder="Token value" autocomplete="new-password" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>';
     h+='<button class="btn-sm" onclick="vaultSave(\''+target+'\')">＋ Save</button>';
     h+='</div>';
     h+='<div id="vaultSaveMsg_'+target+'" style="font-size:12px;margin-top:5px;min-height:16px"></div>';
     if(tokens.length){
-      h+='<div style="font-size:12px;font-weight:600;color:#374151;margin:8px 0 4px">Saved Tokens</div>';
+      h+='<div style="font-size:12px;font-weight:600;color:#374151;margin:8px 0 4px">Manage</div>';
       h+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
       tokens.forEach(function(name){h+='<div style="display:flex;align-items:center;gap:4px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:7px;padding:3px 8px;font-size:12px"><span style="font-weight:600">'+esc(name)+'</span><button class="btn-sm" style="border-color:#fca5a5;color:#dc2626;padding:1px 6px;font-size:11px" onclick="vaultDel(\''+target+'\',\''+esc(name)+'\')">✕</button></div>';});
       h+='</div>';
     }
-    h+='</div></div>';
+    h+='</div>';
   }
   el.innerHTML=h;
 }
@@ -266,37 +270,31 @@ function renderVaultPanel(target){
 async function vaultUnlock(target){
   var pw=document.getElementById('vaultPw').value;
   var errEl=document.getElementById('vaultErr');
-  errEl.textContent='';
-  if(!pw){errEl.textContent='Enter a password.';return;}
+  if(errEl)errEl.textContent='';
+  if(!pw){if(errEl)errEl.textContent='Enter a password.';return;}
   try{await Vault.unlock(pw);renderVaultPanel(target);}
-  catch(e){errEl.textContent=e.message;}
+  catch(e){if(errEl)errEl.textContent=e.message;}
 }
-function vaultLockAll(){Vault.lock();['GH','ZH'].forEach(function(t){document.getElementById('vaultPanel'+t).style.display='none';document.getElementById('vaultBtn'+t).textContent='🔒 Use Vault';});_activeVaultTarget=null;}
+function vaultLockAll(){Vault.lock();['GH','ZH'].forEach(function(t){document.getElementById('vaultPanel'+t).style.display='none';document.getElementById('vaultBtn'+t).textContent='🔒';});_activeVaultTarget=null;}
 async function vaultUse(target,name){
   try{
     var tok=await Vault.get(name);
     if(target==='gh')document.getElementById('ghToken').value=tok;
     else document.getElementById('zhTokenInput').value=tok;
-    toggleVault(target); // close panel
+    toggleVault(target);
   }catch(e){alert('Failed to decrypt: '+e.message);}
 }
 async function vaultSave(target){
   var name=document.getElementById('vaultNewName_'+target).value.trim();
   var tok=document.getElementById('vaultNewTok_'+target).value.trim();
   var msgEl=document.getElementById('vaultSaveMsg_'+target);
-  if(!name||!tok){msgEl.style.color='#dc2626';msgEl.textContent='Name and token are required.';return;}
-  try{
-    await Vault.add(name,tok);
-    msgEl.style.color='#059669';msgEl.textContent='"'+name+'" saved!';
-    setTimeout(function(){renderVaultPanel(target);},600);
-  }catch(e){msgEl.style.color='#dc2626';msgEl.textContent=e.message;}
+  if(!name||!tok){msgEl.style.color='#dc2626';msgEl.textContent='Name and token required.';return;}
+  try{await Vault.add(name,tok);msgEl.style.color='#059669';msgEl.textContent='"'+name+'" saved!';setTimeout(function(){renderVaultPanel(target);},600);}
+  catch(e){msgEl.style.color='#dc2626';msgEl.textContent=e.message;}
 }
-function vaultDel(target,name){
-  if(!confirm('Delete "'+name+'" from vault?'))return;
-  Vault.del(name);renderVaultPanel(target);
-}
+function vaultDel(target,name){if(!confirm('Delete "'+name+'"?'))return;Vault.del(name);renderVaultPanel(target);}
 
-// ── Core helpers ─────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function tabColor(def){if(def&&def.labelKey&&S.labelColors[def.labelKey])return '#'+S.labelColors[def.labelKey];return def?def.color:'#6b7280';}
 function lum(h){h=(h||'cccccc').replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];var r=parseInt(h.substr(0,2),16)/255,g=parseInt(h.substr(2,2),16)/255,b=parseInt(h.substr(4,2),16)/255;return 0.2126*r+0.7152*g+0.0722*b;}
@@ -327,20 +325,8 @@ function showDash(){['setup','cfgScr'].forEach(hideEl);showEl('dash');}
 function showCfg(){['setup','dash'].forEach(hideEl);showEl('cfgScr');renderCfg();}
 function backToSetup(){['cfgScr','dash'].forEach(hideEl);showEl('setup');renderProfileDd();}
 function setStatus(html){var el=document.getElementById('loadedAt');if(el)el.innerHTML=html;}
-
-function renderProfileDd(){
-  var sel=document.getElementById('profileSelect');if(!sel)return;
-  sel.innerHTML='<option value="">-- Select a project --</option>';
-  loadProfiles().forEach(function(p){sel.innerHTML+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});
-  loadZHCreds();
-}
-function onProfileSel(){
-  var sel=document.getElementById('profileSelect');
-  var p=loadProfiles().find(function(x){return x.id===sel.value;});
-  if(!p)return;
-  S.activeProfile=p;
-  document.getElementById('reposInput').value=p.type==='group'?(p.repos||[]).map(function(r){return r.repo;}).join(','):p.repo;
-}
+function renderProfileDd(){var sel=document.getElementById('profileSelect');if(!sel)return;sel.innerHTML='<option value="">-- Select a project --</option>';loadProfiles().forEach(function(p){sel.innerHTML+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});loadZHCreds();}
+function onProfileSel(){var sel=document.getElementById('profileSelect');var p=loadProfiles().find(function(x){return x.id===sel.value;});if(!p)return;S.activeProfile=p;document.getElementById('reposInput').value=p.type==='group'?(p.repos||[]).map(function(r){return r.repo;}).join(','):p.repo;}
 
 function renderCfg(){
   var profiles=loadProfiles(),h='';
@@ -380,8 +366,12 @@ function saveNewProfile(){var n=document.getElementById('pName').value.trim(),r=
 function delProfile(id){if(!confirm('Delete?'))return;saveProfiles(loadProfiles().filter(function(p){return p.id!==id;}));renderCfg();}
 function editProfile(id){var p=loadProfiles(),pr=p.find(function(x){return x.id===id;});if(!pr)return;var n=prompt('Name:',pr.name);if(n===null)return;var r=prompt('Repo:',pr.repo);if(r===null)return;var w=prompt('ZenHub workspace ID:',pr.zhWorkspace||'');if(w===null)return;pr.name=n.trim();pr.repo=r.trim();pr.zhWorkspace=w.trim();saveProfiles(p);renderCfg();}
 
+// ── API helpers ───────────────────────────────────────────────────────────────
 async function ghFetch(path){var r=await fetch('https://api.github.com'+path,{headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json'}});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);return r.json();}
 async function ghFetchAll(path,maxPages){maxPages=maxPages||10;var results=[],per=100;for(var page=1;page<=maxPages;page++){var sep=path.indexOf('?')!==-1?'&':'?';var batch=await ghFetch(path+sep+'per_page='+per+'&page='+page);if(!Array.isArray(batch)||!batch.length)break;results=results.concat(batch);if(batch.length<per)break;}return results;}
+async function ghPatch(path,body){var r=await fetch('https://api.github.com'+path,{method:'PATCH',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);return r.json();}
+async function ghPost(path,body){var r=await fetch('https://api.github.com'+path,{method:'POST',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);return r.json();}
+async function ghDel(path){await fetch('https://api.github.com'+path,{method:'DELETE',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json'}});}
 async function zhPost(path,body){var r=await fetch('https://api.zenhub.com'+path,{method:'POST',headers:{'X-Authentication-Token':S.zhToken,'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);}
 async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{headers:{'X-Authentication-Token':S.zhToken}});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
 
@@ -414,27 +404,15 @@ async function connect(){
   btn.disabled=false;btn.textContent='▶ Load Dashboard';
 }
 
-function zhLoad(){
-  if(!S.zhToken||!S.zhWorkspace)return;
-  S.zhConnected=false;
-  setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');
-  loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});
-}
+function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
 async function bgRefresh(){try{await Promise.all([loadLabelColors(),loadIssues()]);saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();}catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}}
 async function doRefresh(){var btn=document.getElementById('refreshBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';try{await Promise.all([loadLabelColors(),loadIssues()]);saveCache();populateFilters();buildTabs();renderMain();if(S.zhToken&&S.zhWorkspace){S.zhIssueMap={};zhLoad();}else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}catch(e){showErr('dashErr',e.message);}btn.disabled=false;btn.innerHTML='↻ Refresh';}
 function startAutoRefresh(){if(S.autoRefreshTimer)clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=setInterval(function(){doRefresh();},15*60*1000);}
 function stopAutoRefresh(){if(S.autoRefreshTimer){clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=null;}}
 
 async function loadLabelColors(){for(var i=0;i<S.repos.length;i++){try{var lb=await ghFetch('/repos/'+S.repos[i]+'/labels?per_page=100');lb.forEach(function(l){S.labelColors[l.name.toLowerCase()]=l.color;});}catch(e){}}}
-async function loadZHData(){
-  S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});
-  for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){console.error('ZH',repo,e.message);}}
-  S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});
-  await loadZHDeps();
-}
-async function loadZHDeps(){
-  for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace,repoId=S.repoIds[repo];if(!S.zhToken||!ws||!repoId)continue;try{var ed=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');for(var j=0;j<(ed.epic_issues||[]).length;j++){var ep=ed.epic_issues[j];try{var edet=await zhGet('/p2/workspaces/'+ws+'/repositories/'+(ep.repo_id||repoId)+'/epics/'+ep.issue_number);(edet.issues||[]).forEach(function(child){var cr=repoForId(child.repo_id)||repo;var ci=S.issues.find(function(iss){return iss.id===child.issue_number&&iss.repo===cr;});if(ci)ci.parent={issueNumber:ep.issue_number};});}catch(e){}}}catch(e){}}
-}
+async function loadZHData(){S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){console.error('ZH',repo,e.message);}}S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});await loadZHDeps();}
+async function loadZHDeps(){for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace,repoId=S.repoIds[repo];if(!S.zhToken||!ws||!repoId)continue;try{var ed=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');for(var j=0;j<(ed.epic_issues||[]).length;j++){var ep=ed.epic_issues[j];try{var edet=await zhGet('/p2/workspaces/'+ws+'/repositories/'+(ep.repo_id||repoId)+'/epics/'+ep.issue_number);(edet.issues||[]).forEach(function(child){var cr=repoForId(child.repo_id)||repo;var ci=S.issues.find(function(iss){return iss.id===child.issue_number&&iss.repo===cr;});if(ci)ci.parent={issueNumber:ep.issue_number};});}catch(e){}}}catch(e){}}}
 function repoForId(id){return Object.keys(S.repoIds).find(function(r){return S.repoIds[r]===id;})||null;}
 
 async function loadIssues(){
@@ -452,56 +430,108 @@ async function loadIssues(){
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
 }
 
+// ── Issue logic ───────────────────────────────────────────────────────────────
 function getAutoClosedItems(issue){if(!issue.labels.some(function(l){return l.toLowerCase()==='cs task item';})||issue.state!=='open')return[];var hits=[];(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(chk&&/#\d+/.test(chk[1].trim()))hits.push(chk[1].trim());});return hits;}
 function isNIP(issue){return issue.pipeline&&issue.pipeline.pipelineName.toLowerCase()==='new issues';}
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
 function isException(issue){if(issue.state!=='open')return false;if(issue.parent)return false;if(isExempt(issue))return false;if(issue.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';}))return false;if(hasCS(issue))return true;if(getAutoClosedItems(issue).length>0)return true;if(isNIP(issue))return true;return false;}
-
 function populateFilters(){var ls={},rs={},ps={};S.issues.concat(S.closedIssues).forEach(function(i){i.labels.forEach(function(l){ls[l]=1;});rs[i.repo]=1;if(i.pipeline)ps[i.pipeline.pipelineName]=1;});var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');fl.innerHTML='<option value="">All labels</option>';Object.keys(ls).sort(lsort).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});fr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});fp.innerHTML='<option value="">All pipelines</option>';Object.keys(ps).sort(lsort).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});}
 function clearFilters(){['searchInput','filterLabel','filterRepo','filterPipeline'].forEach(function(id){document.getElementById(id).value='';});renderMain();}
 function getExceptions(){return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isException(i);});}
-
-function getTabIssues(tab){
-  var t=tab||S.activeTab;
-  if(t==='exceptions')return getExceptions();
-  if(t==='ignored')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;});
-  if(t==='closed')return S.closedIssues;
-  if(t==='testing'){var oT=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});var cT=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});return oT.concat(cT);}
-  if(t==='taskitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
-  var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';});});
-  if(t==='newitems')return base.filter(function(i){return !hasCS(i);});
-  if(t==='prod')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});});
-  if(t==='uat')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});
-  if(t==='csitems')return base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';});});
-  return base;
-}
+function getTabIssues(tab){var t=tab||S.activeTab;if(t==='exceptions')return getExceptions();if(t==='ignored')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;});if(t==='closed')return S.closedIssues;if(t==='testing'){var oT=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});var cT=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});return oT.concat(cT);}if(t==='taskitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';});});if(t==='newitems')return base.filter(function(i){return !hasCS(i);});if(t==='prod')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});});if(t==='uat')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});if(t==='csitems')return base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';});});return base;}
 function applyFilters(list){var q=(document.getElementById('searchInput').value||'').toLowerCase(),fl=(document.getElementById('filterLabel').value||'').toLowerCase(),fr=document.getElementById('filterRepo').value||'',fp=document.getElementById('filterPipeline').value||'';if(q)list=list.filter(function(i){return i.title.toLowerCase().indexOf(q)!==-1||String(i.id).indexOf(q)!==-1||i.labels.join(' ').toLowerCase().indexOf(q)!==-1||i.repo.toLowerCase().indexOf(q)!==-1||i.assignees.join(' ').toLowerCase().indexOf(q)!==-1;});if(fl)list=list.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()===fl;});});if(fr)list=list.filter(function(i){return i.repo===fr;});if(fp)list=list.filter(function(i){return i.pipeline&&i.pipeline.pipelineName===fp;});return list;}
-function sortIssues(list,tab){
-  if(tab==='taskitem')return list.slice().sort(function(a,b){var at=a.title.toLowerCase(),bt=b.title.toLowerCase();var aP=at.indexOf('cs production issues')===0,bP=bt.indexOf('cs production issues')===0;var aF=at.indexOf('cs features')===0,bF=bt.indexOf('cs features')===0;var aCS=at.indexOf('cs ')===0,bCS=bt.indexOf('cs ')===0;if(aP&&!bP)return -1;if(!aP&&bP)return 1;if(aF&&!bF)return -1;if(!aF&&bF)return 1;if(aCS&&!bCS)return -1;if(!aCS&&bCS)return 1;return at.localeCompare(bt);});
-  var col=S.sortState.col,dir=S.sortState.dir;
-  if(tab==='newitems'&&col==='age')dir=1;
-  return list.slice().sort(function(a,b){var av,bv;if(col==='age'||col==='created'){av=new Date(a.createdAt);bv=new Date(b.createdAt);}else if(col==='title'){av=a.title.toLowerCase();bv=b.title.toLowerCase();}else if(col==='repo'){av=a.repo;bv=b.repo;}else if(col==='id'){av=a.id;bv=b.id;}else if(col==='closed'){av=new Date(a.closedAt||0);bv=new Date(b.closedAt||0);}else{av=new Date(a.createdAt);bv=new Date(b.createdAt);}if(av<bv)return -dir;if(av>bv)return dir;return 0;});
-}
+function sortIssues(list,tab){if(tab==='taskitem')return list.slice().sort(function(a,b){var at=a.title.toLowerCase(),bt=b.title.toLowerCase();var aP=at.indexOf('cs production issues')===0,bP=bt.indexOf('cs production issues')===0;var aF=at.indexOf('cs features')===0,bF=bt.indexOf('cs features')===0;var aCS=at.indexOf('cs ')===0,bCS=bt.indexOf('cs ')===0;if(aP&&!bP)return -1;if(!aP&&bP)return 1;if(aF&&!bF)return -1;if(!aF&&bF)return 1;if(aCS&&!bCS)return -1;if(!aCS&&bCS)return 1;return at.localeCompare(bt);});var col=S.sortState.col,dir=S.sortState.dir;if(tab==='newitems'&&col==='age')dir=1;return list.slice().sort(function(a,b){var av,bv;if(col==='age'||col==='created'){av=new Date(a.createdAt);bv=new Date(b.createdAt);}else if(col==='title'){av=a.title.toLowerCase();bv=b.title.toLowerCase();}else if(col==='repo'){av=a.repo;bv=b.repo;}else if(col==='id'){av=a.id;bv=b.id;}else if(col==='closed'){av=new Date(a.closedAt||0);bv=new Date(b.closedAt||0);}else{av=new Date(a.createdAt);bv=new Date(b.createdAt);}if(av<bv)return -dir;if(av>bv)return dir;return 0;});}
 function mkTh(col,label){var active=S.sortState.col===col;return '<th class="'+(active?'sorted':'')+'" onclick="doSort(\''+col+'\')">'+label+' <span class="si">'+(active?(S.sortState.dir===1?'▲':'▼'):'▲')+'</span></th>';}
 function doSort(col){if(S.sortState.col===col)S.sortState.dir*=-1;else{S.sortState.col=col;S.sortState.dir=1;}renderMain();}
 
-function renderStats(){
-  var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i);});
-  var tN=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length+S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
-  var stats=[{n:base.filter(function(i){return !hasCS(i);}).length,tab:'newitems'},{n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length,tab:'prod'},{n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,tab:'uat'},{n:base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});}).length,tab:'csitems'},{n:tN,tab:'testing'},{n:S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,tab:'taskitem'},{n:getExceptions().length,tab:'exceptions'},{n:S.closedIssues.length,tab:'closed'}];
-  var h='';stats.forEach(function(s){if((s.tab==='prod'||s.tab==='uat')&&s.n===0)return;var def=TAB_DEFS.find(function(d){return d.id===s.tab;}),c=tabColor(def),l=def?def.label:s.tab;h+='<div class="sc2" style="border-top-color:'+c+'" onclick="switchTab(\''+s.tab+'\')"><div class="sn" style="color:'+c+'">'+s.n+'</div><div class="sl">'+esc(l)+'</div></div>';});
-  document.getElementById('statGrid').innerHTML=h;
-}
-function buildTabs(){
-  var pN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length;
-  var uN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length;
-  var h='';TAB_DEFS.forEach(function(t){if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0))return;var cnt=getTabIssues(t.id).length,active=S.activeTab===t.id,c=tabColor(t);h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+c:'')+'">'+esc(t.label)+'<span class="tc">'+cnt+'</span></button>';});
-  document.getElementById('tabsWrap').innerHTML=h;
-}
+function renderStats(){var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i);});var tN=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length+S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;var stats=[{n:base.filter(function(i){return !hasCS(i);}).length,tab:'newitems'},{n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length,tab:'prod'},{n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,tab:'uat'},{n:base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});}).length,tab:'csitems'},{n:tN,tab:'testing'},{n:S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,tab:'taskitem'},{n:getExceptions().length,tab:'exceptions'},{n:S.closedIssues.length,tab:'closed'}];var h='';stats.forEach(function(s){if((s.tab==='prod'||s.tab==='uat')&&s.n===0)return;var def=TAB_DEFS.find(function(d){return d.id===s.tab;}),c=tabColor(def),l=def?def.label:s.tab;h+='<div class="sc2" style="border-top-color:'+c+'" onclick="switchTab(\''+s.tab+'\')"><div class="sn" style="color:'+c+'">'+s.n+'</div><div class="sl">'+esc(l)+'</div></div>';});document.getElementById('statGrid').innerHTML=h;}
+function buildTabs(){var pN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length;var uN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length;var h='';TAB_DEFS.forEach(function(t){if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0))return;var cnt=getTabIssues(t.id).length,active=S.activeTab===t.id,c=tabColor(t);h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+c:'')+'">'+esc(t.label)+'<span class="tc">'+cnt+'</span></button>';});document.getElementById('tabsWrap').innerHTML=h;}
 function switchTab(name){S.activeTab=name;document.getElementById('searchBar').style.display=name==='report'?'none':'flex';buildTabs();renderMain();}
 function ignoreIssue(k){if(S.ignored.indexOf(k)===-1)S.ignored.push(k);saveIgnored();buildTabs();renderMain();}
 function unignoreIssue(k){S.ignored=S.ignored.filter(function(x){return x!==k;});saveIgnored();buildTabs();renderMain();}
 
+// ── Label editing ─────────────────────────────────────────────────────────────
+var _openLabelPanel=null;
+function toggleLabelEdit(issueId,repo){
+  var key=issueId+'_'+repo;
+  var panelId='lblpanel_'+key;
+  if(_openLabelPanel&&_openLabelPanel!==panelId){var old=document.getElementById(_openLabelPanel);if(old)old.style.display='none';}
+  var panel=document.getElementById(panelId);if(!panel)return;
+  var isOpen=panel.style.display==='block';
+  panel.style.display=isOpen?'none':'block';
+  _openLabelPanel=isOpen?null:panelId;
+  if(!isOpen)renderLabelEditPanel(issueId,repo);
+}
+function renderLabelEditPanel(issueId,repo){
+  var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;})||S.closedIssues.find(function(i){return i.id===issueId&&i.repo===repo;});
+  var panel=document.getElementById('lblpanel_'+issueId+'_'+repo);
+  if(!issue||!panel)return;
+  var allLabels=Object.keys(S.labelColors).sort(lsort);
+  var current=issue.labels.map(function(l){return l.toLowerCase();});
+  var h='<div class="lbl-edit-panel">';
+  h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Edit Labels — #'+issueId+'</div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">';
+  if(issue.labels.length){issue.labels.forEach(function(l){var c=S.labelColors[l.toLowerCase()]||'e5e7eb';h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#'+c+';color:'+tfb(c)+';padding:3px 8px;border-radius:999px;font-size:11px;font-weight:600">'+esc(l)+'<button onclick="removeLbl('+issueId+',\''+esc(repo)+'\',\''+esc(l)+'\')" style="background:none;border:none;cursor:pointer;color:inherit;font-size:11px;padding:0;opacity:0.7">✕</button></span>';});}
+  else h+='<span style="font-size:12px;color:#9ca3af">No labels</span>';
+  h+='</div>';
+  h+='<div style="display:flex;gap:6px;align-items:center">';
+  h+='<select id="lblAddSel_'+issueId+'_'+esc(repo)+'" style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"><option value="">— Add a label —</option>';
+  allLabels.forEach(function(l){if(current.indexOf(l)===-1)h+='<option value="'+esc(l)+'">'+esc(l)+'</option>';});
+  h+='</select><button class="btn-sm" onclick="addLbl('+issueId+',\''+esc(repo)+'\')">＋ Add</button>';
+  h+='</div></div>';
+  panel.innerHTML=h;
+}
+async function addLbl(issueId,repo){
+  var sel=document.getElementById('lblAddSel_'+issueId+'_'+repo);
+  var label=sel?sel.value:'';if(!label)return;
+  var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;})||S.closedIssues.find(function(i){return i.id===issueId&&i.repo===repo;});if(!issue)return;
+  var newLabels=issue.labels.concat([label]);
+  try{await ghPatch('/repos/'+repo+'/issues/'+issueId,{labels:newLabels});issue.labels=newLabels;renderMain();setTimeout(function(){var p=document.getElementById('lblpanel_'+issueId+'_'+repo);if(p&&p.style.display==='block')renderLabelEditPanel(issueId,repo);},80);}
+  catch(e){alert('Failed: '+e.message);}
+}
+async function removeLbl(issueId,repo,label){
+  var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;})||S.closedIssues.find(function(i){return i.id===issueId&&i.repo===repo;});if(!issue)return;
+  var newLabels=issue.labels.filter(function(l){return l.toLowerCase()!==label.toLowerCase();});
+  try{await ghPatch('/repos/'+repo+'/issues/'+issueId,{labels:newLabels});issue.labels=newLabels;renderMain();setTimeout(function(){var p=document.getElementById('lblpanel_'+issueId+'_'+repo);if(p&&p.style.display==='block')renderLabelEditPanel(issueId,repo);},80);}
+  catch(e){alert('Failed: '+e.message);}
+}
+
+// ── Label Manager Modal ───────────────────────────────────────────────────────
+function showLabelManager(){document.getElementById('labelModal').style.display='block';renderLabelManager();}
+function hideLabelManager(){document.getElementById('labelModal').style.display='none';}
+function renderLabelManager(){
+  var el=document.getElementById('labelModalContent');
+  var labels=Object.keys(S.labelColors).sort(lsort);
+  var h='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:16px">';
+  h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">Create New Label</div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+  h+='<input type="text" id="newLblName" placeholder="Label name" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/>';
+  h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;color:#6b7280">Color:</span><input type="color" id="newLblColor" value="#4338ca" style="width:36px;height:32px;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:2px"/></div>';
+  h+='<button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="createLabel()">＋ Create</button>';
+  h+='</div><div id="lblCreateMsg" style="font-size:12px;margin-top:6px;min-height:16px"></div></div>';
+  h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">Existing Labels ('+labels.length+')</div>';
+  if(!labels.length){h+='<div style="font-size:13px;color:#9ca3af">No labels loaded.</div>';}
+  else{
+    h+='<div style="display:flex;flex-direction:column;gap:6px">';
+    labels.forEach(function(l){var c=S.labelColors[l]||'e5e7eb';
+      h+='<div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px">';
+      h+='<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#'+c+';border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></span>';
+      h+='<span style="flex:1;font-size:13px;font-weight:600">'+esc(l)+'</span>';
+      h+='<input type="text" value="'+esc(l)+'" id="leName_'+esc(l)+'" style="width:150px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none"/>';
+      h+='<input type="color" value="#'+c+'" id="leColor_'+esc(l)+'" style="width:32px;height:28px;border:1px solid #ddd;border-radius:5px;cursor:pointer;padding:1px"/>';
+      h+='<button class="btn-sm" onclick="updateLabel(\''+esc(l)+'\')">Save</button>';
+      h+='<button class="btn-d" style="padding:5px 10px;font-size:12px" onclick="deleteLabel(\''+esc(l)+'\')">Delete</button>';
+      h+='</div>';
+    });
+    h+='</div>';
+  }
+  el.innerHTML=h;
+}
+async function createLabel(){var name=document.getElementById('newLblName').value.trim(),color=document.getElementById('newLblColor').value.replace('#',''),msg=document.getElementById('lblCreateMsg');if(!name){msg.style.color='#dc2626';msg.textContent='Name required.';return;}try{await ghPost('/repos/'+S.repos[0]+'/labels',{name:name,color:color});S.labelColors[name.toLowerCase()]=color;msg.style.color='#059669';msg.textContent='"'+name+'" created!';document.getElementById('newLblName').value='';setTimeout(function(){renderLabelManager();},600);}catch(e){msg.style.color='#dc2626';msg.textContent=e.message;}}
+async function updateLabel(oldName){var newName=document.getElementById('leName_'+oldName).value.trim(),newColor=document.getElementById('leColor_'+oldName).value.replace('#','');if(!newName)return;try{await fetch('https://api.github.com/repos/'+S.repos[0]+'/labels/'+encodeURIComponent(oldName),{method:'PATCH',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify({new_name:newName,color:newColor})});delete S.labelColors[oldName.toLowerCase()];S.labelColors[newName.toLowerCase()]=newColor;S.issues.concat(S.closedIssues).forEach(function(i){i.labels=i.labels.map(function(l){return l.toLowerCase()===oldName.toLowerCase()?newName:l;});});renderLabelManager();renderMain();}catch(e){alert('Failed: '+e.message);}}
+async function deleteLabel(name){if(!confirm('Delete label "'+name+'"? This cannot be undone.'))return;try{await ghDel('/repos/'+S.repos[0]+'/labels/'+encodeURIComponent(name));delete S.labelColors[name.toLowerCase()];S.issues.concat(S.closedIssues).forEach(function(i){i.labels=i.labels.filter(function(l){return l.toLowerCase()!==name.toLowerCase();});});renderLabelManager();renderMain();}catch(e){alert('Failed: '+e.message);}}
+
+// ── Render ────────────────────────────────────────────────────────────────────
 function renderExcReason(issue){var parts=[],ai=getAutoClosedItems(issue);if(ai.length){var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';ai.forEach(function(t){h+='<div class="acit">'+esc(t)+'</div>';});parts.push(h+'</div>');}if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');if(!parts.length)parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>');return parts.join('<div style="margin-top:4px"></div>');}
 
 function renderTable(issues,tab,def){
@@ -525,7 +555,10 @@ function renderTable(issues,tab,def){
     h+='<tr'+(isOT||isExc?' style="background:#fff5f5"':'')+'>'; 
     h+='<td style="color:#6b7280;font-size:12px">#'+issue.id+'</td>';
     h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
-    h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});h+='</div></td>';
+    h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
+    sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
+    h+='<button onclick="toggleLabelEdit('+issue.id+',\''+esc(issue.repo)+'\')" title="Edit labels" style="background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;color:#9ca3af;border-radius:4px;line-height:1" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">✏️</button>';
+    h+='</div><div id="lblpanel_'+issue.id+'_'+esc(issue.repo)+'" style="display:none"></div></td>';
     if(S.repos.length>1)h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.repo.split('/')[1])+'</td>';
     h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
     if(isTesting)h+='<td>'+(isOT?'<span class="of">⚠ Should be closed</span>':'<span class="badge" style="background:#d1fae5;color:#065f46">Closed</span>')+'</td>';
@@ -544,16 +577,10 @@ async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTa
 
 function renderMain(){renderStats();buildTabs();hideErr('dashErr');if(S.activeTab==='report'){renderReport();return;}var def=TAB_DEFS.find(function(d){return d.id===S.activeTab;});document.getElementById('mainContent').innerHTML=renderTable(applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab)),S.activeTab,def);}
 
+// ── Report ────────────────────────────────────────────────────────────────────
 function parseSnapshotIssue(issue){var t=0,c=0,o=0,n=0;(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i),unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);if(!chk&&!unk)return;var text=(chk||unk)[1].trim();if(!/#\d+/.test(text)){n++;return;}t++;if(chk)c++;else o++;});return{id:issue.id,title:issue.title,url:issue.url,total:t,closed:c,open:o,noIssue:n};}
 function getCurrentSnapshot(){
-  var tracking=S.issues.filter(function(i){
-    if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
-    var t=i.title.trim().toLowerCase();
-    if(t.indexOf('cs ')!==0)return false;
-    if(t.indexOf('research items')!==-1)return false;
-    if(t.indexOf('cs ba ')===0)return false;
-    return true;
-  });
+  var tracking=S.issues.filter(function(i){if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;var t=i.title.trim().toLowerCase();if(t.indexOf('cs ')!==0)return false;if(t.indexOf('research items')!==-1)return false;if(t.indexOf('cs ba ')===0)return false;return true;});
   if(!tracking.length)return null;
   var rows=[],total=0,closed=0,open=0,noIssue=0,nums=[];
   tracking.forEach(function(issue){nums.push(issue.id);var r=parseSnapshotIssue(issue);rows.push(r);total+=r.total;closed+=r.closed;open+=r.open;noIssue+=r.noIssue;});
@@ -572,7 +599,7 @@ function renderReport(){
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
   h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">Today\'s Snapshot</div><div style="font-size:12px;color:#9ca3af;margin-top:2px">'+todayStr()+'</div></div>';
   h+='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
-  if(excCount>0)h+='<div style="font-size:12px;color:#dc2626;font-weight:600;display:flex;align-items:center;gap:5px">⚠ '+excCount+' unresolved exception'+(excCount>1?'s':'')+' — resolve before saving <button class="btn-sm" style="font-size:11px;padding:3px 9px;border-color:#fca5a5;color:#dc2626" onclick="switchTab(\'exceptions\')">View</button></div>';
+  if(excCount>0)h+='<div style="font-size:12px;color:#dc2626;font-weight:600;display:flex;align-items:center;gap:5px">⚠ '+excCount+' unresolved exception'+(excCount>1?'s':'')+' <button class="btn-sm" style="font-size:11px;padding:3px 9px;border-color:#fca5a5;color:#dc2626" onclick="switchTab(\'exceptions\')">View</button></div>';
   h+='<button class="btn-p" onclick="saveSnap()" style="font-size:13px;padding:8px 18px"'+(canSave?'':' disabled')+'>⬇ Save to Report</button>';
   h+='</div></div>';
   if(!snap){h+='<div style="color:#9ca3af;font-size:13px">No open CS Task Item issues found.</div>';}
@@ -607,6 +634,7 @@ function loadHistoricalData(){
   saveHistory(rows);alert('Loaded '+rows.length+' historical rows.');renderReport();
 }
 
+// ── Settings ──────────────────────────────────────────────────────────────────
 function toggleSettings(){S.showSettings=!S.showSettings;renderSettings();}
 function renderSettings(){
   var el=document.getElementById('settingsPanel');
@@ -617,7 +645,7 @@ function renderSettings(){
   h+='<div style="margin-bottom:16px"><button class="btn-p" style="justify-content:center;width:100%" onclick="toggleSettings();showSetup()">💻 Reconnect GitHub</button></div>';
   h+='<div style="font-size:13px;font-weight:700;color:#1e1b4b;margin-bottom:10px;padding-top:10px;border-top:1px solid #e5e7eb">ZenHub</div>';
   h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">ZenHub API Token</label>';
-  h+='<input type="text" id="zhTI" value="" placeholder="Paste token" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhToken?'<div style="font-size:11px;color:#059669;margin-top:3px">✓ Token saved</div>':'')+'</div>';
+  h+='<input type="password" id="zhTI" placeholder="Paste token" autocomplete="new-password" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhToken?'<div style="font-size:11px;color:#059669;margin-top:3px">✓ Token saved</div>':'')+'</div>';
   h+='<div class="fg" style="margin-top:10px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Workspace ID</label>';
   h+='<input type="text" id="zhWI" value="'+esc(S.zhWorkspace)+'" placeholder="Numeric ID" autocomplete="off" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;font-family:monospace"/>'+(S.zhWorkspace?'<div style="font-size:11px;color:#059669;margin-top:3px">✓ '+esc(S.zhWorkspace)+'</div>':'<div style="font-size:11px;color:#dc2626;margin-top:3px">⚠ No workspace ID set</div>')+'</div>';
   h+='<div id="zhErr" style="display:none;margin-top:8px"></div>';
