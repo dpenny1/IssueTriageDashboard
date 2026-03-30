@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CS Issues Hub</title>
+<title>CentralView</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -93,7 +93,7 @@ tr:hover td{background:#f9fafb}
 
 <div id="setup">
   <div class="hdr"><div class="hdr-in">
-    <div><h1>📋 CS Issues Hub</h1><p>Select a project to get started</p></div>
+    <div><h1>📋 CentralView</h1><p>Select a project to get started</p></div>
     <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-w">🛠 PM Tools</a>
   </div></div>
   <div class="main"><div class="sw"><div class="sc">
@@ -128,7 +128,7 @@ tr:hover td{background:#f9fafb}
 
 <div id="cfgScr">
   <div class="hdr"><div class="hdr-in">
-    <div><h1>📋 CS Issues Hub</h1><p>Manage projects</p></div>
+    <div><h1>📋 CentralView</h1><p>Manage projects</p></div>
     <button class="btn btn-w" onclick="backToSetup()">← Back</button>
   </div></div>
   <div class="main" style="max-width:620px;margin:0 auto"><div id="cfgList"></div></div>
@@ -423,7 +423,7 @@ async function loadIssues(){
     for(var j=0;j<cd.length;j++){var iss=cd[j];if(iss.pull_request)continue;var lbls=iss.labels.map(function(l){return l.name;});if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))continue;closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,url:iss.html_url,state:'closed',pipeline:null,parent:null});if(++count>=50)break;}
   }
   S.issues=open;S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
-  document.getElementById('dashTitle').textContent='📋 '+(S.activeProfile?S.activeProfile.name+' Issues':'CS Issues Hub');
+  document.getElementById('dashTitle').textContent='📋 CentralView — '+(S.activeProfile?S.activeProfile.name:'Dashboard');
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
 }
 
