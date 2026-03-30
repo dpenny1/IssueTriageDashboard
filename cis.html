@@ -236,31 +236,42 @@ function renderVaultPanel(target){
     h+='<span style="font-size:13px;font-weight:600;color:#374151">🔓 Select a token</span>';
     h+='<button class="btn-sm" onclick="vaultLockAll()">🔒 Lock</button>';
     h+='</div>';
-    if(tokens.length){h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';tokens.forEach(function(t){var badge=t.type?'<span style="font-size:10px;padding:1px 6px;border-radius:999px;font-weight:700;background:'+(t.type==='gh'?'#e0e7ff':'#d1fae5')+';color:'+(t.type==='gh'?'#3730a3':'#065f46')+';margin-left:3px">'+(t.type==='gh'?'GH':'ZH')+'</span>':'<span style="font-size:10px;color:#9ca3af;margin-left:3px">untagged</span>';h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(t.name)+'\')">'+esc(t.name)+badge+' ▶</button>';});h+='</div>';}
-    else h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">No tokens saved yet.</div>';
+    if(tokens.length){
+      h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
+      tokens.forEach(function(t){
+        var badge=t.type
+          ?'<span style="font-size:10px;padding:1px 6px;border-radius:999px;font-weight:700;background:'+(t.type==='gh'?'#e0e7ff':'#d1fae5')+';color:'+(t.type==='gh'?'#3730a3':'#065f46')+';margin-left:4px">'+(t.type==='gh'?'GH':'ZH')+'</span>'
+          :'<span style="font-size:10px;color:#f59e0b;font-weight:700;margin-left:4px">⚠ untagged</span>';
+        h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(t.name)+'\')">'+esc(t.name)+badge+' ▶</button>';
+      });
+      h+='</div>';
+    } else {
+      h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">No tokens saved yet.</div>';
+    }
     h+='<div style="border-top:1px solid #e0e7ff;padding-top:10px">';
     h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Save New Token</div>';
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
     h+='<input type="text" id="vaultNewName_'+target+'" placeholder="Name" style="width:120px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>';
-    h+='<select id="vaultNewType_'+target+'" style="padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;color:#374151"><option value="">Type...</option><option value="gh">GitHub (GH)</option><option value="zh">ZenHub (ZH)</option></select>';
+    h+='<select id="vaultNewType_'+target+'" style="padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;color:#374151"><option value="">Type...</option><option value="gh">GitHub (GH)</option><option value="zh">ZenHub (ZH)</option><option value="asana">Asana</option></select>';
     h+='<input type="password" id="vaultNewTok_'+target+'" placeholder="Token value" autocomplete="new-password" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>';
     h+='<button class="btn-sm" onclick="vaultSave(\''+target+'\')">＋ Save</button>';
     h+='</div>';
     h+='<div id="vaultSaveMsg_'+target+'" style="font-size:12px;margin-top:5px;min-height:16px"></div>';
     if(tokens.length){
-      h+='<div style="font-size:12px;font-weight:600;color:#374151;margin:8px 0 4px">Manage</div>';
-      h+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
+      h+='<div style="font-size:12px;font-weight:600;color:#374151;margin:10px 0 6px">Manage &amp; Tag</div>';
+      h+='<div style="display:flex;flex-direction:column;gap:5px">';
       tokens.forEach(function(t){
-        var typeColor=t.type==='gh'?'#3730a3':t.type==='zh'?'#065f46':'#9ca3af';
+        var typeColor=t.type==='gh'?'#3730a3':t.type==='zh'?'#065f46':'#6b7280';
         var typeBg=t.type==='gh'?'#e0e7ff':t.type==='zh'?'#d1fae5':'#f3f4f6';
-        h+='<div style="display:flex;align-items:center;gap:4px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:7px;padding:3px 8px;font-size:12px">';
-        h+='<span style="font-weight:600">'+esc(t.name)+'</span>';
-        h+='<select onchange="vaultSetType(\''+esc(t.name)+'\',this.value)" style="font-size:10px;padding:1px 4px;border:1px solid #ddd;border-radius:5px;background:'+typeBg+';color:'+typeColor+';font-weight:700;cursor:pointer">';
-        h+='<option value=""'+(t.type===''?' selected':'')+'>—</option>';
-        h+='<option value="gh"'+(t.type==='gh'?' selected':'')+'>GH</option>';
-        h+='<option value="zh"'+(t.type==='zh'?' selected':'')+'>ZH</option>';
+        h+='<div style="display:flex;align-items:center;gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px">';
+        h+='<span style="font-weight:600;font-size:13px;flex:1">'+esc(t.name)+'</span>';
+        h+='<span style="font-size:11px;color:#6b7280">Tag as:</span>';
+        h+='<select onchange="vaultSetType(\''+esc(t.name)+'\',this.value)" style="font-size:12px;padding:3px 8px;border:1px solid #ddd;border-radius:6px;background:'+typeBg+';color:'+typeColor+';font-weight:700;cursor:pointer;outline:none">';
+        h+='<option value=""'+(t.type===''?' selected':'')+'>— untagged —</option>';
+        h+='<option value="gh"'+(t.type==='gh'?' selected':'')+'>GitHub (GH)</option>';
+        h+='<option value="zh"'+(t.type==='zh'?' selected':'')+'>ZenHub (ZH)</option>';
         h+='</select>';
-        h+='<button class="btn-sm" style="border-color:#fca5a5;color:#dc2626;padding:1px 6px;font-size:11px" onclick="vaultDel(\''+target+'\',\''+esc(t.name)+'\')">✕</button>';
+        h+='<button class="btn-sm" style="border-color:#fca5a5;color:#dc2626;padding:3px 8px;font-size:11px" onclick="vaultDel(\''+target+'\',\''+esc(t.name)+'\')">✕ Delete</button>';
         h+='</div>';
       });
       h+='</div>';
