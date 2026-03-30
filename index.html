@@ -152,6 +152,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
     get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
     add:async function(name,tok,type){if(_data.find(function(e){return e.name===name;}))throw new Error('Name already exists');var enc=await encrypt(tok,_pw);save(_data.concat([{name:name,enc:enc,type:type||''}]));},
     setType:function(name,type){var d=_data.map(function(e){return e.name===name?{name:e.name,enc:e.enc,type:type}:e;});save(d);},
+    rename:function(oldName,newName){var d=_data.map(function(e){return e.name===oldName?{name:newName,enc:e.enc,type:e.type||''}:e;});save(d);},
     del:function(name){save(_data.filter(function(e){return e.name!==name;}));}
   };
 })();
@@ -292,6 +293,31 @@ async function idxVaultSave(){
 function idxVaultDel(name){
   if(!confirm('Delete "'+name+'"?'))return;
   Vault.del(name);
+  // clear session if this token was active
+  ['gh','zh','asana'].forEach(function(type){
+    if(sessionStorage.getItem('cv_session_'+type+'_name')===name){
+      sessionStorage.removeItem('cv_session_'+type);
+      sessionStorage.removeItem('cv_session_'+type+'_name');
+    }
+  });
+  renderTokenList();
+  renderActiveBar();
+}
+
+function idxVaultRename(name){
+  var newName=prompt('Rename "'+name+'" to:',name);
+  if(!newName||newName===name)return;
+  newName=newName.trim();
+  if(!newName)return;
+  var tokens=Vault.list();
+  if(tokens.find(function(t){return t.name===newName;})){alert('"'+newName+'" already exists.');return;}
+  Vault.rename(name,newName);
+  // update session references
+  ['gh','zh','asana'].forEach(function(type){
+    if(sessionStorage.getItem('cv_session_'+type+'_name')===name){
+      sessionStorage.setItem('cv_session_'+type+'_name',newName);
+    }
+  });
   renderTokenList();
   renderActiveBar();
 }
