@@ -88,6 +88,21 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <!-- Unlocked state -->
       <div id="vaultUnlockedPanel" style="display:none">
         <div id="vaultTokenList"></div>
+        <div style="border-top:1px solid #e5e7eb;margin-top:14px;padding-top:14px">
+          <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">➕ Add New Token</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input type="text" id="idxNewName" placeholder="Name" style="width:120px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>
+            <select id="idxNewType" style="padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;color:#374151">
+              <option value="">Type...</option>
+              <option value="gh">GitHub (GH)</option>
+              <option value="zh">ZenHub (ZH)</option>
+              <option value="asana">Asana</option>
+            </select>
+            <input type="password" id="idxNewTok" placeholder="Token value" autocomplete="new-password" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>
+            <button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="idxVaultSave()">＋ Save</button>
+          </div>
+          <div id="idxSaveMsg" style="font-size:12px;margin-top:5px;min-height:16px"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -125,6 +140,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
   var Vault=(function(){
   var KEY='cis_vault_v1',_pw=null,_data=[];
   async function deriveKey(pw,salt){var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
+  async function encrypt(text,pw){var salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));var key=await deriveKey(pw,salt);var ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,new TextEncoder().encode(text));var buf=new Uint8Array(28+ct.byteLength);buf.set(salt,0);buf.set(iv,16);buf.set(new Uint8Array(ct),28);return btoa(String.fromCharCode(...buf));}
   async function decrypt(b64,pw){var buf=Uint8Array.from(atob(b64),function(c){return c.charCodeAt(0);});var key=await deriveKey(pw,buf.slice(0,16));var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(16,28)},key,buf.slice(28));return new TextDecoder().decode(plain);}
   function load(){try{var v=localStorage.getItem(KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
   function save(d){localStorage.setItem(KEY,JSON.stringify(d));_data=d;}
@@ -134,7 +150,9 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
     lock:function(){_pw=null;_data=[];},
     list:function(){return _data.map(function(e){return {name:e.name,type:e.type||''};});},
     get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
-    setType:function(name,type){var d=_data.map(function(e){return e.name===name?{name:e.name,enc:e.enc,type:type}:e;});save(d);}
+    add:async function(name,tok,type){if(_data.find(function(e){return e.name===name;}))throw new Error('Name already exists');var enc=await encrypt(tok,_pw);save(_data.concat([{name:name,enc:enc,type:type||''}]));},
+    setType:function(name,type){var d=_data.map(function(e){return e.name===name?{name:e.name,enc:e.enc,type:type}:e;});save(d);},
+    del:function(name){save(_data.filter(function(e){return e.name!==name;}));}
   };
 })();
 
@@ -249,6 +267,31 @@ async function assignToken(name,type){
 function unassignToken(type){
   if(type==='gh'){sessionStorage.removeItem(SESSION_GH);sessionStorage.removeItem('cv_session_gh_name');}
   else{sessionStorage.removeItem(SESSION_ZH);sessionStorage.removeItem('cv_session_zh_name');}
+  renderTokenList();
+  renderActiveBar();
+}
+
+async function idxVaultSave(){
+  var name=document.getElementById('idxNewName').value.trim();
+  var type=document.getElementById('idxNewType').value;
+  var tok=document.getElementById('idxNewTok').value.trim();
+  var msg=document.getElementById('idxSaveMsg');
+  msg.textContent='';
+  if(!name||!tok){msg.style.color='#dc2626';msg.textContent='Name and token are required.';return;}
+  try{
+    await Vault.add(name,tok,type);
+    msg.style.color='#059669';
+    msg.textContent='"'+name+'" saved!'+(type?' Tagged as '+type.toUpperCase()+'.':'');
+    document.getElementById('idxNewName').value='';
+    document.getElementById('idxNewType').value='';
+    document.getElementById('idxNewTok').value='';
+    setTimeout(function(){msg.textContent='';renderTokenList();},800);
+  }catch(e){msg.style.color='#dc2626';msg.textContent=e.message;}
+}
+
+function idxVaultDel(name){
+  if(!confirm('Delete "'+name+'"?'))return;
+  Vault.del(name);
   renderTokenList();
   renderActiveBar();
 }
