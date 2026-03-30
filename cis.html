@@ -202,9 +202,10 @@ var Vault=(function(){
     isUnlocked:function(){return _pw!==null;},
     unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}} _pw=pw;_data=data;},
     lock:function(){_pw=null;_data=[];},
-    list:function(){return _data.map(function(e){return e.name;});},
+    list:function(){return _data.map(function(e){return {name:e.name,type:e.type||''};});},
     get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
-    add:async function(name,tok){if(_data.find(function(e){return e.name===name;}))throw new Error('Name already exists');var enc=await encrypt(tok,_pw);save(_data.concat([{name:name,enc:enc}]));},
+    add:async function(name,tok,type){if(_data.find(function(e){return e.name===name;}))throw new Error('Name already exists');var enc=await encrypt(tok,_pw);save(_data.concat([{name:name,enc:enc,type:type||''}]));},
+    setType:function(name,type){var d=_data.map(function(e){return e.name===name?{name:e.name,enc:e.enc,type:type}:e;});save(d);},
     del:function(name){save(_data.filter(function(e){return e.name!==name;}));}
   };
 })();
@@ -235,12 +236,13 @@ function renderVaultPanel(target){
     h+='<span style="font-size:13px;font-weight:600;color:#374151">🔓 Select a token</span>';
     h+='<button class="btn-sm" onclick="vaultLockAll()">🔒 Lock</button>';
     h+='</div>';
-    if(tokens.length){h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';tokens.forEach(function(name){h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(name)+'\')">'+esc(name)+' ▶</button>';});h+='</div>';}
+    if(tokens.length){h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';tokens.forEach(function(t){var badge=t.type?'<span style="font-size:10px;padding:1px 6px;border-radius:999px;font-weight:700;background:'+(t.type==='gh'?'#e0e7ff':'#d1fae5')+';color:'+(t.type==='gh'?'#3730a3':'#065f46')+';margin-left:3px">'+(t.type==='gh'?'GH':'ZH')+'</span>':'<span style="font-size:10px;color:#9ca3af;margin-left:3px">untagged</span>';h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(t.name)+'\')">'+esc(t.name)+badge+' ▶</button>';});h+='</div>';}
     else h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">No tokens saved yet.</div>';
     h+='<div style="border-top:1px solid #e0e7ff;padding-top:10px">';
     h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Save New Token</div>';
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
-    h+='<input type="text" id="vaultNewName_'+target+'" placeholder="Name" style="width:130px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>';
+    h+='<input type="text" id="vaultNewName_'+target+'" placeholder="Name" style="width:120px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>';
+    h+='<select id="vaultNewType_'+target+'" style="padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;color:#374151"><option value="">Type...</option><option value="gh">GitHub (GH)</option><option value="zh">ZenHub (ZH)</option></select>';
     h+='<input type="password" id="vaultNewTok_'+target+'" placeholder="Token value" autocomplete="new-password" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>';
     h+='<button class="btn-sm" onclick="vaultSave(\''+target+'\')">＋ Save</button>';
     h+='</div>';
@@ -248,7 +250,19 @@ function renderVaultPanel(target){
     if(tokens.length){
       h+='<div style="font-size:12px;font-weight:600;color:#374151;margin:8px 0 4px">Manage</div>';
       h+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
-      tokens.forEach(function(name){h+='<div style="display:flex;align-items:center;gap:4px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:7px;padding:3px 8px;font-size:12px"><span style="font-weight:600">'+esc(name)+'</span><button class="btn-sm" style="border-color:#fca5a5;color:#dc2626;padding:1px 6px;font-size:11px" onclick="vaultDel(\''+target+'\',\''+esc(name)+'\')">✕</button></div>';});
+      tokens.forEach(function(t){
+        var typeColor=t.type==='gh'?'#3730a3':t.type==='zh'?'#065f46':'#9ca3af';
+        var typeBg=t.type==='gh'?'#e0e7ff':t.type==='zh'?'#d1fae5':'#f3f4f6';
+        h+='<div style="display:flex;align-items:center;gap:4px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:7px;padding:3px 8px;font-size:12px">';
+        h+='<span style="font-weight:600">'+esc(t.name)+'</span>';
+        h+='<select onchange="vaultSetType(\''+esc(t.name)+'\',this.value)" style="font-size:10px;padding:1px 4px;border:1px solid #ddd;border-radius:5px;background:'+typeBg+';color:'+typeColor+';font-weight:700;cursor:pointer">';
+        h+='<option value=""'+(t.type===''?' selected':'')+'>—</option>';
+        h+='<option value="gh"'+(t.type==='gh'?' selected':'')+'>GH</option>';
+        h+='<option value="zh"'+(t.type==='zh'?' selected':'')+'>ZH</option>';
+        h+='</select>';
+        h+='<button class="btn-sm" style="border-color:#fca5a5;color:#dc2626;padding:1px 6px;font-size:11px" onclick="vaultDel(\''+target+'\',\''+esc(t.name)+'\')">✕</button>';
+        h+='</div>';
+      });
       h+='</div>';
     }
     h+='</div>';
@@ -258,7 +272,8 @@ function renderVaultPanel(target){
 async function vaultUnlock(target){var pw=document.getElementById('vaultPw').value;var errEl=document.getElementById('vaultErr');if(errEl)errEl.textContent='';if(!pw){if(errEl)errEl.textContent='Enter a password.';return;}try{await Vault.unlock(pw);renderVaultPanel(target);}catch(e){if(errEl)errEl.textContent=e.message;}}
 function vaultLockAll(){Vault.lock();['GH','ZH'].forEach(function(t){document.getElementById('vaultPanel'+t).style.display='none';document.getElementById('vaultBtn'+t).textContent='🔒';});_activeVaultTarget=null;}
 async function vaultUse(target,name){try{var tok=await Vault.get(name);if(target==='gh')document.getElementById('ghToken').value=tok;else document.getElementById('zhTokenInput').value=tok;toggleVault(target);}catch(e){alert('Failed to decrypt: '+e.message);}}
-async function vaultSave(target){var name=document.getElementById('vaultNewName_'+target).value.trim();var tok=document.getElementById('vaultNewTok_'+target).value.trim();var msgEl=document.getElementById('vaultSaveMsg_'+target);if(!name||!tok){msgEl.style.color='#dc2626';msgEl.textContent='Name and token required.';return;}try{await Vault.add(name,tok);msgEl.style.color='#059669';msgEl.textContent='"'+name+'" saved!';setTimeout(function(){renderVaultPanel(target);},600);}catch(e){msgEl.style.color='#dc2626';msgEl.textContent=e.message;}}
+async function vaultSave(target){var name=document.getElementById('vaultNewName_'+target).value.trim();var tok=document.getElementById('vaultNewTok_'+target).value.trim();var type=document.getElementById('vaultNewType_'+target).value;var msgEl=document.getElementById('vaultSaveMsg_'+target);if(!name||!tok){msgEl.style.color='#dc2626';msgEl.textContent='Name and token required.';return;}try{await Vault.add(name,tok,type);msgEl.style.color='#059669';msgEl.textContent='"'+name+'" saved!'+(type?' Tagged as '+(type==='gh'?'GitHub':'ZenHub')+'.':[]);setTimeout(function(){renderVaultPanel(target);},600);}catch(e){msgEl.style.color='#dc2626';msgEl.textContent=e.message;}}
+function vaultSetType(name,type){Vault.setType(name,type);['GH','ZH'].forEach(function(t){var inner=document.getElementById('vaultInner'+t);if(inner&&inner.innerHTML)renderVaultPanel(t.toLowerCase());});}
 function vaultDel(target,name){if(!confirm('Delete "'+name+'"?'))return;Vault.del(name);renderVaultPanel(target);}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
