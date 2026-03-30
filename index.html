@@ -14,6 +14,10 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .hdr p{color:#c7d2fe;font-size:0.85rem;margin-top:2px}
 .btn-w{background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:9px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:all 0.15s}
 .btn-w:hover{background:rgba(255,255,255,0.32);transform:translateY(-1px)}
+.btn-sm{padding:6px 12px;font-size:12px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:7px;cursor:pointer;font-weight:600}
+.btn-sm:hover{background:#f9fafb}
+.btn-p{background:#4338ca;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-p:hover{background:#3730a3}
 .main{padding:40px 24px}
 .grid{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;max-width:900px;margin:0 auto}
 .card{background:#fff;border-radius:14px;padding:28px 32px;box-shadow:0 2px 8px rgba(0,0,0,0.07);border-top:4px solid transparent;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;text-decoration:none;color:inherit;flex:1;min-width:220px;max-width:260px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px}
@@ -24,6 +28,29 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .card-badge{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:700;margin-top:4px}
 .coming{opacity:0.5;cursor:default;pointer-events:none}
 .section-label{width:100%;max-width:900px;margin:0 auto 16px;font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;padding:0 4px}
+
+/* Vault widget */
+.vault-bar{background:#fff;border:1px solid #e0e7ff;border-radius:14px;padding:18px 24px;max-width:900px;margin:0 auto 32px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.vault-bar-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.vault-bar-title{font-size:13px;font-weight:700;color:#1e1b4b;display:flex;align-items:center;gap:7px}
+.vault-status{font-size:12px;color:#6b7280}
+.vault-body{margin-top:14px;display:none}
+.vault-tokens{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.vault-token-chip{display:flex;align-items:center;gap:8px;background:#f8f7ff;border:1px solid #c7d2fe;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;color:#3730a3}
+.vault-token-chip button{background:none;border:none;cursor:pointer;font-size:11px;color:#6b7280;padding:0}
+.vault-token-chip button:hover{color:#4338ca}
+.tok-active{background:#e0fdf4;border-color:#6ee7b7;color:#065f46}
+.tok-badge{font-size:10px;padding:2px 7px;border-radius:999px;font-weight:700;background:#e0e7ff;color:#3730a3;margin-left:4px}
+.tok-badge.active{background:#d1fae5;color:#065f46}
+.pw-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pw-row input{flex:1;min-width:180px;padding:9px 13px;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none}
+.pw-row input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
+.err-msg{font-size:12px;color:#dc2626;margin-top:5px;min-height:16px}
+.hint{font-size:12px;color:#9ca3af;margin-top:4px}
+.active-tokens{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.at-chip{display:inline-flex;align-items:center;gap:5px;background:#e0fdf4;border:1px solid #6ee7b7;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#065f46}
+.at-chip button{background:none;border:none;cursor:pointer;font-size:11px;color:#059669;padding:0;line-height:1}
+.at-chip button:hover{color:#dc2626}
 </style>
 </head>
 <body>
@@ -34,6 +61,39 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
   </div>
 </div>
 <div class="main">
+
+  <!-- Vault Widget -->
+  <div class="vault-bar">
+    <div class="vault-bar-top">
+      <div class="vault-bar-title">
+        <span id="vaultIcon">🔒</span> Token Vault
+        <span class="vault-status" id="vaultStatusText">Unlock to pre-fill tokens for any dashboard</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="active-tokens" id="activeTokensBar" style="display:none"></div>
+        <button class="btn-sm" id="vaultToggleBtn" onclick="toggleVaultWidget()">Unlock Vault</button>
+        <button class="btn-sm" id="vaultLockBtn" style="display:none;border-color:#fca5a5;color:#dc2626" onclick="lockVaultWidget()">🔒 Lock</button>
+      </div>
+    </div>
+    <div class="vault-body" id="vaultBody">
+      <!-- Locked state -->
+      <div id="vaultLockForm">
+        <div class="pw-row">
+          <input type="password" id="vaultPwInput" placeholder="Master password..." autocomplete="new-password" onkeydown="if(event.key==='Enter')unlockVault()"/>
+          <button class="btn-p" onclick="unlockVault()">Unlock</button>
+        </div>
+        <div class="err-msg" id="vaultPwErr"></div>
+        <div class="hint">Tokens saved in your vault on any dashboard are available here.</div>
+      </div>
+      <!-- Unlocked state -->
+      <div id="vaultUnlockedPanel" style="display:none">
+        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Select tokens to use for this session:</div>
+        <div id="vaultTokenList" class="vault-tokens"></div>
+        <div style="font-size:12px;color:#9ca3af">Click a token to assign it as your GitHub or ZenHub token. Dashboards will auto-fill on load.</div>
+      </div>
+    </div>
+  </div>
+
   <div class="grid">
     <div class="section-label">Active Dashboards</div>
 
@@ -59,8 +119,143 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="card-desc">Issues dashboard — coming soon</div>
       <span class="card-badge" style="background:#d1fae5;color:#065f46">Placeholder</span>
     </a>
-
   </div>
 </div>
+
+<script>
+// ── Vault (same AES-GCM impl as cis.html) ────────────────────────────────────
+var Vault=(function(){
+  var KEY='cis_vault_v1',_pw=null,_data=[];
+  async function deriveKey(pw,salt){var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
+  async function decrypt(b64,pw){var buf=Uint8Array.from(atob(b64),function(c){return c.charCodeAt(0);});var key=await deriveKey(pw,buf.slice(0,16));var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(16,28)},key,buf.slice(28));return new TextDecoder().decode(plain);}
+  function load(){try{var v=localStorage.getItem(KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+  return{
+    isUnlocked:function(){return _pw!==null;},
+    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}}  _pw=pw;_data=data;},
+    lock:function(){_pw=null;_data=[];},
+    list:function(){return _data.map(function(e){return e.name;});},
+    get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);}
+  };
+})();
+
+var SESSION_GH='cv_session_gh',SESSION_ZH='cv_session_zh';
+
+function getSessionTokens(){
+  return{
+    gh:sessionStorage.getItem(SESSION_GH)||null,
+    zh:sessionStorage.getItem(SESSION_ZH)||null
+  };
+}
+
+function toggleVaultWidget(){
+  var body=document.getElementById('vaultBody');
+  var open=body.style.display==='block';
+  body.style.display=open?'none':'block';
+  document.getElementById('vaultToggleBtn').textContent=open?'Unlock Vault':'Hide';
+}
+
+async function unlockVault(){
+  var pw=document.getElementById('vaultPwInput').value;
+  var err=document.getElementById('vaultPwErr');
+  err.textContent='';
+  if(!pw){err.textContent='Enter your master password.';return;}
+  try{
+    await Vault.unlock(pw);
+    document.getElementById('vaultLockForm').style.display='none';
+    document.getElementById('vaultUnlockedPanel').style.display='block';
+    document.getElementById('vaultLockBtn').style.display='inline-flex';
+    document.getElementById('vaultToggleBtn').textContent='Hide';
+    document.getElementById('vaultIcon').textContent='🔓';
+    document.getElementById('vaultStatusText').textContent='Vault unlocked — assign tokens below';
+    renderTokenList();
+    renderActiveBar();
+  }catch(e){
+    document.getElementById('vaultPwErr').textContent=e.message;
+  }
+}
+
+function lockVaultWidget(){
+  Vault.lock();
+  sessionStorage.removeItem(SESSION_GH);
+  sessionStorage.removeItem(SESSION_ZH);
+  document.getElementById('vaultLockForm').style.display='block';
+  document.getElementById('vaultUnlockedPanel').style.display='none';
+  document.getElementById('vaultLockBtn').style.display='none';
+  document.getElementById('vaultBody').style.display='none';
+  document.getElementById('vaultToggleBtn').textContent='Unlock Vault';
+  document.getElementById('vaultIcon').textContent='🔒';
+  document.getElementById('vaultStatusText').textContent='Unlock to pre-fill tokens for any dashboard';
+  document.getElementById('vaultPwInput').value='';
+  document.getElementById('activeTokensBar').style.display='none';
+  renderActiveBar();
+}
+
+function renderTokenList(){
+  var names=Vault.list();
+  var sess=getSessionTokens();
+  var el=document.getElementById('vaultTokenList');
+  if(!names.length){el.innerHTML='<div style="font-size:13px;color:#9ca3af">No tokens found. Add tokens from a dashboard first.</div>';return;}
+  var ghName=sessionStorage.getItem('cv_session_gh_name')||null;
+  var zhName=sessionStorage.getItem('cv_session_zh_name')||null;
+  var h='';
+  names.forEach(function(name){
+    var isGH=ghName===name, isZH=zhName===name;
+    var activeClass=isGH||isZH?' tok-active':'';
+    h+='<div class="vault-token-chip'+activeClass+'" id="chip_'+esc(name)+'">';
+    h+='<span>'+esc(name)+'</span>';
+    if(isGH)h+='<span class="tok-badge active">GH</span>';
+    if(isZH)h+='<span class="tok-badge active">ZH</span>';
+    if(!isGH&&!isZH){
+      h+='<button onclick="assignToken(\''+esc(name)+'\',\'gh\')" title="Use as GitHub token">→ GH</button>';
+      h+='<button onclick="assignToken(\''+esc(name)+'\',\'zh\')" title="Use as ZenHub token">→ ZH</button>';
+    } else {
+      if(isGH)h+='<button onclick="unassignToken(\'gh\')" title="Remove GitHub assignment">✕</button>';
+      if(isZH)h+='<button onclick="unassignToken(\'zh\')" title="Remove ZenHub assignment">✕</button>';
+      if(!isGH)h+='<button onclick="assignToken(\''+esc(name)+'\',\'gh\')" title="Also use as GitHub token">→ GH</button>';
+      if(!isZH)h+='<button onclick="assignToken(\''+esc(name)+'\',\'zh\')" title="Also use as ZenHub token">→ ZH</button>';
+    }
+    h+='</div>';
+  });
+  el.innerHTML=h;
+}
+
+async function assignToken(name,type){
+  try{
+    var tok=await Vault.get(name);
+    if(type==='gh'){
+      sessionStorage.setItem(SESSION_GH,tok);
+      sessionStorage.setItem('cv_session_gh_name',name);
+    } else {
+      sessionStorage.setItem(SESSION_ZH,tok);
+      sessionStorage.setItem('cv_session_zh_name',name);
+    }
+    renderTokenList();
+    renderActiveBar();
+  }catch(e){alert('Failed: '+e.message);}
+}
+
+function unassignToken(type){
+  if(type==='gh'){sessionStorage.removeItem(SESSION_GH);sessionStorage.removeItem('cv_session_gh_name');}
+  else{sessionStorage.removeItem(SESSION_ZH);sessionStorage.removeItem('cv_session_zh_name');}
+  renderTokenList();
+  renderActiveBar();
+}
+
+function renderActiveBar(){
+  var bar=document.getElementById('activeTokensBar');
+  var ghName=sessionStorage.getItem('cv_session_gh_name');
+  var zhName=sessionStorage.getItem('cv_session_zh_name');
+  var h='';
+  if(ghName)h+='<div class="at-chip">🔑 GH: '+esc(ghName)+'<button onclick="unassignToken(\'gh\')" title="Remove">✕</button></div>';
+  if(zhName)h+='<div class="at-chip">🔑 ZH: '+esc(zhName)+'<button onclick="unassignToken(\'zh\')" title="Remove">✕</button></div>';
+  bar.innerHTML=h;
+  bar.style.display=(ghName||zhName)?'flex':'none';
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// On load, show active token chips if session already has tokens
+renderActiveBar();
+</script>
 </body>
 </html>
