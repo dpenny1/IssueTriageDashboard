@@ -846,6 +846,14 @@ function loadHistoricalData(){
   saveHistory(rows);alert('Loaded '+rows.length+' historical rows.');renderReport();
 }
 
+// Auto-fill tokens from index page session vault
+(function(){
+  var gh=sessionStorage.getItem('cv_session_gh');
+  var zh=sessionStorage.getItem('cv_session_zh');
+  if(gh){var el=document.getElementById('ghToken');if(el)el.value=gh;}
+  if(zh){var el=document.getElementById('zhTokenInput');if(el)el.value=zh;}
+})();
+
 showEl('setup');
 renderProfileDd();
 </script>
