@@ -400,6 +400,19 @@ async function connect(){
 function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
 async function bgRefresh(){try{await Promise.all([loadLabelColors(),loadIssues()]);saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();}catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}}
 
+async function refreshTrackingBodies(){
+  // Re-fetch bodies of all CS Task Item issues to catch auto-checked boxes
+  var tracking=S.issues.filter(function(i){
+    return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});
+  });
+  for(var i=0;i<tracking.length;i++){
+    try{
+      var fresh=await ghFetch('/repos/'+tracking[i].repo+'/issues/'+tracking[i].id);
+      tracking[i].body=fresh.body||'';
+    }catch(e){}
+  }
+}
+
 async function doRefresh(){
   var btn=document.getElementById('refreshBtn');
   btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
@@ -407,6 +420,7 @@ async function doRefresh(){
   S.zhIssueMap={};S.zhPipelines={};S.repoIds={};S.zhConnected=false;
   try{
     await Promise.all([loadLabelColors(),loadIssues()]);
+    await refreshTrackingBodies();
     saveCache();populateFilters();buildTabs();renderMain();
     if(S.zhToken&&S.zhWorkspace)zhLoad();
     else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
