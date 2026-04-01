@@ -513,12 +513,14 @@ function isException(issue){
   if(issue.state!=='open')return false;
   if(isExempt(issue))return false;
   if(issue.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';}))return false;
-  // Only flag auto-checked if parentless — parented issues with checked boxes were legitimately completed
+  // Auto-checked in tracking issue — exception regardless of parent
   if(!issue.parent&&findAutoCheckedParents(issue.id).length>0)return true;
+  // Still in New Issues pipeline — exception regardless of parent
+  if(isNIP(issue))return true;
+  // Remaining checks only apply to parentless issues
   if(issue.parent)return false;
   if(hasCS(issue))return true;
   if(getAutoClosedItems(issue).length>0)return true;
-  if(isNIP(issue))return true;
   return false;
 }
 
