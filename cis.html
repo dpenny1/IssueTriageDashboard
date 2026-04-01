@@ -292,7 +292,21 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 function tabColor(def){if(def&&def.labelKey&&S.labelColors[def.labelKey])return '#'+S.labelColors[def.labelKey];return def?def.color:'#6b7280';}
 function lum(h){h=(h||'cccccc').replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];var r=parseInt(h.substr(0,2),16)/255,g=parseInt(h.substr(2,2),16)/255,b=parseInt(h.substr(4,2),16)/255;return 0.2126*r+0.7152*g+0.0722*b;}
 function tfb(h){return lum(h)>0.45?'#1a1a1a':'#ffffff';}
-function lblBadge(n){var c=S.labelColors[n.toLowerCase()]||'e5e7eb';var display=S.labelNames[n.toLowerCase()]||n;return '<span class="badge" style="background:#'+c+';color:'+tfb(c)+'">'+esc(display)+'</span>';}
+function lblBadge(n){
+  var key=n.toLowerCase();
+  var c=S.labelColors[key]||'e5e7eb';
+  var display=S.labelNames[key]||n;
+  return '<span class="badge" style="background:#'+c+';color:'+tfb(c)+'">'+esc(display)+'</span>';
+}
+
+function sortLbls(labels){
+  return labels.slice().sort(function(a,b){
+    var da=S.labelNames[a.toLowerCase()]||a;
+    var db=S.labelNames[b.toLowerCase()]||b;
+    return da.toLowerCase().localeCompare(db.toLowerCase());
+  });
+}
+
 function ageDays(d){return Math.floor((Date.now()-new Date(d).getTime())/86400000);}
 function ageCls(d){return d<3?'ao':d<7?'aw':'ab';}
 function todayStr(){var d=new Date();return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
@@ -392,25 +406,30 @@ async function connect(){
     btn.disabled=false;btn.textContent='▶ Load Dashboard';
     bgRefresh();return;
   }
-  try{await Promise.all([loadLabelColors(),loadIssues()]);saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();}
+  try{await Promise.all([loadLabelColors(),loadIssues()]);await refreshTrackingBodies();saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();}
   catch(e){showErr('setupErr',e.message);}
   btn.disabled=false;btn.textContent='▶ Load Dashboard';
 }
 
 function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
-async function bgRefresh(){try{await Promise.all([loadLabelColors(),loadIssues()]);saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();}catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}}
+async function bgRefresh(){try{await Promise.all([loadLabelColors(),loadIssues()]);await refreshTrackingBodies();saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();}catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}}
 
 async function refreshTrackingBodies(){
-  // Re-fetch bodies of all CS Task Item issues to catch auto-checked boxes
   var tracking=S.issues.filter(function(i){
     return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});
   });
+  console.log('[refreshTrackingBodies] refreshing bodies for '+tracking.length+' CS Task Item issues');
   for(var i=0;i<tracking.length;i++){
     try{
       var fresh=await ghFetch('/repos/'+tracking[i].repo+'/issues/'+tracking[i].id);
+      var oldBody=tracking[i].body||'';
       tracking[i].body=fresh.body||'';
-    }catch(e){}
+      var hasChecked=tracking[i].body.match(/^\s*-\s*\[x\]/im);
+      console.log('[refreshTrackingBodies] #'+tracking[i].id+' body length: '+tracking[i].body.length+(hasChecked?' HAS CHECKED BOXES':''));
+      if(oldBody!==tracking[i].body)console.log('[refreshTrackingBodies] #'+tracking[i].id+' body CHANGED');
+    }catch(e){console.error('[refreshTrackingBodies] failed for #'+tracking[i].id,e);}
   }
+  console.log('[refreshTrackingBodies] done');
 }
 
 async function doRefresh(){
@@ -464,16 +483,23 @@ function getAutoClosedItems(issue){if(!issue.labels.some(function(l){return l.to
 // Find which CS Task Item tracking issues have a checked box referencing this issue number
 function findAutoCheckedParents(issueId){
   var parents=[];
-  S.issues.forEach(function(ti){
-    if(!ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return;
-    if(ti.state!=='open')return;
-    (ti.body||'').split('\n').forEach(function(line){
+  var taskItems=S.issues.filter(function(ti){
+    return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}) && ti.state==='open';
+  });
+  console.log('[findAutoCheckedParents] checking issueId='+issueId+' against '+taskItems.length+' CS Task Item issues');
+  taskItems.forEach(function(ti){
+    var lines=(ti.body||'').split('\n');
+    lines.forEach(function(line){
       var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
       if(!chk)return;
       var ref=chk[1].trim();
       var m=ref.match(/#(\d+)/);
-      if(m&&parseInt(m[1])===issueId){
-        parents.push({trackingIssue:ti,lineText:ref,fullLine:line.trim()});
+      if(m){
+        console.log('[findAutoCheckedParents] tracking #'+ti.id+' has checked ref #'+m[1]+' (looking for #'+issueId+')');
+        if(parseInt(m[1])===issueId){
+          console.log('[findAutoCheckedParents] MATCH FOUND in tracking issue #'+ti.id);
+          parents.push({trackingIssue:ti,lineText:ref,fullLine:line.trim()});
+        }
       }
     });
   });
@@ -655,7 +681,7 @@ function renderExcReason(issue){
       '<div style="display:flex;flex-direction:column;gap:6px">'+
       '<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>'+
       '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'+
-      '<input type="text" id="psearch_'+key+'" placeholder="# or title..." style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:160px" oninput="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')"/>'+
+      '<input type="text" id="psearch_'+key+'" placeholder="# or title..." style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:160px" autocomplete="off" oninput="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')"/>'+
       '<button class="btn-sm" style="font-size:11px;padding:3px 9px" onclick="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')">🔍</button>'+
       '</div>'+
       '<div id="presults_'+key+'" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:320px"></div>'+
@@ -701,6 +727,7 @@ async function setParent(issueId,repo,parentId,parentTitle){
   try{
     var r=await fetch('https://api.github.com/repos/'+repo+'/issues/'+parentId+'/sub_issues',{
       method:'POST',
+      credentials:'omit',
       headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
       body:JSON.stringify({sub_issue_id:issueId})
     });
