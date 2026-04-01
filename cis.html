@@ -80,8 +80,7 @@ tr:hover td{background:#f9fafb}
 .aci{display:flex;flex-direction:column;gap:3px}
 .acit{font-size:11px;background:#fff3cd;border:1px solid #ffc107;border-radius:5px;padding:3px 7px;color:#7a4f00;max-width:280px;word-break:break-word}
 .lbl-edit-panel{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-top:6px}
-.vault-panel{background:#f8f7ff;border:1px solid #c7d2fe;border-radius:10px;padding:14px;margin-top:8px}
-.vault-chip{display:inline-flex;align-items:center;gap:4px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3;cursor:pointer;border:none}
+.vault-chip{display:inline-flex;align-items:center;gap:4px;background:#e0e7ff;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3;cursor:pointer;border:none}
 .vault-chip:hover{background:#c7d2fe}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;overflow-y:auto}
 .modal-box{background:#fff;border-radius:14px;max-width:580px;margin:40px auto;padding:24px 28px;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
@@ -159,11 +158,8 @@ tr:hover td{background:#f9fafb}
 
 <script>
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
-var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
-
+var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1',REVIEWED_KEY='cis_scan_reviewed_v1';
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
-var CS_ROUTING_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item'];
-
 var TAB_DEFS=[
   {id:'newitems',label:'New Issues',color:'#0891b2'},
   {id:'exceptions',label:'Exceptions',color:'#b91c1c'},
@@ -176,6 +172,7 @@ var TAB_DEFS=[
   {id:'ignored',label:'Ignored',color:'#6b7280'},
   {id:'report',label:'Weekly Report',color:'#1e1b4b'}
 ];
+var PR_AUTO_CHECK_WINDOW_MS=10*1000; // 10 seconds
 
 // ── Token Vault ───────────────────────────────────────────────────────────────
 var Vault=(function(){
@@ -187,7 +184,7 @@ var Vault=(function(){
   function save(d){localStorage.setItem(KEY,JSON.stringify(d));_data=d;}
   return{
     isUnlocked:function(){return _pw!==null;},
-    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}} _pw=pw;_data=data;},
+    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}}  _pw=pw;_data=data;},
     lock:function(){_pw=null;_data=[];},
     list:function(){return _data.map(function(e){return {name:e.name,type:e.type||''};});},
     get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
@@ -198,68 +195,23 @@ var Vault=(function(){
 })();
 
 var _activeVaultTarget=null;
-function toggleVault(target){
-  if(_activeVaultTarget===target){_activeVaultTarget=null;document.getElementById('vaultPanel'+target.toUpperCase()).style.display='none';return;}
-  _activeVaultTarget=target;
-  document.getElementById('vaultPanel'+target.toUpperCase()).style.display='block';
-  renderVaultPanel(target);
-}
+function toggleVault(target){if(_activeVaultTarget===target){_activeVaultTarget=null;document.getElementById('vaultPanel'+target.toUpperCase()).style.display='none';return;}_activeVaultTarget=target;document.getElementById('vaultPanel'+target.toUpperCase()).style.display='block';renderVaultPanel(target);}
 function renderVaultPanel(target){
-  var el=document.getElementById('vaultInner'+target.toUpperCase());
-  if(!el)return;
-  var h='';
+  var el=document.getElementById('vaultInner'+target.toUpperCase());if(!el)return;var h='';
   if(!Vault.isUnlocked()){
     h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">🔒 Unlock Vault</div>';
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
-    h+='<input type="password" id="vaultPw" placeholder="Master password..." autocomplete="new-password" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')vaultUnlock(\''+target+'\')"/>';
-    h+='<button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="vaultUnlock(\''+target+'\')">Unlock</button>';
-    h+='</div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="password" id="vaultPw" placeholder="Master password..." autocomplete="new-password" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')vaultUnlock(\''+target+'\')"/><button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="vaultUnlock(\''+target+'\')">Unlock</button></div>';
     h+='<div id="vaultErr" style="font-size:12px;color:#dc2626;margin-top:6px;min-height:16px"></div>';
     h+='<div class="hint" style="margin-top:4px">New vault? Enter any password to create one.</div>';
   } else {
     var tokens=Vault.list();
-    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
-    h+='<span style="font-size:13px;font-weight:600;color:#374151">🔓 Select a token</span>';
-    h+='<button class="btn-sm" onclick="vaultLockAll()">🔒 Lock</button>';
-    h+='</div>';
-    if(tokens.length){
-      h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
-      tokens.forEach(function(t){
-        var badge=t.type?'<span style="font-size:10px;padding:1px 6px;border-radius:999px;font-weight:700;background:'+(t.type==='gh'?'#e0e7ff':'#d1fae5')+';color:'+(t.type==='gh'?'#3730a3':'#065f46')+';margin-left:4px">'+(t.type==='gh'?'GH':'ZH')+'</span>':'<span style="font-size:10px;color:#f59e0b;font-weight:700;margin-left:4px">⚠ untagged</span>';
-        h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(t.name)+'\')">'+esc(t.name)+badge+' ▶</button>';
-      });
-      h+='</div>';
-    } else {
-      h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">No tokens saved yet.</div>';
-    }
-    h+='<div style="border-top:1px solid #e0e7ff;padding-top:10px">';
-    h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Save New Token</div>';
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
-    h+='<input type="text" id="vaultNewName_'+target+'" placeholder="Name" style="width:120px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>';
-    h+='<select id="vaultNewType_'+target+'" style="padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;color:#374151"><option value="">Type...</option><option value="gh">GitHub (GH)</option><option value="zh">ZenHub (ZH)</option><option value="asana">Asana</option></select>';
-    h+='<input type="password" id="vaultNewTok_'+target+'" placeholder="Token value" autocomplete="new-password" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>';
-    h+='<button class="btn-sm" onclick="vaultSave(\''+target+'\')">＋ Save</button>';
-    h+='</div>';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-size:13px;font-weight:600;color:#374151">🔓 Select a token</span><button class="btn-sm" onclick="vaultLockAll()">🔒 Lock</button></div>';
+    if(tokens.length){h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';tokens.forEach(function(t){var badge=t.type?'<span style="font-size:10px;padding:1px 6px;border-radius:999px;font-weight:700;background:'+(t.type==='gh'?'#e0e7ff':'#d1fae5')+';color:'+(t.type==='gh'?'#3730a3':'#065f46')+';margin-left:4px">'+(t.type==='gh'?'GH':'ZH')+'</span>':'<span style="font-size:10px;color:#f59e0b;font-weight:700;margin-left:4px">⚠ untagged</span>';h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(t.name)+'\')">'+esc(t.name)+badge+' ▶</button>';});h+='</div>';}
+    else h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">No tokens saved yet.</div>';
+    h+='<div style="border-top:1px solid #e0e7ff;padding-top:10px"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Save New Token</div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="text" id="vaultNewName_'+target+'" placeholder="Name" style="width:120px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/><select id="vaultNewType_'+target+'" style="padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;color:#374151"><option value="">Type...</option><option value="gh">GitHub (GH)</option><option value="zh">ZenHub (ZH)</option></select><input type="password" id="vaultNewTok_'+target+'" placeholder="Token value" autocomplete="new-password" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/><button class="btn-sm" onclick="vaultSave(\''+target+'\')">＋ Save</button></div>';
     h+='<div id="vaultSaveMsg_'+target+'" style="font-size:12px;margin-top:5px;min-height:16px"></div>';
-    if(tokens.length){
-      h+='<div style="font-size:12px;font-weight:600;color:#374151;margin:10px 0 6px">Manage &amp; Tag</div>';
-      h+='<div style="display:flex;flex-direction:column;gap:5px">';
-      tokens.forEach(function(t){
-        var typeColor=t.type==='gh'?'#3730a3':t.type==='zh'?'#065f46':'#6b7280';
-        var typeBg=t.type==='gh'?'#e0e7ff':t.type==='zh'?'#d1fae5':'#f3f4f6';
-        h+='<div style="display:flex;align-items:center;gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px">';
-        h+='<span style="font-weight:600;font-size:13px;flex:1">'+esc(t.name)+'</span>';
-        h+='<span style="font-size:11px;color:#6b7280">Tag as:</span>';
-        h+='<select onchange="vaultSetType(\''+esc(t.name)+'\',this.value)" style="font-size:12px;padding:3px 8px;border:1px solid #ddd;border-radius:6px;background:'+typeBg+';color:'+typeColor+';font-weight:700;cursor:pointer;outline:none">';
-        h+='<option value=""'+(t.type===''?' selected':'')+'>— untagged —</option>';
-        h+='<option value="gh"'+(t.type==='gh'?' selected':'')+'>GitHub (GH)</option>';
-        h+='<option value="zh"'+(t.type==='zh'?' selected':'')+'>ZenHub (ZH)</option>';
-        h+='</select>';
-        h+='<button class="btn-sm" style="border-color:#fca5a5;color:#dc2626;padding:3px 8px;font-size:11px" onclick="vaultDel(\''+target+'\',\''+esc(t.name)+'\')">✕ Delete</button>';
-        h+='</div>';
-      });
-      h+='</div>';
-    }
+    if(tokens.length){h+='<div style="font-size:12px;font-weight:600;color:#374151;margin:10px 0 6px">Manage &amp; Tag</div><div style="display:flex;flex-direction:column;gap:5px">';tokens.forEach(function(t){var typeColor=t.type==='gh'?'#3730a3':t.type==='zh'?'#065f46':'#6b7280';var typeBg=t.type==='gh'?'#e0e7ff':t.type==='zh'?'#d1fae5':'#f3f4f6';h+='<div style="display:flex;align-items:center;gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px"><span style="font-weight:600;font-size:13px;flex:1">'+esc(t.name)+'</span><span style="font-size:11px;color:#6b7280">Tag as:</span><select onchange="vaultSetType(\''+esc(t.name)+'\',this.value)" style="font-size:12px;padding:3px 8px;border:1px solid #ddd;border-radius:6px;background:'+typeBg+';color:'+typeColor+';font-weight:700;cursor:pointer;outline:none"><option value=""'+(t.type===''?' selected':'')+'>— untagged —</option><option value="gh"'+(t.type==='gh'?' selected':'')+'>GitHub (GH)</option><option value="zh"'+(t.type==='zh'?' selected':'')+'>ZenHub (ZH)</option></select><button class="btn-sm" style="border-color:#fca5a5;color:#dc2626;padding:3px 8px;font-size:11px" onclick="vaultDel(\''+target+'\',\''+esc(t.name)+'\')">✕ Delete</button></div>';});h+='</div>';}
     h+='</div>';
   }
   el.innerHTML=h;
@@ -282,13 +234,7 @@ function ageCls(d){return d<3?'ao':d<7?'aw':'ab';}
 function todayStr(){var d=new Date();return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
 function hasCS(i){return i.labels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});}
 function lsort(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}
-function sortLbls(labels){
-  return labels.slice().sort(function(a,b){
-    var da=S.labelNames[a.toLowerCase()]||a;
-    var db=S.labelNames[b.toLowerCase()]||b;
-    return da.toLowerCase().localeCompare(db.toLowerCase());
-  });
-}
+function sortLbls(labels){return labels.slice().sort(function(a,b){var da=S.labelNames[a.toLowerCase()]||a;var db=S.labelNames[b.toLowerCase()]||b;return da.toLowerCase().localeCompare(db.toLowerCase());});}
 function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveIgnored(){try{localStorage.setItem(IGNORED_KEY,JSON.stringify(S.ignored));}catch(e){}}
 function loadHistory(){try{var v=localStorage.getItem(STORAGE_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
@@ -299,6 +245,9 @@ function loadProfiles(){try{var v=localStorage.getItem(PROFILES_KEY);return v?JS
 function saveProfiles(p){try{localStorage.setItem(PROFILES_KEY,JSON.stringify(p));}catch(e){}}
 function saveCache(){try{localStorage.setItem(CACHE_KEY,JSON.stringify({issues:S.issues,closedIssues:S.closedIssues,labelColors:S.labelColors,labelNames:S.labelNames,savedAt:Date.now()}));}catch(e){}}
 function loadCache(){try{var v=localStorage.getItem(CACHE_KEY);return v?JSON.parse(v):null;}catch(e){return null;}}
+function loadReviewed(){try{var v=localStorage.getItem(REVIEWED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+function saveReviewed(r){try{localStorage.setItem(REVIEWED_KEY,JSON.stringify(r));}catch(e){}}
+function markReviewed(trackingId,childId){var r=loadReviewed();var key=trackingId+'_'+childId;if(r.indexOf(key)===-1)r.push(key);saveReviewed(r);if(_scanResults)_scanResults=_scanResults.filter(function(x){return !(x.trackingIssue.id===trackingId&&x.childId===childId);});renderReport();}
 function showErr(id,msg){var el=document.getElementById(id);el.className='err';el.textContent=msg;el.style.display='block';}
 function hideErr(id){document.getElementById(id).style.display='none';}
 function showEl(id){document.getElementById(id).style.display='block';}
@@ -312,31 +261,11 @@ function onProfileSel(){var sel=document.getElementById('profileSelect');var p=l
 
 function renderCfg(){
   var profiles=loadProfiles(),h='';
-  if(profiles.length){
-    h+='<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">';
-    profiles.forEach(function(p){
-      h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.05)"><div style="display:flex;align-items:center;gap:10px"><div style="flex:1">';
-      h+='<div style="display:flex;align-items:center;gap:8px"><div style="font-size:14px;font-weight:700;color:#1e1b4b">'+esc(p.name)+'</div>';
-      if(p.type==='group')h+='<span class="badge" style="background:#e0e7ff;color:#3730a3">Group</span>';
-      h+='</div>';
-      if(p.type==='group')(p.repos||[]).forEach(function(r){h+='<div style="font-size:12px;color:#6b7280;margin-top:3px">• '+esc(r.repo)+(r.zhWorkspace?' <span style="color:#9ca3af">(ws: '+esc(r.zhWorkspace)+')</span>':'')+'</div>';});
-      else h+='<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(p.repo)+'</div><div style="font-size:11px;color:#9ca3af">ZenHub workspace: '+esc(p.zhWorkspace||'not set')+'</div>';
-      h+='</div><button class="btn-sm" onclick="editProfile(\''+p.id+'\')">Edit</button> <button class="btn-d" onclick="delProfile(\''+p.id+'\')">Delete</button></div></div>';
-    });
-    h+='</div>';
-  } else h+='<div class="es" style="margin-bottom:20px">No projects yet.</div>';
-  h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">';
-  h+='<div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn-sm" id="ctS" onclick="showCfgTab(\'s\')" style="background:#4338ca;color:#fff;border-color:#4338ca">Individual</button><button class="btn-sm" id="ctG" onclick="showCfgTab(\'g\')">Group</button></div>';
-  h+='<div id="cfgS"><div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Display name</label><input type="text" id="pName" placeholder="e.g. CIS" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
-  h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">GitHub repo (owner/repo)</label><input type="text" id="pRepo" placeholder="e.g. myorg/phoenix" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
-  h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">ZenHub workspace ID</label><input type="text" id="pWorkspace" placeholder="e.g. 5e8f9c..." style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
-  h+='<div id="pErr" style="display:none;margin-top:8px"></div><div style="margin-top:14px"><button class="btn-p" onclick="saveNewProfile()">Add project</button></div></div>';
-  h+='<div id="cfgG" style="display:none"><div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Group name</label><input type="text" id="gName" placeholder="e.g. All Products" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
-  h+='<div style="font-size:13px;font-weight:600;color:#374151;margin:12px 0 8px">Repos</div><div id="gRepoList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>';
-  h+='<div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap"><div style="flex:1"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Repo</label><input type="text" id="gRI" placeholder="myorg/repo" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/></div>';
-  h+='<div style="flex:1"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">ZenHub workspace ID</label><input type="text" id="gWI" placeholder="5e8f9c..." style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/></div>';
-  h+='<button class="btn-sm" onclick="addGRepo()">+ Add</button></div>';
-  h+='<div id="gErr" style="display:none;margin-top:8px"></div><div style="margin-top:14px"><button class="btn-p" onclick="saveGroup()">Save group</button></div></div></div>';
+  if(profiles.length){h+='<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">';profiles.forEach(function(p){h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.05)"><div style="display:flex;align-items:center;gap:10px"><div style="flex:1"><div style="display:flex;align-items:center;gap:8px"><div style="font-size:14px;font-weight:700;color:#1e1b4b">'+esc(p.name)+'</div>';if(p.type==='group')h+='<span class="badge" style="background:#e0e7ff;color:#3730a3">Group</span>';h+='</div>';if(p.type==='group')(p.repos||[]).forEach(function(r){h+='<div style="font-size:12px;color:#6b7280;margin-top:3px">• '+esc(r.repo)+(r.zhWorkspace?' <span style="color:#9ca3af">(ws: '+esc(r.zhWorkspace)+')</span>':'')+'</div>';});else h+='<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(p.repo)+'</div><div style="font-size:11px;color:#9ca3af">ZenHub workspace: '+esc(p.zhWorkspace||'not set')+'</div>';h+='</div><button class="btn-sm" onclick="editProfile(\''+p.id+'\')">Edit</button> <button class="btn-d" onclick="delProfile(\''+p.id+'\')">Delete</button></div></div>';});h+='</div>';}
+  else h+='<div class="es" style="margin-bottom:20px">No projects yet.</div>';
+  h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)"><div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn-sm" id="ctS" onclick="showCfgTab(\'s\')" style="background:#4338ca;color:#fff;border-color:#4338ca">Individual</button><button class="btn-sm" id="ctG" onclick="showCfgTab(\'g\')">Group</button></div>';
+  h+='<div id="cfgS"><div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Display name</label><input type="text" id="pName" placeholder="e.g. CIS" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div><div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">GitHub repo (owner/repo)</label><input type="text" id="pRepo" placeholder="e.g. myorg/phoenix" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div><div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">ZenHub workspace ID</label><input type="text" id="pWorkspace" placeholder="e.g. 5e8f9c..." style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div><div id="pErr" style="display:none;margin-top:8px"></div><div style="margin-top:14px"><button class="btn-p" onclick="saveNewProfile()">Add project</button></div></div>';
+  h+='<div id="cfgG" style="display:none"><div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Group name</label><input type="text" id="gName" placeholder="e.g. All Products" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div><div style="font-size:13px;font-weight:600;color:#374151;margin:12px 0 8px">Repos</div><div id="gRepoList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div><div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap"><div style="flex:1"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Repo</label><input type="text" id="gRI" placeholder="myorg/repo" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/></div><div style="flex:1"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">ZenHub workspace ID</label><input type="text" id="gWI" placeholder="5e8f9c..." style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/></div><button class="btn-sm" onclick="addGRepo()">+ Add</button></div><div id="gErr" style="display:none;margin-top:8px"></div><div style="margin-top:14px"><button class="btn-p" onclick="saveGroup()">Save group</button></div></div></div>';
   document.getElementById('cfgList').innerHTML=h;window._gr=[];
 }
 function showCfgTab(t){document.getElementById('cfgS').style.display=t==='s'?'block':'none';document.getElementById('cfgG').style.display=t==='g'?'block':'none';document.getElementById('ctS').style.cssText=t==='s'?'background:#4338ca;color:#fff;border-color:#4338ca':'';document.getElementById('ctG').style.cssText=t==='g'?'background:#4338ca;color:#fff;border-color:#4338ca':'';}
@@ -357,6 +286,7 @@ async function ghDel(path){await fetch('https://api.github.com'+path,{method:'DE
 async function zhPost(path,body){var r=await fetch('https://api.zenhub.com'+path,{method:'POST',headers:{'X-Authentication-Token':S.zhToken,'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);}
 async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{headers:{'X-Authentication-Token':S.zhToken}});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
 
+// ── Load / refresh ────────────────────────────────────────────────────────────
 async function connect(){
   var rp=document.getElementById('reposInput').value.trim();
   hideErr('setupErr');
@@ -382,20 +312,19 @@ async function connect(){
     await Promise.all([loadLabelColors(),loadIssues()]);
     await refreshTrackingBodies();
     saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();
+    runScanInBackground();
   }catch(e){showErr('setupErr',e.message);}
   btn.disabled=false;btn.textContent='▶ Load Dashboard';
 }
-
 function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
-
 async function bgRefresh(){
   try{
     await Promise.all([loadLabelColors(),loadIssues()]);
     await refreshTrackingBodies();
     saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();
+    runScanInBackground();
   }catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}
 }
-
 async function doRefresh(){
   var btn=document.getElementById('refreshBtn');
   btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
@@ -407,34 +336,17 @@ async function doRefresh(){
     saveCache();populateFilters();buildTabs();renderMain();
     if(S.zhToken&&S.zhWorkspace)zhLoad();
     else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
+    runScanInBackground();
   }catch(e){showErr('dashErr',e.message);}
   btn.disabled=false;btn.innerHTML='↻ Refresh';
 }
-
 function startAutoRefresh(){if(S.autoRefreshTimer)clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=setInterval(function(){doRefresh();},15*60*1000);}
 function stopAutoRefresh(){if(S.autoRefreshTimer){clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=null;}}
-
-async function loadLabelColors(){
-  for(var i=0;i<S.repos.length;i++){
-    try{var lb=await ghFetch('/repos/'+S.repos[i]+'/labels?per_page=100');lb.forEach(function(l){S.labelColors[l.name.toLowerCase()]=l.color;S.labelNames[l.name.toLowerCase()]=l.name;});}catch(e){}
-  }
-}
+async function loadLabelColors(){for(var i=0;i<S.repos.length;i++){try{var lb=await ghFetch('/repos/'+S.repos[i]+'/labels?per_page=100');lb.forEach(function(l){S.labelColors[l.name.toLowerCase()]=l.color;S.labelNames[l.name.toLowerCase()]=l.name;});}catch(e){}}}
 async function loadZHData(){S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){console.error('ZH',repo,e.message);}}S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});await loadZHDeps();}
 async function loadZHDeps(){for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace,repoId=S.repoIds[repo];if(!S.zhToken||!ws||!repoId)continue;try{var ed=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');for(var j=0;j<(ed.epic_issues||[]).length;j++){var ep=ed.epic_issues[j];try{var edet=await zhGet('/p2/workspaces/'+ws+'/repositories/'+(ep.repo_id||repoId)+'/epics/'+ep.issue_number);(edet.issues||[]).forEach(function(child){var cr=repoForId(child.repo_id)||repo;var ci=S.issues.find(function(iss){return iss.id===child.issue_number&&iss.repo===cr;});if(ci)ci.parent={issueNumber:ep.issue_number};});}catch(e){}}}catch(e){}}}
 function repoForId(id){return Object.keys(S.repoIds).find(function(r){return S.repoIds[r]===id;})||null;}
-
-async function refreshTrackingBodies(){
-  var tracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
-  console.log('[refreshTrackingBodies] refreshing '+tracking.length+' CS Task Item issues');
-  for(var i=0;i<tracking.length;i++){
-    try{
-      var fresh=await ghFetch('/repos/'+tracking[i].repo+'/issues/'+tracking[i].id);
-      tracking[i].body=fresh.body||'';
-    }catch(e){console.error('[refreshTrackingBodies] failed #'+tracking[i].id,e);}
-  }
-  console.log('[refreshTrackingBodies] done');
-}
-
+async function refreshTrackingBodies(){var tracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});for(var i=0;i<tracking.length;i++){try{var fresh=await ghFetch('/repos/'+tracking[i].repo+'/issues/'+tracking[i].id);tracking[i].body=fresh.body||'';}catch(e){}}}
 async function loadIssues(){
   var open=[],closed=[];
   for(var i=0;i<S.repos.length;i++){
@@ -451,8 +363,7 @@ async function loadIssues(){
     if(!Array.isArray(cd))cd=[];
     var count=0;
     for(var j=0;j<cd.length;j++){
-      var iss=cd[j];
-      if(iss.pull_request)continue;
+      var iss=cd[j];if(iss.pull_request)continue;
       var lbls=iss.labels.map(function(l){return l.name;});
       if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))continue;
       closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:null});
@@ -467,49 +378,11 @@ async function loadIssues(){
 
 // ── Issue logic ───────────────────────────────────────────────────────────────
 function getAutoClosedItems(issue){if(!issue.labels.some(function(l){return l.toLowerCase()==='cs task item';})||issue.state!=='open')return[];var hits=[];(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(chk&&/#\d+/.test(chk[1].trim()))hits.push(chk[1].trim());});return hits;}
-
-function findAutoCheckedParents(issueId){
-  var parents=[];
-  S.issues.forEach(function(ti){
-    if(!ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return;
-    if(ti.state!=='open')return;
-    (ti.body||'').split('\n').forEach(function(line){
-      var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
-      if(!chk)return;
-      var ref=chk[1].trim();
-      var m=ref.match(/#(\d+)/);
-      if(m&&parseInt(m[1])===issueId){
-        parents.push({trackingIssue:ti,lineText:ref,fullLine:line.trim()});
-      }
-    });
-  });
-  return parents;
-}
-
-async function uncheckInParent(trackingIssueId,trackingRepo,childIssueId){
-  var ti=S.issues.find(function(i){return i.id===trackingIssueId&&i.repo===trackingRepo;});
-  if(!ti){alert('Tracking issue not found in local state.');return;}
-  var lines=(ti.body||'').split('\n');
-  var changed=false;
-  var newLines=lines.map(function(line){
-    var chk=line.match(/^(\s*-\s*)\[x\](\s*.+)/i);
-    if(!chk)return line;
-    var ref=chk[2];
-    var m=ref.match(/#(\d+)/);
-    if(m&&parseInt(m[1])===childIssueId){changed=true;return chk[1]+'[ ]'+chk[2];}
-    return line;
-  });
-  if(!changed){alert('Could not find the checked line to uncheck.');return;}
-  try{
-    await ghPatch('/repos/'+trackingRepo+'/issues/'+trackingIssueId,{body:newLines.join('\n')});
-    ti.body=newLines.join('\n');
-    renderMain();
-  }catch(e){alert('Failed to uncheck: '+e.message);}
-}
-
+function findAutoCheckedParents(issueId){var parents=[];S.issues.forEach(function(ti){if(!ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return;if(ti.state!=='open')return;(ti.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(!chk)return;var ref=chk[1].trim();var m=ref.match(/#(\d+)/);if(m&&parseInt(m[1])===issueId)parents.push({trackingIssue:ti,lineText:ref,fullLine:line.trim()});});});return parents;}
+function isReferencedInTaskItem(issueId){return S.issues.some(function(ti){if(!ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;return (ti.body||'').split('\n').some(function(line){var m=line.match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!m)return false;var n=m[1].trim().match(/#(\d+)/);return n&&parseInt(n[1])===issueId;});});}
+async function uncheckInParent(trackingIssueId,trackingRepo,childIssueId){var ti=S.issues.find(function(i){return i.id===trackingIssueId&&i.repo===trackingRepo;});if(!ti){alert('Tracking issue not found.');return;}var lines=(ti.body||'').split('\n');var changed=false;var newLines=lines.map(function(line){var chk=line.match(/^(\s*-\s*)\[x\](\s*.+)/i);if(!chk)return line;var ref=chk[2];var m=ref.match(/#(\d+)/);if(m&&parseInt(m[1])===childIssueId){changed=true;return chk[1]+'[ ]'+chk[2];}return line;});if(!changed){alert('Could not find the checked line.');return;}try{await ghPatch('/repos/'+trackingRepo+'/issues/'+trackingIssueId,{body:newLines.join('\n')});ti.body=newLines.join('\n');renderMain();}catch(e){alert('Failed to uncheck: '+e.message);}}
 function isNIP(issue){return issue.pipeline&&issue.pipeline.pipelineName.toLowerCase()==='new issues';}
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
-
 function isException(issue){
   if(issue.state!=='open')return false;
   if(isExempt(issue))return false;
@@ -517,11 +390,14 @@ function isException(issue){
   if(!issue.parent&&findAutoCheckedParents(issue.id).length>0)return true;
   if(isNIP(issue))return true;
   if(issue.parent)return false;
-  if(hasCS(issue))return true;
+  if(hasCS(issue)){
+    // CS-labeled issues with no task item reference are exceptions
+    if(!isReferencedInTaskItem(issue.id))return true;
+    return true;
+  }
   if(getAutoClosedItems(issue).length>0)return true;
   return false;
 }
-
 function populateFilters(){var ls={},rs={},ps={};S.issues.concat(S.closedIssues).forEach(function(i){i.labels.forEach(function(l){ls[l]=1;});rs[i.repo]=1;if(i.pipeline)ps[i.pipeline.pipelineName]=1;});var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');fl.innerHTML='<option value="">All labels</option>';Object.keys(ls).sort(lsort).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});fr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});fp.innerHTML='<option value="">All pipelines</option>';Object.keys(ps).sort(lsort).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});}
 function clearFilters(){['searchInput','filterLabel','filterRepo','filterPipeline'].forEach(function(id){document.getElementById(id).value='';});renderMain();}
 function getExceptions(){return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isException(i);});}
@@ -530,11 +406,7 @@ function getTabIssues(tab){
   if(t==='exceptions')return getExceptions();
   if(t==='ignored')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;});
   if(t==='closed')return S.closedIssues.slice().sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
-  if(t==='testing'){
-    var oT=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
-    var cT=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
-    return oT.concat(cT);
-  }
+  if(t==='testing'){var oT=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});var cT=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});return oT.concat(cT);}
   if(t==='taskitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';});});
   if(t==='newitems')return base.filter(function(i){return !hasCS(i);});
@@ -557,102 +429,55 @@ function doSort(col){if(S.sortState.col===col)S.sortState.dir*=-1;else{S.sortSta
 function renderStats(){
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i);});
   var tN=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length+S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
-  var stats=[
-    {n:base.filter(function(i){return !hasCS(i);}).length,tab:'newitems'},
-    {n:getExceptions().length,tab:'exceptions'},
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length,tab:'prod'},
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,tab:'uat'},
-    {n:base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});}).length,tab:'csitems'},
-    {n:tN,tab:'testing'},
-    {n:S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,tab:'taskitem'},
-    {n:S.closedIssues.length,tab:'closed'},
-    {n:S.ignored.length,tab:'ignored'},
-    {n:'',tab:'report'}
-  ];
+  var stats=[{n:base.filter(function(i){return !hasCS(i);}).length,tab:'newitems'},{n:getExceptions().length,tab:'exceptions'},{n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length,tab:'prod'},{n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,tab:'uat'},{n:base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});}).length,tab:'csitems'},{n:tN,tab:'testing'},{n:S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,tab:'taskitem'},{n:S.closedIssues.length,tab:'closed'},{n:S.ignored.length,tab:'ignored'},{n:'',tab:'report'}];
   var h='';
-  stats.forEach(function(s){
-    if((s.tab==='prod'||s.tab==='uat')&&s.n===0)return;
-    var def=TAB_DEFS.find(function(d){return d.id===s.tab;}),c=tabColor(def),l=def?def.label:s.tab;
-    var isActive=S.activeTab===s.tab;
-    h+='<div class="sc2" style="border-top-color:'+c+';'+(isActive?'box-shadow:0 0 0 2px '+c+';':'')+'" onclick="switchTab(\''+s.tab+'\')">';
-    h+=s.tab==='report'?'<div class="sn" style="color:'+c+';font-size:2rem">📋</div>':'<div class="sn" style="color:'+c+'">'+s.n+'</div>';
-    h+='<div class="sl">'+esc(l)+'</div></div>';
-  });
+  stats.forEach(function(s){if((s.tab==='prod'||s.tab==='uat')&&s.n===0)return;var def=TAB_DEFS.find(function(d){return d.id===s.tab;}),c=tabColor(def),l=def?def.label:s.tab;var isActive=S.activeTab===s.tab;h+='<div class="sc2" style="border-top-color:'+c+';'+(isActive?'box-shadow:0 0 0 2px '+c+';':'')+'" onclick="switchTab(\''+s.tab+'\')">';h+=s.tab==='report'?'<div class="sn" style="color:'+c+';font-size:2rem">📋</div>':'<div class="sn" style="color:'+c+'">'+s.n+'</div>';h+='<div class="sl">'+esc(l)+'</div></div>';});
   document.getElementById('statGrid').innerHTML=h;
 }
-
 function buildTabs(){var pN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length;var uN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length;var h='';TAB_DEFS.forEach(function(t){if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0))return;var cnt=getTabIssues(t.id).length,active=S.activeTab===t.id,c=tabColor(t);h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+c:'')+'">'+esc(t.label)+'<span class="tc">'+cnt+'</span></button>';});document.getElementById('tabsWrap').innerHTML=h;}
-
-function switchTab(name){
-  S.activeTab=name;
-  document.getElementById('searchBar').style.display=name==='report'?'none':'flex';
-  if(name==='closed')S.sortState={col:'closed',dir:-1};
-  buildTabs();renderMain();
-}
-
+function switchTab(name){S.activeTab=name;document.getElementById('searchBar').style.display=name==='report'?'none':'flex';if(name==='closed')S.sortState={col:'closed',dir:-1};buildTabs();renderMain();}
 function ignoreIssue(k){if(S.ignored.indexOf(k)===-1)S.ignored.push(k);saveIgnored();buildTabs();renderMain();}
 function unignoreIssue(k){S.ignored=S.ignored.filter(function(x){return x!==k;});saveIgnored();buildTabs();renderMain();}
 
 // ── Label editing ─────────────────────────────────────────────────────────────
 var _openLabelPanel=null;
 function toggleLabelEdit(issueId,repo){var key=issueId+'_'+repo;var panelId='lblpanel_'+key;if(_openLabelPanel&&_openLabelPanel!==panelId){var old=document.getElementById(_openLabelPanel);if(old)old.style.display='none';}var panel=document.getElementById(panelId);if(!panel)return;var isOpen=panel.style.display==='block';panel.style.display=isOpen?'none':'block';_openLabelPanel=isOpen?null:panelId;if(!isOpen)renderLabelEditPanel(issueId,repo);}
-function renderLabelEditPanel(issueId,repo){
-  var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;})||S.closedIssues.find(function(i){return i.id===issueId&&i.repo===repo;});
-  var panel=document.getElementById('lblpanel_'+issueId+'_'+repo);
-  if(!issue||!panel)return;
-  var allLabels=Object.keys(S.labelColors).sort(lsort);
-  var current=issue.labels.map(function(l){return l.toLowerCase();});
-  var h='<div class="lbl-edit-panel"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Edit Labels — #'+issueId+'</div>';
-  h+='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">';
-  if(issue.labels.length){issue.labels.forEach(function(l){var c=S.labelColors[l.toLowerCase()]||'e5e7eb';var display=S.labelNames[l.toLowerCase()]||l;h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#'+c+';color:'+tfb(c)+';padding:3px 8px;border-radius:999px;font-size:11px;font-weight:600">'+esc(display)+'<button onclick="removeLbl('+issueId+',\''+esc(repo)+'\',\''+esc(l)+'\')" style="background:none;border:none;cursor:pointer;color:inherit;font-size:11px;padding:0;opacity:0.7">✕</button></span>';});}
-  else h+='<span style="font-size:12px;color:#9ca3af">No labels</span>';
-  h+='</div><div style="display:flex;gap:6px;align-items:center">';
-  h+='<select id="lblAddSel_'+issueId+'_'+esc(repo)+'" style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"><option value="">— Add a label —</option>';
-  allLabels.forEach(function(l){if(current.indexOf(l)===-1){var display=S.labelNames[l]||l;h+='<option value="'+esc(l)+'">'+esc(display)+'</option>';}});
-  h+='</select><button class="btn-sm" onclick="addLbl('+issueId+',\''+esc(repo)+'\')">＋ Add</button></div></div>';
-  panel.innerHTML=h;
-}
+function renderLabelEditPanel(issueId,repo){var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;})||S.closedIssues.find(function(i){return i.id===issueId&&i.repo===repo;});var panel=document.getElementById('lblpanel_'+issueId+'_'+repo);if(!issue||!panel)return;var allLabels=Object.keys(S.labelColors).sort(lsort);var current=issue.labels.map(function(l){return l.toLowerCase();});var h='<div class="lbl-edit-panel"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Edit Labels — #'+issueId+'</div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">';if(issue.labels.length){issue.labels.forEach(function(l){var c=S.labelColors[l.toLowerCase()]||'e5e7eb';var display=S.labelNames[l.toLowerCase()]||l;h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#'+c+';color:'+tfb(c)+';padding:3px 8px;border-radius:999px;font-size:11px;font-weight:600">'+esc(display)+'<button onclick="removeLbl('+issueId+',\''+esc(repo)+'\',\''+esc(l)+'\')" style="background:none;border:none;cursor:pointer;color:inherit;font-size:11px;padding:0;opacity:0.7">✕</button></span>';});}else h+='<span style="font-size:12px;color:#9ca3af">No labels</span>';h+='</div><div style="display:flex;gap:6px;align-items:center"><select id="lblAddSel_'+issueId+'_'+esc(repo)+'" style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"><option value="">— Add a label —</option>';allLabels.forEach(function(l){if(current.indexOf(l)===-1){var display=S.labelNames[l]||l;h+='<option value="'+esc(l)+'">'+esc(display)+'</option>';}});h+='</select><button class="btn-sm" onclick="addLbl('+issueId+',\''+esc(repo)+'\')">＋ Add</button></div></div>';panel.innerHTML=h;}
 async function addLbl(issueId,repo){var sel=document.getElementById('lblAddSel_'+issueId+'_'+repo);var labelKey=sel?sel.value:'';if(!labelKey)return;var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;})||S.closedIssues.find(function(i){return i.id===issueId&&i.repo===repo;});if(!issue)return;var displayName=S.labelNames[labelKey]||labelKey;var newLabels=issue.labels.concat([displayName]);try{await ghPatch('/repos/'+repo+'/issues/'+issueId,{labels:newLabels});issue.labels=newLabels;renderMain();setTimeout(function(){var p=document.getElementById('lblpanel_'+issueId+'_'+repo);if(p&&p.style.display==='block')renderLabelEditPanel(issueId,repo);},80);}catch(e){alert('Failed: '+e.message);}}
 async function removeLbl(issueId,repo,label){var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;})||S.closedIssues.find(function(i){return i.id===issueId&&i.repo===repo;});if(!issue)return;var newLabels=issue.labels.filter(function(l){return l.toLowerCase()!==label.toLowerCase();});try{await ghPatch('/repos/'+repo+'/issues/'+issueId,{labels:newLabels});issue.labels=newLabels;renderMain();setTimeout(function(){var p=document.getElementById('lblpanel_'+issueId+'_'+repo);if(p&&p.style.display==='block')renderLabelEditPanel(issueId,repo);},80);}catch(e){alert('Failed: '+e.message);}}
 
 // ── Label Manager Modal ───────────────────────────────────────────────────────
 function showLabelManager(){document.getElementById('labelModal').style.display='block';renderLabelManager();}
 function hideLabelManager(){document.getElementById('labelModal').style.display='none';}
-function renderLabelManager(){
-  var el=document.getElementById('labelModalContent');
-  var labels=Object.keys(S.labelColors).sort(lsort);
-  var h='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:16px">';
-  h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">Create New Label</div>';
-  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
-  h+='<input type="text" id="newLblName" placeholder="Label name" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/>';
-  h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;color:#6b7280">Color:</span><input type="color" id="newLblColor" value="#4338ca" style="width:36px;height:32px;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:2px"/></div>';
-  h+='<button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="createLabel()">＋ Create</button>';
-  h+='</div><div id="lblCreateMsg" style="font-size:12px;margin-top:6px;min-height:16px"></div></div>';
-  h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">Existing Labels ('+labels.length+')</div>';
-  if(!labels.length)h+='<div style="font-size:13px;color:#9ca3af">No labels loaded.</div>';
-  else{
-    h+='<div style="display:flex;flex-direction:column;gap:6px">';
-    labels.forEach(function(lk){var c=S.labelColors[lk]||'e5e7eb';var display=S.labelNames[lk]||lk;
-      h+='<div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px">';
-      h+='<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#'+c+';border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></span>';
-      h+='<span style="flex:1;font-size:13px;font-weight:600">'+esc(display)+'</span>';
-      h+='<input type="text" value="'+esc(display)+'" id="leName_'+esc(lk)+'" style="width:150px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none"/>';
-      h+='<input type="color" value="#'+c+'" id="leColor_'+esc(lk)+'" style="width:32px;height:28px;border:1px solid #ddd;border-radius:5px;cursor:pointer;padding:1px"/>';
-      h+='<button class="btn-sm" onclick="updateLabel(\''+esc(lk)+'\')">Save</button>';
-      h+='<button class="btn-d" style="padding:5px 10px;font-size:12px" onclick="deleteLabel(\''+esc(lk)+'\')">Delete</button>';
-      h+='</div>';
-    });
-    h+='</div>';
-  }
-  el.innerHTML=h;
-}
+function renderLabelManager(){var el=document.getElementById('labelModalContent');var labels=Object.keys(S.labelColors).sort(lsort);var h='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">Create New Label</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="text" id="newLblName" placeholder="Label name" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/><div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;color:#6b7280">Color:</span><input type="color" id="newLblColor" value="#4338ca" style="width:36px;height:32px;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:2px"/></div><button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="createLabel()">＋ Create</button></div><div id="lblCreateMsg" style="font-size:12px;margin-top:6px;min-height:16px"></div></div>';h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">Existing Labels ('+labels.length+')</div>';if(!labels.length)h+='<div style="font-size:13px;color:#9ca3af">No labels loaded.</div>';else{h+='<div style="display:flex;flex-direction:column;gap:6px">';labels.forEach(function(lk){var c=S.labelColors[lk]||'e5e7eb';var display=S.labelNames[lk]||lk;h+='<div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#'+c+';border:1px solid rgba(0,0,0,0.1);flex-shrink:0"></span><span style="flex:1;font-size:13px;font-weight:600">'+esc(display)+'</span><input type="text" value="'+esc(display)+'" id="leName_'+esc(lk)+'" style="width:150px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none"/><input type="color" value="#'+c+'" id="leColor_'+esc(lk)+'" style="width:32px;height:28px;border:1px solid #ddd;border-radius:5px;cursor:pointer;padding:1px"/><button class="btn-sm" onclick="updateLabel(\''+esc(lk)+'\')">Save</button><button class="btn-d" style="padding:5px 10px;font-size:12px" onclick="deleteLabel(\''+esc(lk)+'\')">Delete</button></div>';});h+='</div>';}el.innerHTML=h;}
 async function createLabel(){var name=document.getElementById('newLblName').value.trim(),color=document.getElementById('newLblColor').value.replace('#',''),msg=document.getElementById('lblCreateMsg');if(!name){msg.style.color='#dc2626';msg.textContent='Name required.';return;}try{await ghPost('/repos/'+S.repos[0]+'/labels',{name:name,color:color});S.labelColors[name.toLowerCase()]=color;S.labelNames[name.toLowerCase()]=name;msg.style.color='#059669';msg.textContent='"'+name+'" created!';document.getElementById('newLblName').value='';setTimeout(function(){renderLabelManager();},600);}catch(e){msg.style.color='#dc2626';msg.textContent=e.message;}}
 async function updateLabel(oldKey){var newName=document.getElementById('leName_'+oldKey).value.trim(),newColor=document.getElementById('leColor_'+oldKey).value.replace('#','');if(!newName)return;var oldDisplay=S.labelNames[oldKey]||oldKey;try{await fetch('https://api.github.com/repos/'+S.repos[0]+'/labels/'+encodeURIComponent(oldDisplay),{method:'PATCH',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify({new_name:newName,color:newColor})});delete S.labelColors[oldKey];delete S.labelNames[oldKey];S.labelColors[newName.toLowerCase()]=newColor;S.labelNames[newName.toLowerCase()]=newName;S.issues.concat(S.closedIssues).forEach(function(i){i.labels=i.labels.map(function(l){return l.toLowerCase()===oldKey?newName:l;});});renderLabelManager();renderMain();}catch(e){alert('Failed: '+e.message);}}
 async function deleteLabel(lk){var display=S.labelNames[lk]||lk;if(!confirm('Delete label "'+display+'"? This cannot be undone.'))return;try{await ghDel('/repos/'+S.repos[0]+'/labels/'+encodeURIComponent(display));delete S.labelColors[lk];delete S.labelNames[lk];S.issues.concat(S.closedIssues).forEach(function(i){i.labels=i.labels.filter(function(l){return l.toLowerCase()!==lk;});});renderLabelManager();renderMain();}catch(e){alert('Failed: '+e.message);}}
 
 // ── Parent search & linking ───────────────────────────────────────────────────
+function mkParentPicker(issue,badgeHtml,descHtml){
+  var key=issue.id+'_'+issue.repo;
+  var h='<div style="display:flex;flex-direction:column;gap:6px" id="parentPicker_'+key+'">';
+  h+=badgeHtml;
+  if(descHtml)h+='<div style="font-size:11px;color:#6b7280">'+descHtml+'</div>';
+  h+='<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">';
+  h+='<input type="text" id="psearch_'+key+'" placeholder="# or title..." autocomplete="off" style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:160px" oninput="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')"/>';
+  h+='<button class="btn-sm" style="font-size:11px;padding:3px 9px" onclick="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')">🔍</button>';
+  h+='</div>';
+  h+='<div id="presults_'+key+'" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:320px"></div>';
+  h+='<div id="pselected_'+key+'" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 12px;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">';
+  h+='<span id="pselectedLabel_'+key+'" style="font-size:12px;font-weight:600;color:#166534;flex:1"></span>';
+  h+='<button class="btn-sm" style="font-size:11px;border-color:#86efac;color:#166534;background:#dcfce7" onclick="clearParentSelection(\''+key+'\')">✕ Clear</button>';
+  h+='<button class="btn-p" style="font-size:12px;padding:5px 14px" id="psaveBtn_'+key+'" onclick="saveParent('+issue.id+',\''+esc(issue.repo)+'\')">💾 Save Parent</button>';
+  h+='</div>';
+  h+='<div id="pstatus_'+key+'" style="display:none;font-size:12px;color:#dc2626;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:6px 10px"></div>';
+  h+='</div>';
+  return h;
+}
+
 function renderExcReason(issue){
   var parts=[];
+
   var autoParents=findAutoCheckedParents(issue.id);
   if(autoParents.length){
     autoParents.forEach(function(ap){
@@ -666,156 +491,47 @@ function renderExcReason(issue){
       parts.push(h);
     });
   }
+
   var ai=getAutoClosedItems(issue);
-  if(ai.length&&!autoParents.length){var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';ai.forEach(function(t){h+='<div class="acit">'+esc(t)+'</div>';});parts.push(h+'</div>');}
-  if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
-  if(!parts.length){
-    var key=issue.id+'_'+issue.repo;
-    parts.push(
-      '<div style="display:flex;flex-direction:column;gap:6px" id="parentPicker_'+key+'">'+
-      '<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>'+
-      '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'+
-      '<input type="text" id="psearch_'+key+'" placeholder="# or title..." autocomplete="off" '+
-        'style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:160px" '+
-        'oninput="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')"/>'+
-      '<button class="btn-sm" style="font-size:11px;padding:3px 9px" onclick="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')">🔍</button>'+
-      '</div>'+
-      '<div id="presults_'+key+'" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:320px"></div>'+
-      '<div id="pselected_'+key+'" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 12px;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'+
-        '<span id="pselectedLabel_'+key+'" style="font-size:12px;font-weight:600;color:#166534;flex:1"></span>'+
-        '<button class="btn-sm" style="font-size:11px;border-color:#86efac;color:#166534;background:#dcfce7" onclick="clearParentSelection(\''+key+'\')">✕ Clear</button>'+
-        '<button class="btn-p" style="font-size:12px;padding:5px 14px" id="psaveBtn_'+key+'" onclick="saveParent('+issue.id+',\''+esc(issue.repo)+'\')">💾 Save Parent</button>'+
-      '</div>'+
-      '<div id="pstatus_'+key+'" style="display:none;font-size:12px;color:#dc2626;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:6px 10px"></div>'+
-      '</div>'
-    );
+  if(ai.length&&!autoParents.length){
+    var h2='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';
+    ai.forEach(function(t){h2+='<div class="acit">'+esc(t)+'</div>';});
+    parts.push(h2+'</div>');
   }
+
+  if(isNIP(issue)){
+    parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
+  }
+
+  if(!parts.length){
+    var isCsItem=issue.labels.some(function(l){
+      var ll=l.toLowerCase();
+      return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';
+    })||hasCS(issue);
+
+    if(isCsItem&&!isReferencedInTaskItem(issue.id)){
+      parts.push(mkParentPicker(issue,
+        '<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not tracked in any CS Task Item</span>',
+        'This issue has a CS label but is not referenced in any open CS Task Item checklist.'
+      ));
+    } else {
+      parts.push(mkParentPicker(issue,
+        '<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>',
+        null
+      ));
+    }
+  }
+
   return parts.join('<div style="margin-top:4px"></div>');
 }
 
-async function searchParent(issueId,repo){
-  var key=issueId+'_'+repo;
-  var q=(document.getElementById('psearch_'+key)||{}).value||'';
-  var el=document.getElementById('presults_'+key);
-  if(!el)return;
-  if(!q){el.style.display='none';return;}
-  el.style.display='block';
-  el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">Searching...</div>';
-  try{
-    var results;
-    var num=parseInt(q);
-    if(!isNaN(num)&&String(num)===q.trim()){
-      try{var single=await ghFetch('/repos/'+repo+'/issues/'+num);results=single.pull_request?[]:[single];}catch(e){results=[];}
-    } else {
-      var data=await ghFetch('/search/issues?q='+encodeURIComponent(q)+'+'+encodeURIComponent('repo:'+repo)+'+is:issue+is:open&per_page=10&sort=updated');
-      results=Array.isArray(data.items)?data.items:[];
-    }
-    if(!results.length){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">No issues found.</div>';return;}
-    var h='';
-    results.slice(0,8).forEach(function(r){
-      h+='<div style="padding:8px 12px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:12px" '+
-        'onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" '+
-        'onclick="selectParent(\''+key+'\','+r.number+',\''+esc(r.title.replace(/'/g,"\\'"))+'\')">'+
-        '<span style="color:#6b7280;font-weight:600">#'+r.number+'</span> '+
-        '<span style="color:#1e1b4b;font-weight:500">'+esc(r.title)+'</span></div>';
-    });
-    el.innerHTML=h;
-  }catch(e){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#dc2626">Error: '+esc(e.message)+'</div>';}
-}
-
-function selectParent(key,parentId,parentTitle){
-  var el=document.getElementById('presults_'+key);
-  if(el)el.style.display='none';
-  var picker=document.getElementById('parentPicker_'+key);
-  if(picker){picker.dataset.selectedId=parentId;picker.dataset.selectedTitle=parentTitle;}
-  var sel=document.getElementById('pselected_'+key);
-  var lbl=document.getElementById('pselectedLabel_'+key);
-  if(sel&&lbl){
-    lbl.textContent='Selected: #'+parentId+' — '+parentTitle;
-    sel.style.display='flex';
-  }
-}
-
-function clearParentSelection(key){
-  var picker=document.getElementById('parentPicker_'+key);
-  if(picker){delete picker.dataset.selectedId;delete picker.dataset.selectedTitle;}
-  var sel=document.getElementById('pselected_'+key);
-  if(sel)sel.style.display='none';
-  var inp=document.getElementById('psearch_'+key);
-  if(inp)inp.value='';
-}
-
-async function saveParent(issueId,repo){
-  var key=issueId+'_'+repo;
-  var picker=document.getElementById('parentPicker_'+key);
-  if(!picker||!picker.dataset.selectedId){alert('No parent selected.');return;}
-  var parentId=parseInt(picker.dataset.selectedId);
-  var parentTitle=picker.dataset.selectedTitle||'';
-  var btn=document.getElementById('psaveBtn_'+key);
-  var statusEl=document.getElementById('pstatus_'+key);
-  console.log('[saveParent] issueId='+issueId+' repo='+repo+' parentId='+parentId+' parentTitle='+parentTitle);
-  console.log('[saveParent] ghToken present='+(!!S.ghToken)+' length='+(S.ghToken||'').length);
-  if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span> Saving...';}
-  if(statusEl){statusEl.textContent='';statusEl.style.display='none';}
-  try{
-    await setParent(issueId,repo,parentId,parentTitle);
-  }catch(e){
-    console.error('[saveParent] unexpected error:',e);
-    if(btn){btn.disabled=false;btn.innerHTML='💾 Save Parent';}
-    if(statusEl){statusEl.style.display='block';statusEl.textContent='Error: '+e.message;}
-  }
-}
-
-async function setParent(issueId,repo,parentId,parentTitle){
-  var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});
-  var succeeded=false;
-
-  try{
-    var r=await fetch('https://api.github.com/repos/'+repo+'/issues/'+parentId+'/sub_issues',{
-      method:'POST',
-      headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
-      body:JSON.stringify({sub_issue_id:issueId})
-    });
-    var rBody={};
-    try{rBody=await r.json();}catch(e){}
-    if(r.ok){
-      succeeded=true;
-      console.log('[setParent] sub_issues API success',rBody);
-    } else {
-      console.warn('[setParent] sub_issues API returned '+r.status,rBody);
-    }
-  }catch(e1){
-    console.warn('[setParent] sub_issues API threw:',e1.message);
-  }
-
-  if(!succeeded){
-    try{
-      console.log('[setParent] Trying body fallback for #'+issueId);
-      var childData=await ghFetch('/repos/'+repo+'/issues/'+issueId);
-      var existingBody=childData.body||'';
-      var parentRef='\n\n**Parent:** #'+parentId+' '+parentTitle;
-      if(existingBody.indexOf('**Parent:** #'+parentId)===-1){
-        await ghPatch('/repos/'+repo+'/issues/'+issueId,{body:existingBody.trimEnd()+parentRef});
-        console.log('[setParent] Body fallback patched #'+issueId);
-      } else {
-        console.log('[setParent] Parent ref already in body, skipping patch');
-      }
-      succeeded=true;
-    }catch(e2){
-      console.error('[setParent] Body fallback failed:',e2.message);
-      alert('Could not set parent.\n\nError: '+e2.message);
-      return;
-    }
-  }
-
-  if(issue){
-    issue.parent={issueNumber:parentId};
-    saveCache();
-    console.log('[setParent] Local state updated, issue #'+issueId+' parent set to #'+parentId);
-  }
-  buildTabs();
-  renderMain();
-}
+async function searchParent(issueId,repo){var key=issueId+'_'+repo;var q=(document.getElementById('psearch_'+key)||{}).value||'';var el=document.getElementById('presults_'+key);if(!el)return;if(!q){el.style.display='none';return;}el.style.display='block';el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">Searching...</div>';try{var results;var num=parseInt(q);if(!isNaN(num)&&String(num)===q.trim()){try{var single=await ghFetch('/repos/'+repo+'/issues/'+num);results=single.pull_request?[]:[single];}catch(e){results=[];}}else{var data=await ghFetch('/search/issues?q='+encodeURIComponent(q)+'+'+encodeURIComponent('repo:'+repo)+'+is:issue+is:open&per_page=10&sort=updated');results=Array.isArray(data.items)?data.items:[];}if(!results.length){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">No issues found.</div>';return;}var h='';results.slice(0,8).forEach(function(r){h+='<div style="padding:8px 12px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="selectParent(\''+key+'\','+r.number+',\''+esc(r.title.replace(/'/g,"\\'"))+'\')"><span style="color:#6b7280;font-weight:600">#'+r.number+'</span> <span style="color:#1e1b4b;font-weight:500">'+esc(r.title)+'</span></div>';});el.innerHTML=h;}catch(e){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#dc2626">Error: '+esc(e.message)+'</div>';}}
+function selectParent(key,parentId,parentTitle){var el=document.getElementById('presults_'+key);if(el)el.style.display='none';var picker=document.getElementById('parentPicker_'+key);if(picker){picker.dataset.selectedId=parentId;picker.dataset.selectedTitle=parentTitle;}var sel=document.getElementById('pselected_'+key);var lbl=document.getElementById('pselectedLabel_'+key);if(sel&&lbl){lbl.textContent='Selected: #'+parentId+' — '+parentTitle;sel.style.display='flex';}}
+function clearParentSelection(key){var picker=document.getElementById('parentPicker_'+key);if(picker){delete picker.dataset.selectedId;delete picker.dataset.selectedTitle;}var sel=document.getElementById('pselected_'+key);if(sel)sel.style.display='none';var inp=document.getElementById('psearch_'+key);if(inp)inp.value='';}
+async function saveParent(issueId,repo){var key=issueId+'_'+repo;var picker=document.getElementById('parentPicker_'+key);if(!picker||!picker.dataset.selectedId){alert('No parent selected.');return;}var parentId=parseInt(picker.dataset.selectedId);var parentTitle=picker.dataset.selectedTitle||'';var btn=document.getElementById('psaveBtn_'+key);var statusEl=document.getElementById('pstatus_'+key);if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span> Saving...';}if(statusEl){statusEl.textContent='';statusEl.style.display='none';}try{await setParent(issueId,repo,parentId,parentTitle);}catch(e){if(btn){btn.disabled=false;btn.innerHTML='💾 Save Parent';}if(statusEl){statusEl.style.display='block';statusEl.textContent='Error: '+e.message;}}}
+async function setParent(issueId,repo,parentId,parentTitle){var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});var succeeded=false;try{var r=await fetch('https://api.github.com/repos/'+repo+'/issues/'+parentId+'/sub_issues',{method:'POST',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({sub_issue_id:issueId})});if(r.ok)succeeded=true;}catch(e){}
+if(!succeeded){try{var childData=await ghFetch('/repos/'+repo+'/issues/'+issueId);var existingBody=childData.body||'';var parentRef='\n\n**Parent:** #'+parentId+' '+parentTitle;if(existingBody.indexOf('**Parent:** #'+parentId)===-1){await ghPatch('/repos/'+repo+'/issues/'+issueId,{body:existingBody.trimEnd()+parentRef});}succeeded=true;}catch(e2){alert('Could not set parent: '+e2.message);return;}}
+if(issue){issue.parent={issueNumber:parentId};saveCache();}buildTabs();renderMain();}
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function renderTable(issues,tab,def){
@@ -825,8 +541,7 @@ function renderTable(issues,tab,def){
   var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
   var h='<div class="gh" style="background:'+color+'"><span class="gt">'+esc(label)+'<span class="gc">'+issues.length+'</span></span>';
   if(S.zhToken&&!isClosed&&!isIgnored&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\''+tab+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
-  h+='</div><div class="tw2"><table><thead><tr>';
-  h+=mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th>';
+  h+='</div><div class="tw2"><table><thead><tr>'+mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th>';
   if(S.repos.length>1)h+=mkTh('repo','Repo');
   h+='<th>Assignee</th>';
   if(isTesting)h+='<th>Status</th>';
@@ -856,82 +571,19 @@ function renderTable(issues,tab,def){
   });
   return h+'</tbody></table></div>';
 }
-
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed: '+e.message);}}
-
 var _csItemsPipeline=null;
 function pipelineOrder(name){var n=(name||'').trim();if(n==='On Deck Priorities')return 0;if(n==='In Progress')return 1;if(n==='Icebox')return 3;return 2;}
-
-function renderCSItemsGrouped(issues,def){
-  var color=tabColor(def),label=def.label;
-  var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
-  var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
-  var groups={};
-  issues.forEach(function(i){var pn=i.pipeline?i.pipeline.pipelineName:'No Pipeline';if(!groups[pn])groups[pn]=[];groups[pn].push(i);});
-  var sortedKeys=Object.keys(groups).sort(function(a,b){var ao=pipelineOrder(a),bo=pipelineOrder(b);if(ao!==bo)return ao-bo;return a.toLowerCase().localeCompare(b.toLowerCase());});
-  if(!_csItemsPipeline||!groups[_csItemsPipeline])_csItemsPipeline=sortedKeys[0]||null;
-  var activeGroup=_csItemsPipeline;
-  var activeIssues=(groups[activeGroup]||[]).slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
-  var h='<div class="gh" style="background:'+color+'"><span class="gt">'+esc(label)+'<span class="gc">'+issues.length+'</span></span>';
-  if(S.zhToken&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\'csitems\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
-  h+='</div>';
-  h+='<div style="display:flex;gap:0;border-bottom:2px solid #e5e7eb;background:#fff;flex-wrap:wrap">';
-  sortedKeys.forEach(function(pn){var isActive=pn===activeGroup;var cnt=groups[pn].length;h+='<button onclick="setCsItemsPipeline(\''+esc(pn)+'\')" style="padding:10px 16px;font-size:12px;font-weight:700;border:none;border-bottom:'+(isActive?'2px solid #4338ca':'2px solid transparent')+';background:'+(isActive?'#f9fafb':'transparent')+';color:'+(isActive?'#4338ca':'#6b7280')+';cursor:pointer;white-space:nowrap;margin-bottom:-2px">'+esc(pn)+' <span style="font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;background:'+(isActive?'#e0e7ff':'#f3f4f6')+';color:'+(isActive?'#4338ca':'#6b7280')+'">'+cnt+'</span></button>';});
-  h+='</div>';
-  h+='<div class="tw2" style="border-top:none;border-radius:0 0 10px 10px"><table><thead><tr>';
-  h+=mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th>';
-  if(S.repos.length>1)h+=mkTh('repo','Repo');
-  h+='<th>Assignee</th>';
-  if(S.zhToken)h+='<th>Pipeline</th>';
-  h+=mkTh('age','Age')+'<th></th></tr></thead><tbody>';
-  if(!activeIssues.length)h+='<tr><td colspan="99" class="er">No issues in this pipeline.</td></tr>';
-  activeIssues.forEach(function(issue){
-    var ikey=issue.id+'_'+issue.repo,days=ageDays(issue.createdAt);
-    h+='<tr>';
-    h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
-    h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
-    h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
-    sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
-    h+='<button onclick="toggleLabelEdit('+issue.id+',\''+esc(issue.repo)+'\')" title="Edit labels" style="background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;color:#9ca3af;border-radius:4px;line-height:1" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">✏️</button>';
-    h+='</div><div id="lblpanel_'+issue.id+'_'+esc(issue.repo)+'" style="display:none"></div></td>';
-    if(S.repos.length>1)h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.repo.split('/')[1])+'</td>';
-    h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
-    if(S.zhToken){var rp=S.zhPipelines[issue.repo]||[],cur=issue.pipeline?issue.pipeline.pipelineId:'',curN=issue.pipeline?issue.pipeline.pipelineName:'—';var srp=rp.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});if(srp.length){h+='<td><select class="ps" onchange="movePipeline('+issue.id+',\''+esc(issue.repo)+'\',this.value)"><option value="">'+esc(curN)+'</option>';srp.forEach(function(p){h+='<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>';});h+='</select></td>';}else h+='<td style="font-size:12px;color:#6b7280">'+esc(curN)+'</td>';}
-    h+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td>';
-    h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
-    h+='</tr>';
-  });
-  h+='</tbody></table></div>';
-  return h;
-}
-
+function renderCSItemsGrouped(issues,def){var color=tabColor(def),label=def.label;var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});var groups={};issues.forEach(function(i){var pn=i.pipeline?i.pipeline.pipelineName:'No Pipeline';if(!groups[pn])groups[pn]=[];groups[pn].push(i);});var sortedKeys=Object.keys(groups).sort(function(a,b){var ao=pipelineOrder(a),bo=pipelineOrder(b);if(ao!==bo)return ao-bo;return a.toLowerCase().localeCompare(b.toLowerCase());});if(!_csItemsPipeline||!groups[_csItemsPipeline])_csItemsPipeline=sortedKeys[0]||null;var activeGroup=_csItemsPipeline;var activeIssues=(groups[activeGroup]||[]).slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});var h='<div class="gh" style="background:'+color+'"><span class="gt">'+esc(label)+'<span class="gc">'+issues.length+'</span></span>';if(S.zhToken&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\'csitems\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}h+='</div><div style="display:flex;gap:0;border-bottom:2px solid #e5e7eb;background:#fff;flex-wrap:wrap">';sortedKeys.forEach(function(pn){var isActive=pn===activeGroup;var cnt=groups[pn].length;h+='<button onclick="setCsItemsPipeline(\''+esc(pn)+'\')" style="padding:10px 16px;font-size:12px;font-weight:700;border:none;border-bottom:'+(isActive?'2px solid #4338ca':'2px solid transparent')+';background:'+(isActive?'#f9fafb':'transparent')+';color:'+(isActive?'#4338ca':'#6b7280')+';cursor:pointer;white-space:nowrap;margin-bottom:-2px">'+esc(pn)+' <span style="font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;background:'+(isActive?'#e0e7ff':'#f3f4f6')+';color:'+(isActive?'#4338ca':'#6b7280')+'">'+cnt+'</span></button>';});h+='</div><div class="tw2" style="border-top:none;border-radius:0 0 10px 10px"><table><thead><tr>'+mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th>';if(S.repos.length>1)h+=mkTh('repo','Repo');h+='<th>Assignee</th>';if(S.zhToken)h+='<th>Pipeline</th>';h+=mkTh('age','Age')+'<th></th></tr></thead><tbody>';if(!activeIssues.length)h+='<tr><td colspan="99" class="er">No issues in this pipeline.</td></tr>';activeIssues.forEach(function(issue){var ikey=issue.id+'_'+issue.repo,days=ageDays(issue.createdAt);h+='<tr><td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td><td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td><td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});h+='<button onclick="toggleLabelEdit('+issue.id+',\''+esc(issue.repo)+'\')" title="Edit labels" style="background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;color:#9ca3af;border-radius:4px;line-height:1" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">✏️</button></div><div id="lblpanel_'+issue.id+'_'+esc(issue.repo)+'" style="display:none"></div></td>';if(S.repos.length>1)h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.repo.split('/')[1])+'</td>';h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';if(S.zhToken){var rp=S.zhPipelines[issue.repo]||[],cur=issue.pipeline?issue.pipeline.pipelineId:'',curN=issue.pipeline?issue.pipeline.pipelineName:'—';var srp=rp.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});if(srp.length){h+='<td><select class="ps" onchange="movePipeline('+issue.id+',\''+esc(issue.repo)+'\',this.value)"><option value="">'+esc(curN)+'</option>';srp.forEach(function(p){h+='<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>';});h+='</select></td>';}else h+='<td style="font-size:12px;color:#6b7280">'+esc(curN)+'</td>';}h+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td><td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td></tr>';});h+='</tbody></table></div>';return h;}
 function setCsItemsPipeline(name){_csItemsPipeline=name;renderMain();}
 async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});if(!list.length){sel.value='';return;}if(!confirm('Move '+list.length+' issues?')){sel.value='';return;}for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}
 function renderMain(){renderStats();buildTabs();hideErr('dashErr');if(S.activeTab==='report'){renderReport();return;}var def=TAB_DEFS.find(function(d){return d.id===S.activeTab;});var issues=applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab));var filterPipeline=document.getElementById('filterPipeline').value||'';if(S.activeTab==='csitems'&&S.zhToken&&!filterPipeline){document.getElementById('mainContent').innerHTML=renderCSItemsGrouped(applyFilters(getTabIssues('csitems')),def);}else{document.getElementById('mainContent').innerHTML=renderTable(issues,S.activeTab,def);}}
 
-// ── Report ────────────────────────────────────────────────────────────────────
-function parseSnapshotIssue(issue){var t=0,c=0,o=0,n=0;(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i),unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);if(!chk&&!unk)return;var text=(chk||unk)[1].trim();if(!/#\d+/.test(text)){n++;return;}t++;if(chk)c++;else o++;});return{id:issue.id,title:issue.title,url:issue.url,total:t,closed:c,open:o,noIssue:n};}
-function getCurrentSnapshot(){
-  var tracking=S.issues.filter(function(i){if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;var t=i.title.trim().toLowerCase();if(t.indexOf('cs ')!==0)return false;if(t.indexOf('research items')!==-1)return false;if(t.indexOf('cs ba ')===0)return false;return true;});
-  if(!tracking.length)return null;
-  var rows=[],total=0,closed=0,open=0,noIssue=0,nums=[];
-  tracking.forEach(function(issue){nums.push(issue.id);var r=parseSnapshotIssue(issue);rows.push(r);total+=r.total;closed+=r.closed;open+=r.open;noIssue+=r.noIssue;});
-  rows.sort(function(a,b){return b.id-a.id;});
-  return{date:todayStr(),tracking:nums.join('/'),total:total,closed:closed,open:open,noIssue:noIssue,rows:rows};
-}
-function saveSnap(){var snap=getCurrentSnapshot();if(!snap){alert('No CS Task Item issues found.');return;}var history=loadHistory();if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}else history.push(snap);saveHistory(history);renderReport();}
-function delRptRow(idx){if(!confirm('Remove this row?'))return;var h=loadHistory();h.splice(idx,1);saveHistory(h);renderReport();}
-function importCSV(){var inp=document.createElement('input');inp.type='file';inp.accept='.csv';inp.onchange=function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){var lines=ev.target.result.split('\n').map(function(l){return l.trim();}).filter(Boolean);if(!lines.length){alert('Empty file.');return;}var start=lines[0].toLowerCase().indexOf('date')!==-1?1:0,imported=[],skipped=0;for(var i=start;i<lines.length;i++){var cols=lines[i].split(',');if(cols.length<5){skipped++;continue;}var row={date:(cols[0]||'').trim(),tracking:(cols[1]||'').trim(),total:parseInt(cols[2])||0,closed:parseInt(cols[3])||0,open:parseInt(cols[4])||0,noIssue:parseInt(cols[5])||0};if(!row.date){skipped++;continue;}imported.push(row);}if(!imported.length){alert('No valid rows found.');return;}var history=loadHistory(),existing={},added=0,dupes=0;history.forEach(function(r){existing[r.date]=1;});imported.forEach(function(r){if(existing[r.date])dupes++;else{history.push(r);added++;}});history.sort(function(a,b){return new Date(a.date)-new Date(b.date);});saveHistory(history);alert('Imported '+added+' row(s).'+(dupes?' Skipped '+dupes+' duplicate(s).':''));renderReport();};reader.readAsText(file);};inp.click();}
-function exportCSV(){var history=loadHistory(),rows=['Date,Tracking Issues,Total,Closed,Open,No Issue Raised'];history.forEach(function(row){rows.push([row.date,row.tracking,row.total,row.closed,row.open,row.noIssue||0].join(','));});var blob=new Blob([rows.join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cs_report.csv';a.click();}
-function clearHistory(){if(!confirm('Clear all report history?'))return;localStorage.removeItem(STORAGE_KEY);renderReport();}
-
 // ── Mismatch Scanner ──────────────────────────────────────────────────────────
 var _scanResults=null,_scanning=false;
 
-async function runMismatchScan(){
-  if(_scanning)return;
-  _scanning=true;_scanResults=null;renderReport();
-  var tracking=S.issues.filter(function(i){
+function getScanTrackingIssues(){
+  return S.issues.filter(function(i){
     if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
     var t=i.title.trim().toLowerCase();
     if(t.indexOf('cs ')!==0)return false;
@@ -939,83 +591,122 @@ async function runMismatchScan(){
     if(t.indexOf('cs ba ')===0)return false;
     return true;
   });
-  console.log('[mismatch] scanning '+tracking.length+' tracking issues');
+}
+
+async function scanTrackingIssue(ti){
+  var freshBody='';
+  try{var fresh=await ghFetch('/repos/'+ti.repo+'/issues/'+ti.id);freshBody=fresh.body||'';}
+  catch(e){freshBody=ti.body||'';}
+
+  // Get timestamps of all body edits on the tracking issue
+  var bodyEditTimes=[];
+  try{
+    var tl=await ghFetch('/repos/'+ti.repo+'/issues/'+ti.id+'/timeline?per_page=100');
+    if(Array.isArray(tl)){
+      tl.forEach(function(ev){
+        if(ev.event==='edited'&&ev.changes&&ev.changes.body){
+          bodyEditTimes.push(new Date(ev.created_at).getTime());
+        }
+      });
+    }
+  }catch(e){}
+
+  var reviewed=loadReviewed();
+  var mismatches=[];
+  var lines=freshBody.split('\n');
+  for(var l=0;l<lines.length;l++){
+    var line=lines[l];
+    var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
+    if(!chk)continue;
+    var ref=chk[1].trim();
+    var m=ref.match(/#(\d+)/);
+    if(!m)continue;
+    var issueNum=parseInt(m[1]);
+    if(reviewed.indexOf(ti.id+'_'+issueNum)!==-1)continue;
+    try{
+      var data=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum);
+      console.log('[scan] tracking #'+ti.id+' → #'+issueNum+' state='+data.state);
+      if(data.state==='open'){
+        console.log('[scan] FLAGGING #'+issueNum+' — open but checked off');
+        mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:false});
+        continue;
+      }
+      if(data.state==='closed'){
+        var closedAt=new Date(data.closed_at||0).getTime();
+        var closedByUser=(data.closed_by&&data.closed_by.login)||'';
+        // Flag if tracking issue body was edited within 10s of the issue being closed
+        var autoChecked=bodyEditTimes.some(function(editTime){
+          return Math.abs(editTime-closedAt)<=PR_AUTO_CHECK_WINDOW_MS;
+        });
+        console.log('[scan] #'+issueNum+' closedAt='+new Date(closedAt).toISOString()+' autoChecked='+autoChecked);
+        if(autoChecked){
+          console.log('[scan] FLAGGING #'+issueNum+' — body edited within 10s of close');
+          mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:true,closedByUser:closedByUser,closedAt:data.closed_at||''});
+        } else {
+          console.log('[scan] #'+issueNum+' — no edit within 10s of close, skipping');
+        }
+      }
+    }catch(e){console.warn('[scan] fetch failed for #'+issueNum,e.message);}
+  }
+  return mismatches;
+}
+
+async function runMismatchScan(){
+  if(_scanning)return;
+  _scanning=true;_scanResults=null;renderReport();
+  var tracking=getScanTrackingIssues();
+  console.log('[scan] manual — '+tracking.length+' tracking issues');
   var mismatches=[];
   for(var t=0;t<tracking.length;t++){
-    var ti=tracking[t];
-    // Always fetch fresh body so we have latest checkbox state
-    var freshBody='';
-    try{
-      var fresh=await ghFetch('/repos/'+ti.repo+'/issues/'+ti.id);
-      freshBody=fresh.body||'';
-    }catch(e){
-      console.warn('[mismatch] could not fetch fresh body for #'+ti.id);
-      freshBody=ti.body||'';
-    }
-    var lines=freshBody.split('\n');
-    var checkedCount=0;
-    console.log('[mismatch] #'+ti.id+' "'+ti.title+'" — '+lines.length+' lines');
-    for(var l=0;l<lines.length;l++){
-      var line=lines[l];
-      var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
-      if(!chk)continue;
-      checkedCount++;
-      var ref=chk[1].trim();
-      var m=ref.match(/#(\d+)/);
-      if(!m)continue;
-      var issueNum=parseInt(m[1]);
-      console.log('[mismatch] #'+ti.id+' has checked ref #'+issueNum);
-      try{
-        var data=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum);
-        console.log('[mismatch] #'+issueNum+' state='+data.state+(data.closed_by?' closedBy='+data.closed_by.login:''));
-        if(data.state==='open'){
-          console.log('[mismatch] FLAGGING #'+issueNum+' — open but checked off');
-          mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:false});
-        } else if(data.state==='closed'){
-          var closedByPR=false;
-          var closedAt=data.closed_at||'';
-          var closedByUser=(data.closed_by&&data.closed_by.login)||'';
-          try{
-            var tl=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum+'/timeline?per_page=100');
-            if(Array.isArray(tl)){
-              tl.forEach(function(ev){
-                if(ev.event==='closed'&&ev.commit_id){closedByPR=true;}
-                if(ev.event==='merged'){closedByPR=true;}
-                if(ev.event==='cross-referenced'&&ev.source&&ev.source.issue&&ev.source.issue.pull_request){closedByPR=true;}
-              });
-            }
-            console.log('[mismatch] #'+issueNum+' closedByPR='+closedByPR);
-          }catch(e){console.warn('[mismatch] timeline fetch failed for #'+issueNum,e.message);}
-          if(closedByPR){
-            console.log('[mismatch] FLAGGING #'+issueNum+' — auto-closed by PR, checkbox needs unchecking');
-            mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:true,closedByPR:true,closedByUser:closedByUser,closedAt:closedAt});
-          } else {
-            console.log('[mismatch] #'+issueNum+' closed manually — checkbox is legitimate, skipping');
-          }
-        }
-      }catch(e){console.warn('[mismatch] fetch failed for #'+issueNum,e.message);}
-    }
-    console.log('[mismatch] #'+ti.id+' — '+checkedCount+' checked boxes scanned');
+    var found=await scanTrackingIssue(tracking[t]);
+    mismatches=mismatches.concat(found);
   }
-  console.log('[mismatch] done — '+mismatches.length+' mismatches found');
+  console.log('[scan] done — '+mismatches.length+' mismatches');
   _scanResults=mismatches;_scanning=false;renderReport();
 }
+
+
+function runScanInBackground(){
+  var tracking=getScanTrackingIssues();
+  console.log('[scan] background — '+tracking.length+' tracking issues');
+  _scanning=true;_scanResults=null;
+  if(S.activeTab==='report')renderReport();
+  var mismatches=[];
+  var idx=0;
+  function next(){
+    if(idx>=tracking.length){
+      _scanResults=mismatches;_scanning=false;
+      console.log('[scan] background done — '+mismatches.length+' mismatches');
+      if(S.activeTab==='report')renderReport();
+      return;
+    }
+    var ti=tracking[idx++];
+    scanTrackingIssue(ti).then(function(found){mismatches=mismatches.concat(found);next();}).catch(function(){next();});
+  }
+  next();
+}
+
+// ── Report ────────────────────────────────────────────────────────────────────
+function parseSnapshotIssue(issue){var t=0,c=0,o=0,n=0;(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i),unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);if(!chk&&!unk)return;var text=(chk||unk)[1].trim();if(!/#\d+/.test(text)){n++;return;}t++;if(chk)c++;else o++;});return{id:issue.id,title:issue.title,url:issue.url,total:t,closed:c,open:o,noIssue:n};}
+function getCurrentSnapshot(){var tracking=S.issues.filter(function(i){if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;var t=i.title.trim().toLowerCase();if(t.indexOf('cs ')!==0)return false;if(t.indexOf('research items')!==-1)return false;if(t.indexOf('cs ba ')===0)return false;return true;});if(!tracking.length)return null;var rows=[],total=0,closed=0,open=0,noIssue=0,nums=[];tracking.forEach(function(issue){nums.push(issue.id);var r=parseSnapshotIssue(issue);rows.push(r);total+=r.total;closed+=r.closed;open+=r.open;noIssue+=r.noIssue;});rows.sort(function(a,b){return b.id-a.id;});return{date:todayStr(),tracking:nums.join('/'),total:total,closed:closed,open:open,noIssue:noIssue,rows:rows};}
+function saveSnap(){var snap=getCurrentSnapshot();if(!snap){alert('No CS Task Item issues found.');return;}var history=loadHistory();if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}else history.push(snap);saveHistory(history);renderReport();}
+function delRptRow(idx){if(!confirm('Remove this row?'))return;var h=loadHistory();h.splice(idx,1);saveHistory(h);renderReport();}
+function importCSV(){var inp=document.createElement('input');inp.type='file';inp.accept='.csv';inp.onchange=function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){var lines=ev.target.result.split('\n').map(function(l){return l.trim();}).filter(Boolean);if(!lines.length){alert('Empty file.');return;}var start=lines[0].toLowerCase().indexOf('date')!==-1?1:0,imported=[],skipped=0;for(var i=start;i<lines.length;i++){var cols=lines[i].split(',');if(cols.length<5){skipped++;continue;}var row={date:(cols[0]||'').trim(),tracking:(cols[1]||'').trim(),total:parseInt(cols[2])||0,closed:parseInt(cols[3])||0,open:parseInt(cols[4])||0,noIssue:parseInt(cols[5])||0};if(!row.date){skipped++;continue;}imported.push(row);}if(!imported.length){alert('No valid rows found.');return;}var history=loadHistory(),existing={},added=0,dupes=0;history.forEach(function(r){existing[r.date]=1;});imported.forEach(function(r){if(existing[r.date])dupes++;else{history.push(r);added++;}});history.sort(function(a,b){return new Date(a.date)-new Date(b.date);});saveHistory(history);alert('Imported '+added+' row(s).'+(dupes?' Skipped '+dupes+' duplicate(s).':''));renderReport();};reader.readAsText(file);};inp.click();}
+function exportCSV(){var history=loadHistory(),rows=['Date,Tracking Issues,Total,Closed,Open,No Issue Raised'];history.forEach(function(row){rows.push([row.date,row.tracking,row.total,row.closed,row.open,row.noIssue||0].join(','));});var blob=new Blob([rows.join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cs_report.csv';a.click();}
+function clearHistory(){if(!confirm('Clear all report history?'))return;localStorage.removeItem(STORAGE_KEY);renderReport();}
 
 function renderMismatchPanel(){
   var h='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #f59e0b">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
   h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Mismatch Scanner</div>';
-  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds checked boxes linked to issues that are still open, or were auto-closed by a PR</div></div>';
-  if(_scanning){
-    h+='<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>';
-  } else {
-    h+='<button class="btn-p" onclick="runMismatchScan()" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
-  }
+  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Flags checked boxes where the issue was closed within 10 seconds of the tracking body being edited (likely auto-checked by GitHub)</div></div>';
+  if(_scanning)h+='<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>';
+  else h+='<button class="btn-p" onclick="runMismatchScan()" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
   h+='</div>';
   if(_scanResults===null&&!_scanning){
-    h+='<div style="font-size:13px;color:#9ca3af">Click Run Scan to check all tracking issues for incorrectly checked boxes.</div>';
+    h+='<div style="font-size:13px;color:#9ca3af">Scan runs automatically on page load and every 15 minutes. Click Run Scan to trigger manually.</div>';
   } else if(_scanning){
-    h+='<div style="font-size:13px;color:#9ca3af">Fetching fresh issue bodies and checking each item against GitHub...</div>';
+    h+='<div style="font-size:13px;color:#9ca3af">Checking each tracked item against GitHub...</div>';
   } else if(_scanResults.length===0){
     h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found.</div>';
   } else {
@@ -1027,16 +718,16 @@ function renderMismatchPanel(){
       h+='<div style="font-size:12px;color:#6b7280;margin-bottom:3px">Tracking: <a href="'+esc(r.trackingIssue.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+r.trackingIssue.id+' '+esc(r.trackingIssue.title)+'</a></div>';
       h+='<div style="font-size:13px;font-weight:600"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:'+(r.closedButChecked?'#7c3aed':'#dc2626')+'">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
       if(r.closedButChecked){
-        var info='Closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'')+' — auto-closed by a PR';
-        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">⚠ '+info+'</span></div>';
+        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'')+' — likely auto-checked by GitHub</span></div>';
       } else {
-        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Issue is still open but checked off</span></div>';
+        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Issue still open but checked off</span></div>';
       }
       h+='<div style="font-size:11px;color:#9ca3af;margin-top:3px;font-family:monospace">'+esc(r.lineText)+'</div>';
       h+='</div>';
       h+='<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">';
       h+='<a href="'+esc(r.childUrl)+'" target="_blank" class="btn-sm" style="font-size:11px;text-decoration:none">👁 View</a>';
       h+='<button class="btn-sm" style="font-size:11px;border-color:#f59e0b;color:#92400e;background:#fffbeb" onclick="uncheckMismatch('+idx+')">☐ Uncheck</button>';
+      h+='<button class="btn-sm" style="font-size:11px;border-color:#86efac;color:#166534;background:#f0fdf4" onclick="markReviewed('+r.trackingIssue.id+','+r.childId+')">✓ Reviewed</button>';
       h+='</div></div>';
     });
     h+='</div>';
@@ -1098,13 +789,7 @@ function loadHistoricalData(){
   var gh=sessionStorage.getItem('cv_session_gh');
   var zh=sessionStorage.getItem('cv_session_zh');
   if(!gh){
-    document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;gap:16px;font-family:ui-sans-serif,system-ui,sans-serif">'
-      +'<div style="background:#fff;border-radius:14px;padding:40px 48px;box-shadow:0 2px 12px rgba(0,0,0,0.08);text-align:center;max-width:400px">'
-      +'<div style="font-size:2.5rem;margin-bottom:12px">🔒</div>'
-      +'<div style="font-size:1.1rem;font-weight:700;color:#1e1b4b;margin-bottom:8px">Tokens required</div>'
-      +'<div style="font-size:14px;color:#6b7280;margin-bottom:24px">Please unlock your vault on the hub page and select your GitHub token before opening this dashboard.</div>'
-      +'<a href="index.html" style="display:inline-block;background:#4338ca;color:#fff;border-radius:9px;padding:11px 28px;font-size:14px;font-weight:700;text-decoration:none">← Go to Hub</a>'
-      +'</div></div>';
+    document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;gap:16px;font-family:ui-sans-serif,system-ui,sans-serif"><div style="background:#fff;border-radius:14px;padding:40px 48px;box-shadow:0 2px 12px rgba(0,0,0,0.08);text-align:center;max-width:400px"><div style="font-size:2.5rem;margin-bottom:12px">🔒</div><div style="font-size:1.1rem;font-weight:700;color:#1e1b4b;margin-bottom:8px">Tokens required</div><div style="font-size:14px;color:#6b7280;margin-bottom:24px">Please unlock your vault on the hub page and select your GitHub token before opening this dashboard.</div><a href="index.html" style="display:inline-block;background:#4338ca;color:#fff;border-radius:9px;padding:11px 28px;font-size:14px;font-weight:700;text-decoration:none">← Go to Hub</a></div></div>';
     return;
   }
   S.ghToken=gh;
@@ -1115,25 +800,18 @@ function loadHistoricalData(){
   var profile=profiles[0];
   S.activeProfile=profile;
   S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo;}):[profile.repo];
-  if(profile.type==='group'){
-    (profile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});
-    if(!S.zhWorkspace&&profile.repos&&profile.repos[0])S.zhWorkspace=profile.repos[0].zhWorkspace||'';
-  } else if(profile.zhWorkspace){
-    S.zhWorkspace=profile.zhWorkspace;
-    if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=profile.zhWorkspace;
-  }
+  if(profile.type==='group'){(profile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(!S.zhWorkspace&&profile.repos&&profile.repos[0])S.zhWorkspace=profile.repos[0].zhWorkspace||'';}
+  else if(profile.zhWorkspace){S.zhWorkspace=profile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=profile.zhWorkspace;}
   S.ignored=loadIgnored();
   var cache=loadCache();
   if(cache&&cache.issues){
-    S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];
-    S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
+    S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
     var age=Math.round((Date.now()-cache.savedAt)/60000);
     populateFilters();showDash();buildTabs();renderMain();
     document.getElementById('dashTitle').textContent='📋 CentralView '+profile.name+' Issues Hub';
     document.getElementById('dashMeta').textContent=S.issues.length+' open issues — '+todayStr();
     setStatus('<span style="color:#fbbf24;font-size:14px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
-    bgRefresh();
-    return;
+    bgRefresh();return;
   }
   showDash();
   document.getElementById('dashTitle').textContent='📋 CentralView '+profile.name+' Issues Hub';
@@ -1141,7 +819,7 @@ function loadHistoricalData(){
   setStatus('<span style="color:#fbbf24">⏳ Loading...</span>');
   Promise.all([loadLabelColors(),loadIssues()])
     .then(function(){return refreshTrackingBodies();})
-    .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();})
+    .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();runScanInBackground();})
     .catch(function(e){document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
 })();
 </script>
