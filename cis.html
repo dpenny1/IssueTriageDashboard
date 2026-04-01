@@ -425,11 +425,13 @@ async function refreshTrackingBodies(){
       var oldBody=tracking[i].body||'';
       tracking[i].body=fresh.body||'';
       var hasChecked=tracking[i].body.match(/^\s*-\s*\[x\]/im);
-      console.log('[refreshTrackingBodies] #'+tracking[i].id+' body length: '+tracking[i].body.length+(hasChecked?' HAS CHECKED BOXES':''));
+      console.log('[refreshTrackingBodies] #'+tracking[i].id+' body length: '+tracking[i].body.length+(hasChecked?' *** HAS CHECKED BOXES ***':''));
       if(oldBody!==tracking[i].body)console.log('[refreshTrackingBodies] #'+tracking[i].id+' body CHANGED');
     }catch(e){console.error('[refreshTrackingBodies] failed for #'+tracking[i].id,e);}
   }
-  console.log('[refreshTrackingBodies] done');
+  console.log('[refreshTrackingBodies] done — re-rendering');
+  buildTabs();
+  renderMain();
 }
 
 async function doRefresh(){
@@ -481,6 +483,8 @@ async function loadIssues(){
 function getAutoClosedItems(issue){if(!issue.labels.some(function(l){return l.toLowerCase()==='cs task item';})||issue.state!=='open')return[];var hits=[];(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(chk&&/#\d+/.test(chk[1].trim()))hits.push(chk[1].trim());});return hits;}
 
 // Find which CS Task Item tracking issues have a checked box referencing this issue number
+// Find which CS Task Item tracking issues have a checked box referencing this issue number
+// Works for both open AND closed issues
 function findAutoCheckedParents(issueId){
   var parents=[];
   var taskItems=S.issues.filter(function(ti){
@@ -500,6 +504,26 @@ function findAutoCheckedParents(issueId){
           console.log('[findAutoCheckedParents] MATCH FOUND in tracking issue #'+ti.id);
           parents.push({trackingIssue:ti,lineText:ref,fullLine:line.trim()});
         }
+      }
+    });
+  });
+  return parents;
+}
+
+// Same as above but scans for a specific issue number — used by mismatch scanner
+// and by isException to catch closed issues that are incorrectly checked
+function findAutoCheckedParentsForId(issueId){
+  var parents=[];
+  S.issues.forEach(function(ti){
+    if(!ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return;
+    if(ti.state!=='open')return;
+    (ti.body||'').split('\n').forEach(function(line){
+      var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
+      if(!chk)return;
+      var ref=chk[1].trim();
+      var m=ref.match(/#(\d+)/);
+      if(m&&parseInt(m[1])===issueId){
+        parents.push({trackingIssue:ti,lineText:ref,fullLine:line.trim()});
       }
     });
   });
@@ -904,7 +928,7 @@ async function runMismatchScan(){
       var m=ref.match(/#(\d+)/);
       if(!m)continue;
       var issueNum=parseInt(m[1]);
-      // Check if this issue is still open
+      // Check open issues first
       var openIssue=S.issues.find(function(i){return i.id===issueNum&&i.repo===ti.repo;});
       if(openIssue){
         mismatches.push({
@@ -930,6 +954,18 @@ async function runMismatchScan(){
               lineText:ref,
               lineIndex:l
             });
+          } else if(data&&data.state==='closed'){
+            // Closed but still checked — this is the key scenario we need to catch
+            mismatches.push({
+              trackingIssue:ti,
+              childId:issueNum,
+              childRepo:ti.repo,
+              childTitle:data.title,
+              childUrl:data.html_url,
+              lineText:ref,
+              lineIndex:l,
+              closedButChecked:true
+            });
           }
         }catch(e){}
       }
@@ -945,7 +981,7 @@ function renderMismatchPanel(){
   var h='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #f59e0b">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
   h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Mismatch Scanner</div>';
-  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds tracking issues where a box is checked ✅ but the referenced issue is still open</div></div>';
+      h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds tracking issues where a box is checked but the issue is still open, OR was closed via PR and needs review</div></div>';
 
   if(_scanning){
     h+='<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>';
@@ -967,7 +1003,8 @@ function renderMismatchPanel(){
       h+='<div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:9px;padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">';
       h+='<div style="flex:1;min-width:200px">';
       h+='<div style="font-size:12px;color:#6b7280;margin-bottom:3px">Tracking issue: <a href="'+esc(r.trackingIssue.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+r.trackingIssue.id+' '+esc(r.trackingIssue.title)+'</a></div>';
-      h+='<div style="font-size:13px;font-weight:600;color:#1e1b4b"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:#dc2626">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
+      h+='<div style="font-size:13px;font-weight:600;color:#1e1b4b"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:'+(r.closedButChecked?'#7c3aed':'#dc2626')+'">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
+      h+='<div style="font-size:11px;margin-top:3px">'+(r.closedButChecked?'<span style="background:#ede9fe;color:#5b21b6;padding:1px 7px;border-radius:999px;font-weight:600;font-size:11px">✓ Issue is closed but box not unchecked yet</span>':'<span style="background:#fee2e2;color:#991b1b;padding:1px 7px;border-radius:999px;font-weight:600;font-size:11px">⚠ Issue is still open</span>')+'</div>';
       h+='<div style="font-size:11px;color:#9ca3af;margin-top:3px;font-family:monospace">'+esc(r.lineText)+'</div>';
       h+='</div>';
       h+='<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">';
