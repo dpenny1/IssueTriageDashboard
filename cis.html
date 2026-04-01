@@ -603,8 +603,9 @@ async function scanTrackingIssue(ti){
             var evNames=childTl.map(function(ev){return ev.event+(ev.commit_id?'[cid]':'')+(ev.commit_url?'[curl]':'')+(ev.source?'[src:'+ev.source.type+']':'');});
             console.log('[scan] #'+issueNum+' timeline: '+evNames.join(', '));
             childTl.forEach(function(ev){
-              // Only flag as PR-closed if there is a direct commit link on the closed event
-              // or a merged event — do NOT use cross-referenced as that doesn't mean auto-close
+              if(ev.event==='closed'){
+                console.log('[scan] #'+issueNum+' closed event: commit_id='+ev.commit_id+' commit_url='+ev.commit_url+' actor='+(ev.actor&&ev.actor.login)+' actor_type='+(ev.actor&&ev.actor.type));
+              }
               if(ev.event==='closed'&&ev.commit_id){prClosedAt=new Date(ev.created_at||data.closed_at).getTime();}
               if(ev.event==='closed'&&ev.commit_url&&!ev.actor){prClosedAt=new Date(ev.created_at||data.closed_at).getTime();}
               if(ev.event==='merged'){prClosedAt=new Date(ev.created_at||data.closed_at).getTime();}
