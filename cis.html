@@ -477,6 +477,7 @@ async function loadIssues(){
   S.issues=open;S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
   document.getElementById('dashTitle').textContent='📋 CentralView '+(S.activeProfile?S.activeProfile.name+' Issues Hub':'Issues Hub');
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
+  if(_debugPending)setTimeout(function(){debugIssue(_debugPending);},500);
 }
 
 // ── Issue logic ───────────────────────────────────────────────────────────────
