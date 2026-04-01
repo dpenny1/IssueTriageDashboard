@@ -382,6 +382,7 @@ async function connect(){
     await Promise.all([loadLabelColors(),loadIssues()]);
     await refreshTrackingBodies();
     saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();
+    autoRunMismatchScan();
   }catch(e){showErr('setupErr',e.message);}
   btn.disabled=false;btn.textContent='▶ Load Dashboard';
 }
@@ -393,6 +394,7 @@ async function bgRefresh(){
     await Promise.all([loadLabelColors(),loadIssues()]);
     await refreshTrackingBodies();
     saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();
+    autoRunMismatchScan();
   }catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}
 }
 
@@ -407,12 +409,109 @@ async function doRefresh(){
     saveCache();populateFilters();buildTabs();renderMain();
     if(S.zhToken&&S.zhWorkspace)zhLoad();
     else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
+    autoRunMismatchScan();
   }catch(e){showErr('dashErr',e.message);}
   btn.disabled=false;btn.innerHTML='↻ Refresh';
 }
 
 function startAutoRefresh(){if(S.autoRefreshTimer)clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=setInterval(function(){doRefresh();},15*60*1000);}
 function stopAutoRefresh(){if(S.autoRefreshTimer){clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=null;}}
+
+async function autoRunMismatchScan(){
+  console.log('[autoScan] starting background mismatch scan');
+  _scanning=true;_scanResults=null;
+  if(S.activeTab==='report')renderReport();
+  var tracking=S.issues.filter(function(i){
+    if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
+    var t=i.title.trim().toLowerCase();
+    if(t.indexOf('cs ')!==0)return false;
+    if(t.indexOf('research items')!==-1)return false;
+    if(t.indexOf('cs ba ')===0)return false;
+    return true;
+  });
+  console.log('[autoScan] scanning '+tracking.length+' tracking issues');
+  var mismatches=[];
+  for(var t=0;t<tracking.length;t++){
+    var ti=tracking[t];
+    var freshBody='';
+    try{
+      var fresh=await ghFetch('/repos/'+ti.repo+'/issues/'+ti.id);
+      freshBody=fresh.body||'';
+    }catch(e){
+      console.warn('[autoScan] could not fetch fresh body for #'+ti.id);
+      freshBody=ti.body||'';
+    }
+    // Fetch tracking issue edit history once per tracking issue
+    var trackingEdits=[];
+    try{
+      var evts=await ghFetch('/repos/'+ti.repo+'/issues/'+ti.id+'/events?per_page=100');
+      if(Array.isArray(evts)){
+        trackingEdits=evts.filter(function(ev){
+          return ev.event==='edited' && ev.actor && ev.actor.type!=='Bot' && ev.actor.login!=='github-actions[bot]';
+        }).map(function(ev){return new Date(ev.created_at).getTime();});
+      }
+    }catch(e){console.warn('[autoScan] could not fetch events for tracking #'+ti.id);}
+
+    var lines=freshBody.split('\n');
+    for(var l=0;l<lines.length;l++){
+      var line=lines[l];
+      var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
+      if(!chk)continue;
+      var ref=chk[1].trim();
+      var m=ref.match(/#(\d+)/);
+      if(!m)continue;
+      var issueNum=parseInt(m[1]);
+      try{
+        var data=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum);
+        if(data.state==='open'){
+          // Open but checked — always a mismatch
+          console.log('[autoScan] FLAGGING #'+issueNum+' — open but checked off');
+          mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:false});
+        } else if(data.state==='closed'){
+          // Find if closed by a PR
+          var prClosedAt=null;
+          var closedByUser=(data.closed_by&&data.closed_by.login)||'';
+          try{
+            var tl=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum+'/timeline?per_page=100');
+            if(Array.isArray(tl)){
+              tl.forEach(function(ev){
+                if((ev.event==='closed'&&ev.commit_id)||ev.event==='merged'){
+                  prClosedAt=new Date(ev.created_at||data.closed_at).getTime();
+                }
+                if(ev.event==='cross-referenced'&&ev.source&&ev.source.issue&&ev.source.issue.pull_request){
+                  // cross-ref alone doesn't mean auto-closed, skip
+                }
+              });
+            }
+          }catch(e){}
+
+          if(prClosedAt===null){
+            // Not closed by a PR — manually closed, checkbox is legitimate
+            console.log('[autoScan] #'+issueNum+' closed manually — skipping');
+            continue;
+          }
+
+          // Closed by PR — check if a human edited the tracking issue AFTER the PR close
+          var humanEditedAfterPRClose=trackingEdits.some(function(editTime){
+            return editTime>prClosedAt;
+          });
+
+          if(humanEditedAfterPRClose){
+            // Human went in and manually checked it after the PR closed — legitimate
+            console.log('[autoScan] #'+issueNum+' closed by PR but human edited tracking issue after — skipping');
+          } else {
+            // No human edit after PR close — GitHub auto-checked it
+            console.log('[autoScan] FLAGGING #'+issueNum+' — auto-checked by PR close, no human edit after');
+            mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:true,closedByPR:true,closedByUser:closedByUser,closedAt:data.closed_at||''});
+          }
+        }
+      }catch(e){console.warn('[autoScan] fetch failed for #'+issueNum,e.message);}
+    }
+  }
+  _scanResults=mismatches;_scanning=false;
+  console.log('[autoScan] done — '+mismatches.length+' mismatches found');
+  if(S.activeTab==='report')renderReport();
+}
 
 async function loadLabelColors(){
   for(var i=0;i<S.repos.length;i++){
@@ -1141,7 +1240,7 @@ function loadHistoricalData(){
   setStatus('<span style="color:#fbbf24">⏳ Loading...</span>');
   Promise.all([loadLabelColors(),loadIssues()])
     .then(function(){return refreshTrackingBodies();})
-    .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();})
+    .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();autoRunMismatchScan();})
     .catch(function(e){document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
 })();
 </script>
