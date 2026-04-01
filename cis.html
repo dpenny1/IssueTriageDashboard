@@ -1020,7 +1020,15 @@ function renderMismatchPanel(){
       h+='<div style="flex:1;min-width:200px">';
       h+='<div style="font-size:12px;color:#6b7280;margin-bottom:3px">Tracking issue: <a href="'+esc(r.trackingIssue.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+r.trackingIssue.id+' '+esc(r.trackingIssue.title)+'</a></div>';
       h+='<div style="font-size:13px;font-weight:600;color:#1e1b4b"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:'+(r.closedButChecked?'#7c3aed':'#dc2626')+'">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
-      h+='<div style="font-size:11px;margin-top:3px">'+(r.closedButChecked?'<span style="background:#ede9fe;color:#5b21b6;padding:1px 7px;border-radius:999px;font-weight:600;font-size:11px">✓ Issue is closed but box not unchecked yet</span>':'<span style="background:#fee2e2;color:#991b1b;padding:1px 7px;border-radius:999px;font-weight:600;font-size:11px">⚠ Issue is still open</span>')+'</div>';
+      if(r.closedButChecked){
+        var closedInfo='Issue is closed';
+        if(r.closedAt)closedInfo+=' on '+new Date(r.closedAt).toLocaleDateString();
+        if(r.closedByPR)closedInfo+=' — <strong>auto-closed by a PR</strong> (box was likely checked automatically)';
+        else if(r.closedByUser)closedInfo+=' by '+esc(r.closedByUser);
+        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">⚠ '+closedInfo+'</span></div>';
+      } else {
+        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Issue is still open but checked off</span></div>';
+      }
       h+='<div style="font-size:11px;color:#9ca3af;margin-top:3px;font-family:monospace">'+esc(r.lineText)+'</div>';
       h+='</div>';
       h+='<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">';
