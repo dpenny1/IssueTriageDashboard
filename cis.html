@@ -770,7 +770,6 @@ async function setParent(issueId,repo,parentId,parentTitle){
   var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});
   var succeeded=false;
 
-  // Try GitHub sub_issues API first
   try{
     var r=await fetch('https://api.github.com/repos/'+repo+'/issues/'+parentId+'/sub_issues',{
       method:'POST',
@@ -789,7 +788,6 @@ async function setParent(issueId,repo,parentId,parentTitle){
     console.warn('[setParent] sub_issues API threw:',e1.message);
   }
 
-  // Fallback: append **Parent:** reference to child issue body
   if(!succeeded){
     try{
       console.log('[setParent] Trying body fallback for #'+issueId);
@@ -797,15 +795,15 @@ async function setParent(issueId,repo,parentId,parentTitle){
       var existingBody=childData.body||'';
       var parentRef='\n\n**Parent:** #'+parentId+' '+parentTitle;
       if(existingBody.indexOf('**Parent:** #'+parentId)===-1){
-        var patched=await ghPatch('/repos/'+repo+'/issues/'+issueId,{body:existingBody.trimEnd()+parentRef});
-        console.log('[setParent] Body fallback patched',patched.number);
+        await ghPatch('/repos/'+repo+'/issues/'+issueId,{body:existingBody.trimEnd()+parentRef});
+        console.log('[setParent] Body fallback patched #'+issueId);
       } else {
         console.log('[setParent] Parent ref already in body, skipping patch');
       }
       succeeded=true;
     }catch(e2){
       console.error('[setParent] Body fallback failed:',e2.message);
-      alert('Could not set parent.\n\nSub-issues API failed and body fallback also failed.\n\nError: '+e2.message);
+      alert('Could not set parent.\n\nError: '+e2.message);
       return;
     }
   }
@@ -815,7 +813,6 @@ async function setParent(issueId,repo,parentId,parentTitle){
     saveCache();
     console.log('[setParent] Local state updated, issue #'+issueId+' parent set to #'+parentId);
   }
-  // Re-evaluate exceptions and re-render so the issue drops out of the Exceptions tab
   buildTabs();
   renderMain();
 }
@@ -946,50 +943,59 @@ async function runMismatchScan(){
   var mismatches=[];
   for(var t=0;t<tracking.length;t++){
     var ti=tracking[t];
-    var lines=(ti.body||'').split('\n');
-    console.log('[mismatch] #'+ti.id+' "'+ti.title+'" — '+lines.length+' lines, body length='+ti.body.length);
+    // Always fetch fresh body so we have latest checkbox state
+    var freshBody='';
+    try{
+      var fresh=await ghFetch('/repos/'+ti.repo+'/issues/'+ti.id);
+      freshBody=fresh.body||'';
+    }catch(e){
+      console.warn('[mismatch] could not fetch fresh body for #'+ti.id);
+      freshBody=ti.body||'';
+    }
+    var lines=freshBody.split('\n');
     var checkedCount=0;
+    console.log('[mismatch] #'+ti.id+' "'+ti.title+'" — '+lines.length+' lines');
     for(var l=0;l<lines.length;l++){
       var line=lines[l];
-      // Match both [x] and [X]
       var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
       if(!chk)continue;
       checkedCount++;
       var ref=chk[1].trim();
       var m=ref.match(/#(\d+)/);
-      if(!m){
-        console.log('[mismatch] #'+ti.id+' checked line has no issue ref: '+line.trim());
-        continue;
-      }
+      if(!m)continue;
       var issueNum=parseInt(m[1]);
-      console.log('[mismatch] #'+ti.id+' checked ref #'+issueNum);
-      // Always fetch fresh from GitHub to get current state
+      console.log('[mismatch] #'+ti.id+' has checked ref #'+issueNum);
       try{
         var data=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum);
-        console.log('[mismatch] #'+issueNum+' state='+data.state);
-        if(data&&data.state==='open'){
+        console.log('[mismatch] #'+issueNum+' state='+data.state+(data.closed_by?' closedBy='+data.closed_by.login:''));
+        if(data.state==='open'){
           console.log('[mismatch] FLAGGING #'+issueNum+' — open but checked off');
           mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:false});
-        } else if(data&&data.state==='closed'){
-          var closedByPR=false,closedByUser='',closedAt=data.closed_at||'';
-          if(data.closed_by&&data.closed_by.login)closedByUser=data.closed_by.login;
+        } else if(data.state==='closed'){
+          var closedByPR=false;
+          var closedAt=data.closed_at||'';
+          var closedByUser=(data.closed_by&&data.closed_by.login)||'';
           try{
             var tl=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum+'/timeline?per_page=100');
-            if(Array.isArray(tl)){tl.forEach(function(ev){
-              if(ev.event==='closed'&&ev.commit_id)closedByPR=true;
-              if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;
-            });}
+            if(Array.isArray(tl)){
+              tl.forEach(function(ev){
+                if(ev.event==='closed'&&ev.commit_id){closedByPR=true;}
+                if(ev.event==='merged'){closedByPR=true;}
+                if(ev.event==='cross-referenced'&&ev.source&&ev.source.issue&&ev.source.issue.pull_request){closedByPR=true;}
+              });
+            }
+            console.log('[mismatch] #'+issueNum+' closedByPR='+closedByPR);
           }catch(e){console.warn('[mismatch] timeline fetch failed for #'+issueNum,e.message);}
           if(closedByPR){
-            console.log('[mismatch] FLAGGING #'+issueNum+' — closed by PR but checked off');
+            console.log('[mismatch] FLAGGING #'+issueNum+' — auto-closed by PR, checkbox needs unchecking');
             mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:true,closedByPR:true,closedByUser:closedByUser,closedAt:closedAt});
           } else {
-            console.log('[mismatch] #'+issueNum+' closed manually — skipping (legitimate)');
+            console.log('[mismatch] #'+issueNum+' closed manually — checkbox is legitimate, skipping');
           }
         }
       }catch(e){console.warn('[mismatch] fetch failed for #'+issueNum,e.message);}
     }
-    console.log('[mismatch] #'+ti.id+' had '+checkedCount+' checked lines');
+    console.log('[mismatch] #'+ti.id+' — '+checkedCount+' checked boxes scanned');
   }
   console.log('[mismatch] done — '+mismatches.length+' mismatches found');
   _scanResults=mismatches;_scanning=false;renderReport();
@@ -999,7 +1005,7 @@ function renderMismatchPanel(){
   var h='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #f59e0b">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
   h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Mismatch Scanner</div>';
-  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds boxes checked on open issues, or auto-checked by a PR closing keyword on closed issues</div></div>';
+  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds checked boxes linked to issues that are still open, or were auto-closed by a PR</div></div>';
   if(_scanning){
     h+='<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>';
   } else {
@@ -1009,7 +1015,7 @@ function renderMismatchPanel(){
   if(_scanResults===null&&!_scanning){
     h+='<div style="font-size:13px;color:#9ca3af">Click Run Scan to check all tracking issues for incorrectly checked boxes.</div>';
   } else if(_scanning){
-    h+='<div style="font-size:13px;color:#9ca3af">Checking each checked item against GitHub...</div>';
+    h+='<div style="font-size:13px;color:#9ca3af">Fetching fresh issue bodies and checking each item against GitHub...</div>';
   } else if(_scanResults.length===0){
     h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found.</div>';
   } else {
@@ -1104,16 +1110,8 @@ function loadHistoricalData(){
   S.ghToken=gh;
   if(zh)S.zhToken=zh;
   var profiles=loadProfiles();
-  if(!profiles.length){
-    showEl('setup');
-    renderProfileDd();
-    return;
-  }
-  if(profiles.length>1){
-    showEl('setup');
-    renderProfileDd();
-    return;
-  }
+  if(!profiles.length){showEl('setup');renderProfileDd();return;}
+  if(profiles.length>1){showEl('setup');renderProfileDd();return;}
   var profile=profiles[0];
   S.activeProfile=profile;
   S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo;}):[profile.repo];
