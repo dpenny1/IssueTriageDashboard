@@ -282,7 +282,7 @@ function lblBadge(n){var key=n.toLowerCase();var c=S.labelColors[key]||'e5e7eb';
 function ageDays(d){return Math.floor((Date.now()-new Date(d).getTime())/86400000);}
 function ageCls(d){return d<3?'ao':d<7?'aw':'ab';}
 function todayStr(){var d=new Date();return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
-function hasCS(i){return i.labels.some(function(l){return CS_ROUTING_LABELS.indexOf(l.toLowerCase())!==-1;});}
+function hasCS(i){return i.labels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});}
 function lsort(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}
 function sortLbls(labels){
   return labels.slice().sort(function(a,b){
