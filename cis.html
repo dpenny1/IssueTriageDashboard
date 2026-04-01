@@ -482,7 +482,12 @@ async function loadIssues(){
   if(dbg){
     console.log('DEBUG #11256 found — labels:',JSON.stringify(dbg.labels),'parent:',JSON.stringify(dbg.parent),'isException:',isException(dbg),'hasCS:',hasCS(dbg),'isNIP:',isNIP(dbg),'ignored:',(S.ignored.indexOf('11256_'+dbg.repo)!==-1));
   } else {
-    console.log('DEBUG #11256 NOT in open issues array');
+    console.log('DEBUG #11256 NOT in open array. Checking raw GitHub response...');
+    // Check if it came back as a PR or was skipped
+    try{
+      var raw=await ghFetch('/repos/'+repo+'/issues/11256');
+      console.log('DEBUG #11256 raw state:'+raw.state+' is_pr:'+(!!raw.pull_request)+' repo:'+repo);
+    }catch(e){console.log('DEBUG #11256 fetch failed:'+e.message);}
   }
 }
 
