@@ -172,7 +172,6 @@ var TAB_DEFS=[
   {id:'ignored',label:'Ignored',color:'#6b7280'},
   {id:'report',label:'Weekly Report',color:'#1e1b4b'}
 ];
-var PR_AUTO_CHECK_WINDOW_MS=10*1000; // 10 seconds
 
 // ── Token Vault ───────────────────────────────────────────────────────────────
 var Vault=(function(){
@@ -184,7 +183,7 @@ var Vault=(function(){
   function save(d){localStorage.setItem(KEY,JSON.stringify(d));_data=d;}
   return{
     isUnlocked:function(){return _pw!==null;},
-    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}}  _pw=pw;_data=data;},
+    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}} _pw=pw;_data=data;},
     lock:function(){_pw=null;_data=[];},
     list:function(){return _data.map(function(e){return {name:e.name,type:e.type||''};});},
     get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
@@ -343,7 +342,7 @@ async function doRefresh(){
 function startAutoRefresh(){if(S.autoRefreshTimer)clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=setInterval(function(){doRefresh();},15*60*1000);}
 function stopAutoRefresh(){if(S.autoRefreshTimer){clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=null;}}
 async function loadLabelColors(){for(var i=0;i<S.repos.length;i++){try{var lb=await ghFetch('/repos/'+S.repos[i]+'/labels?per_page=100');lb.forEach(function(l){S.labelColors[l.name.toLowerCase()]=l.color;S.labelNames[l.name.toLowerCase()]=l.name;});}catch(e){}}}
-async function loadZHData(){S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){console.error('ZH',repo,e.message);}}S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});await loadZHDeps();}
+async function loadZHData(){S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){}}S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});await loadZHDeps();}
 async function loadZHDeps(){for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace,repoId=S.repoIds[repo];if(!S.zhToken||!ws||!repoId)continue;try{var ed=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');for(var j=0;j<(ed.epic_issues||[]).length;j++){var ep=ed.epic_issues[j];try{var edet=await zhGet('/p2/workspaces/'+ws+'/repositories/'+(ep.repo_id||repoId)+'/epics/'+ep.issue_number);(edet.issues||[]).forEach(function(child){var cr=repoForId(child.repo_id)||repo;var ci=S.issues.find(function(iss){return iss.id===child.issue_number&&iss.repo===cr;});if(ci)ci.parent={issueNumber:ep.issue_number};});}catch(e){}}}catch(e){}}}
 function repoForId(id){return Object.keys(S.repoIds).find(function(r){return S.repoIds[r]===id;})||null;}
 async function refreshTrackingBodies(){var tracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});for(var i=0;i<tracking.length;i++){try{var fresh=await ghFetch('/repos/'+tracking[i].repo+'/issues/'+tracking[i].id);tracking[i].body=fresh.body||'';}catch(e){}}}
@@ -390,11 +389,7 @@ function isException(issue){
   if(!issue.parent&&findAutoCheckedParents(issue.id).length>0)return true;
   if(isNIP(issue))return true;
   if(issue.parent)return false;
-  if(hasCS(issue)){
-    // CS-labeled issues with no task item reference are exceptions
-    if(!isReferencedInTaskItem(issue.id))return true;
-    return true;
-  }
+  if(hasCS(issue)){if(!isReferencedInTaskItem(issue.id))return true;return true;}
   if(getAutoClosedItems(issue).length>0)return true;
   return false;
 }
@@ -426,6 +421,40 @@ function sortIssues(list,tab){
 function mkTh(col,label){var active=S.sortState.col===col;return '<th class="'+(active?'sorted':'')+'" onclick="doSort(\''+col+'\')">'+label+' <span class="si">'+(active?(S.sortState.dir===1?'▲':'▼'):'▲')+'</span></th>';}
 function doSort(col){if(S.sortState.col===col)S.sortState.dir*=-1;else{S.sortState.col=col;S.sortState.dir=1;}renderMain();}
 
+// ── renderStats — ONE definition only ────────────────────────────────────────
+function renderStats(){
+  var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i);});
+  var tN=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length+S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
+  var stats=[
+    {n:base.filter(function(i){return !hasCS(i);}).length,tab:'newitems'},
+    {n:getExceptions().length,tab:'exceptions'},
+    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length,tab:'prod'},
+    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,tab:'uat'},
+    {n:base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});}).length,tab:'csitems'},
+    {n:tN,tab:'testing'},
+    {n:S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,tab:'taskitem'},
+    {n:S.closedIssues.length,tab:'closed'},
+    {n:S.ignored.length,tab:'ignored'},
+    {n:'',tab:'report'}
+  ];
+  var h='';
+  stats.forEach(function(s){
+    if((s.tab==='prod'||s.tab==='uat')&&s.n===0)return;
+    var def=TAB_DEFS.find(function(d){return d.id===s.tab;}),c=tabColor(def),l=def?def.label:s.tab;
+    var isActive=S.activeTab===s.tab;
+    h+='<div class="sc2" style="border-top-color:'+c+';'+(isActive?'box-shadow:0 0 0 2px '+c+';':'')+'" onclick="switchTab(\''+s.tab+'\')">';
+    if(s.tab==='report'){
+      h+='<div class="sn" style="color:'+c+';font-size:2rem">📋</div>';
+      h+='<div class="sl">'+esc(l)+'</div>';
+      h+='<button onclick="event.stopPropagation();runMismatchScan()" style="margin-top:8px;font-size:11px;padding:4px 10px;border:1px solid '+c+';color:'+c+';background:#fff;border-radius:6px;cursor:pointer;font-weight:600">▶ Run Scan</button>';
+    } else {
+      h+='<div class="sn" style="color:'+c+'">'+s.n+'</div>';
+      h+='<div class="sl">'+esc(l)+'</div>';
+    }
+    h+='</div>';
+  });
+  document.getElementById('statGrid').innerHTML=h;
+}
 
 function buildTabs(){var pN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length;var uN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length;var h='';TAB_DEFS.forEach(function(t){if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0))return;var cnt=getTabIssues(t.id).length,active=S.activeTab===t.id,c=tabColor(t);h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+c:'')+'">'+esc(t.label)+'<span class="tc">'+cnt+'</span></button>';});document.getElementById('tabsWrap').innerHTML=h;}
 function switchTab(name){S.activeTab=name;document.getElementById('searchBar').style.display=name==='report'?'none':'flex';if(name==='closed')S.sortState={col:'closed',dir:-1};buildTabs();renderMain();}
@@ -470,7 +499,6 @@ function mkParentPicker(issue,badgeHtml,descHtml){
 
 function renderExcReason(issue){
   var parts=[];
-
   var autoParents=findAutoCheckedParents(issue.id);
   if(autoParents.length){
     autoParents.forEach(function(ap){
@@ -484,37 +512,21 @@ function renderExcReason(issue){
       parts.push(h);
     });
   }
-
   var ai=getAutoClosedItems(issue);
   if(ai.length&&!autoParents.length){
     var h2='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';
     ai.forEach(function(t){h2+='<div class="acit">'+esc(t)+'</div>';});
     parts.push(h2+'</div>');
   }
-
-  if(isNIP(issue)){
-    parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
-  }
-
+  if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
   if(!parts.length){
-    var isCsItem=issue.labels.some(function(l){
-      var ll=l.toLowerCase();
-      return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';
-    })||hasCS(issue);
-
+    var isCsItem=issue.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';})||hasCS(issue);
     if(isCsItem&&!isReferencedInTaskItem(issue.id)){
-      parts.push(mkParentPicker(issue,
-        '<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not tracked in any CS Task Item</span>',
-        'This issue has a CS label but is not referenced in any open CS Task Item checklist.'
-      ));
+      parts.push(mkParentPicker(issue,'<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not tracked in any CS Task Item</span>','This issue has a CS label but is not referenced in any open CS Task Item checklist.'));
     } else {
-      parts.push(mkParentPicker(issue,
-        '<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>',
-        null
-      ));
+      parts.push(mkParentPicker(issue,'<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>',null));
     }
   }
-
   return parts.join('<div style="margin-top:4px"></div>');
 }
 
@@ -590,7 +602,6 @@ async function scanTrackingIssue(ti){
   var freshBody='';
   try{var fresh=await ghFetch('/repos/'+ti.repo+'/issues/'+ti.id);freshBody=fresh.body||'';}
   catch(e){freshBody=ti.body||'';}
-
   var reviewed=loadReviewed();
   var mismatches=[];
   var lines=freshBody.split('\n');
@@ -605,37 +616,33 @@ async function scanTrackingIssue(ti){
     if(reviewed.indexOf(ti.id+'_'+issueNum)!==-1)continue;
     try{
       var data=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum);
-      console.log('[scan] tracking #'+ti.id+' → #'+issueNum+' state='+data.state);
       if(data.state==='open'){
-        console.log('[scan] FLAGGING #'+issueNum+' — open but checked off');
         mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:false});
       } else if(data.state==='closed'){
-        console.log('[scan] FLAGGING #'+issueNum+' — closed and checked, needs review');
         mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:true,closedAt:data.closed_at||'',closedByUser:(data.closed_by&&data.closed_by.login)||''});
       }
-    }catch(e){console.warn('[scan] fetch failed for #'+issueNum,e.message);}
+    }catch(e){}
   }
   return mismatches;
 }
 
 async function runMismatchScan(){
   if(_scanning)return;
-  _scanning=true;_scanResults=null;renderReport();
+  _scanning=true;_scanResults=null;
+  S.activeTab='report';
+  document.getElementById('searchBar').style.display='none';
+  buildTabs();renderReport();
   var tracking=getScanTrackingIssues();
-  console.log('[scan] manual — '+tracking.length+' tracking issues');
   var mismatches=[];
   for(var t=0;t<tracking.length;t++){
     var found=await scanTrackingIssue(tracking[t]);
     mismatches=mismatches.concat(found);
   }
-  console.log('[scan] done — '+mismatches.length+' mismatches');
   _scanResults=mismatches;_scanning=false;renderReport();
 }
 
-
 function runScanInBackground(){
   var tracking=getScanTrackingIssues();
-  console.log('[scan] background — '+tracking.length+' tracking issues');
   _scanning=true;_scanResults=null;
   if(S.activeTab==='report')renderReport();
   var mismatches=[];
@@ -643,8 +650,6 @@ function runScanInBackground(){
   function next(){
     if(idx>=tracking.length){
       _scanResults=mismatches;_scanning=false;
-      console.log('[scan] background done — '+mismatches.length+' mismatches');
-      // Always switch to report tab and render when scan completes with results
       if(mismatches.length>0){
         S.activeTab='report';
         document.getElementById('searchBar').style.display='none';
@@ -653,8 +658,7 @@ function runScanInBackground(){
       if(S.activeTab==='report')renderReport();
       return;
     }
-    var ti=tracking[idx++];
-    scanTrackingIssue(ti).then(function(found){mismatches=mismatches.concat(found);next();}).catch(function(){next();});
+    scanTrackingIssue(tracking[idx++]).then(function(found){mismatches=mismatches.concat(found);next();}).catch(function(){next();});
   }
   next();
 }
@@ -671,17 +675,17 @@ function clearHistory(){if(!confirm('Clear all report history?'))return;localSto
 function renderMismatchPanel(){
   var h='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #f59e0b">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
-  h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Mismatch Scanner</div>';
-  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Shows all checked boxes where the linked issue is closed. Click ✓ Reviewed to dismiss ones that are correct — dismissals are saved permanently.</div></div>';
+  h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Review</div>';
+  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">All checked boxes where the linked issue is closed. Click ✓ Reviewed to dismiss — saved permanently.</div></div>';
   if(_scanning)h+='<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>';
   else h+='<button class="btn-p" onclick="runMismatchScan()" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
   h+='</div>';
   if(_scanResults===null&&!_scanning){
-    h+='<div style="font-size:13px;color:#9ca3af">Scan runs automatically on page load and every 15 minutes. Click Run Scan to trigger manually.</div>';
+    h+='<div style="font-size:13px;color:#9ca3af">Scan runs automatically on page load and every 15 minutes.</div>';
   } else if(_scanning){
     h+='<div style="font-size:13px;color:#9ca3af">Checking each tracked item against GitHub...</div>';
   } else if(_scanResults.length===0){
-    h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found. All checked boxes have been reviewed.</div>';
+    h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> All checked boxes reviewed — nothing needs attention.</div>';
   } else {
     h+='<div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">⚠ '+_scanResults.length+' item'+(+_scanResults.length!==1?'s':'')+' need review:</div>';
     h+='<div style="display:flex;flex-direction:column;gap:8px">';
@@ -709,11 +713,7 @@ function renderMismatchPanel(){
   return h;
 }
 
-async function uncheckMismatch(idx){
-  var r=_scanResults[idx];if(!r)return;
-  await uncheckInParent(r.trackingIssue.id,r.trackingIssue.repo,r.childId);
-  _scanResults.splice(idx,1);renderReport();
-}
+async function uncheckMismatch(idx){var r=_scanResults[idx];if(!r)return;await uncheckInParent(r.trackingIssue.id,r.trackingIssue.repo,r.childId);_scanResults.splice(idx,1);renderReport();}
 
 function renderReport(){
   var snap=getCurrentSnapshot(),history=loadHistory(),excCount=getExceptions().length,canSave=snap&&excCount===0;
