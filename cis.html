@@ -567,9 +567,15 @@ async function scanTrackingIssue(ti){
   try{
     var tl=await ghFetch('/repos/'+ti.repo+'/issues/'+ti.id+'/timeline?per_page=100');
     if(Array.isArray(tl)){
-      timelineEdits=tl.filter(function(ev){
-        return ev.event==='edited'&&ev.changes&&ev.changes.body&&ev.actor&&ev.actor.type!=='Bot'&&ev.actor.login!=='github-actions[bot]';
+      var allEdits=tl.filter(function(ev){return ev.event==='edited';});
+      console.log('[scan] tracking #'+ti.id+' — '+allEdits.length+' edited events total');
+      allEdits.forEach(function(ev,i){
+        console.log('[scan] tracking #'+ti.id+' edit['+i+']: actor='+( ev.actor&&ev.actor.login)+' type='+(ev.actor&&ev.actor.type)+' has_body_changes='+(ev.changes&&!!ev.changes.body)+' has_body_from='+(ev.changes&&ev.changes.body&&!!ev.changes.body.from));
       });
+      timelineEdits=allEdits.filter(function(ev){
+        return ev.changes&&ev.changes.body&&ev.actor&&ev.actor.type!=='Bot'&&ev.actor.login!=='github-actions[bot]';
+      });
+      console.log('[scan] tracking #'+ti.id+' — '+timelineEdits.length+' human body edits with content');
     }
   }catch(e){console.warn('[scan] timeline fetch failed for tracking #'+ti.id,e.message);}
 
