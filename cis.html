@@ -747,7 +747,9 @@ async function searchParent(issueId,repo){
 
 async function setParent(issueId,repo,parentId,parentTitle){
   var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});
-  var method='';
+  var succeeded=false;
+
+  // Attempt 1: sub_issues beta API
   try{
     var r=await fetch('https://api.github.com/repos/'+repo+'/issues/'+parentId+'/sub_issues',{
       method:'POST',
@@ -755,25 +757,39 @@ async function setParent(issueId,repo,parentId,parentTitle){
       headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
       body:JSON.stringify({sub_issue_id:issueId})
     });
-    if(r.ok){method='sub_issues API';}
-    else{throw new Error('sub_issues returned '+r.status);}
+    if(r.ok){
+      succeeded=true;
+      console.log('Parent set via sub_issues API — #'+issueId+' → #'+parentId);
+    } else {
+      console.log('sub_issues API returned '+r.status+', trying fallback');
+    }
   }catch(e1){
+    console.log('sub_issues API failed: '+e1.message);
+  }
+
+  // Attempt 2: PATCH the child issue body to add a parent reference line
+  if(!succeeded){
     try{
-      var parentData=await ghFetch('/repos/'+repo+'/issues/'+parentId);
-      var existingBody=parentData.body||'';
-      var childRef='- [ ] #'+issueId;
-      if(existingBody.indexOf('- [ ] #'+issueId)===-1&&existingBody.indexOf('- [x] #'+issueId)===-1){
-        var newBody=existingBody.trimEnd()+'\n\n'+childRef;
-        await ghPatch('/repos/'+repo+'/issues/'+parentId,{body:newBody});
+      var childData=await ghFetch('/repos/'+repo+'/issues/'+issueId);
+      var existingBody=childData.body||'';
+      var parentRef='\n\n**Parent:** #'+parentId+' '+parentTitle;
+      // Only add if not already there
+      if(existingBody.indexOf('**Parent:** #'+parentId)===-1){
+        await ghPatch('/repos/'+repo+'/issues/'+issueId,{body:existingBody.trimEnd()+parentRef});
       }
-      method='body checklist';
+      succeeded=true;
+      console.log('Parent set via child body reference — #'+issueId+' → #'+parentId);
     }catch(e2){
-      alert('Could not link issues:\n• Sub-issues API: '+e1.message+'\n• Body fallback: '+e2.message);
+      alert('Could not set parent:\n'+e2.message);
       return;
     }
   }
-  if(issue)issue.parent={issueNumber:parentId};
-  console.log('Parent set via',method,'— #'+issueId,'→ #'+parentId);
+
+  // Update local state and save to cache so it survives refresh
+  if(issue){
+    issue.parent={issueNumber:parentId};
+    saveCache();
+  }
   renderMain();
 }
 
