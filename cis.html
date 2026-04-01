@@ -177,6 +177,9 @@ tr:hover td{background:#f9fafb}
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
+// Labels that actively route an issue OUT of New Issues into CS Items/other tabs
+// 'cs item' alone is just a tag and should NOT exclude from New Issues
+var CS_ROUTING_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item'];
 var TAB_DEFS=[
   {id:'newitems',label:'New Issues',color:'#0891b2'},
   {id:'exceptions',label:'Exceptions',color:'#b91c1c'},
@@ -310,7 +313,7 @@ function sortLbls(labels){
 function ageDays(d){return Math.floor((Date.now()-new Date(d).getTime())/86400000);}
 function ageCls(d){return d<3?'ao':d<7?'aw':'ab';}
 function todayStr(){var d=new Date();return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
-function hasCS(i){return i.labels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});}
+function hasCS(i){return i.labels.some(function(l){return CS_ROUTING_LABELS.indexOf(l.toLowerCase())!==-1;});}
 function lsort(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}
 function sortLbls(labels){var a=labels.filter(function(l){return l.toLowerCase()==='cs item';});var b=labels.filter(function(l){return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs item';}).sort(lsort);var c=labels.filter(function(l){return l.toLowerCase().indexOf('cs ')!==0;}).sort(lsort);return a.concat(b).concat(c);}
 function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
@@ -477,18 +480,7 @@ async function loadIssues(){
   S.issues=open;S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
   document.getElementById('dashTitle').textContent='📋 CentralView '+(S.activeProfile?S.activeProfile.name+' Issues Hub':'Issues Hub');
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
-  // Debug: log issue 11256 if present
-  var dbg=open.find(function(i){return i.id===11256;});
-  if(dbg){
-    console.log('DEBUG #11256 found — labels:',JSON.stringify(dbg.labels),'parent:',JSON.stringify(dbg.parent),'isException:',isException(dbg),'hasCS:',hasCS(dbg),'isNIP:',isNIP(dbg),'ignored:',(S.ignored.indexOf('11256_'+dbg.repo)!==-1));
-  } else {
-    console.log('DEBUG #11256 NOT in open array. Checking raw GitHub response...');
-    // Check if it came back as a PR or was skipped
-    try{
-      var raw=await ghFetch('/repos/'+repo+'/issues/11256');
-      console.log('DEBUG #11256 raw state:'+raw.state+' is_pr:'+(!!raw.pull_request)+' repo:'+repo);
-    }catch(e){console.log('DEBUG #11256 fetch failed:'+e.message);}
-  }
+}
 }
 
 // ── Issue logic ───────────────────────────────────────────────────────────────
