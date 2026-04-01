@@ -603,9 +603,11 @@ async function scanTrackingIssue(ti){
             var evNames=childTl.map(function(ev){return ev.event+(ev.commit_id?'[cid]':'')+(ev.commit_url?'[curl]':'')+(ev.source?'[src:'+ev.source.type+']':'');});
             console.log('[scan] #'+issueNum+' timeline: '+evNames.join(', '));
             childTl.forEach(function(ev){
-              if(ev.event==='closed'&&(ev.commit_id||ev.commit_url)){prClosedAt=new Date(ev.created_at||data.closed_at).getTime();}
+              // Only flag as PR-closed if there is a direct commit link on the closed event
+              // or a merged event — do NOT use cross-referenced as that doesn't mean auto-close
+              if(ev.event==='closed'&&ev.commit_id){prClosedAt=new Date(ev.created_at||data.closed_at).getTime();}
+              if(ev.event==='closed'&&ev.commit_url&&!ev.actor){prClosedAt=new Date(ev.created_at||data.closed_at).getTime();}
               if(ev.event==='merged'){prClosedAt=new Date(ev.created_at||data.closed_at).getTime();}
-              if(ev.event==='cross-referenced'&&ev.source&&ev.source.issue&&ev.source.issue.pull_request&&ev.source.issue.state==='closed'){if(!prClosedAt)prClosedAt=new Date(ev.created_at||data.closed_at).getTime();}
             });
           }
           console.log('[scan] #'+issueNum+' prClosedAt='+(prClosedAt?new Date(prClosedAt).toISOString():'null'));
