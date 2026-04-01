@@ -7,7 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9fafb;color:#1a1a1a;min-height:100vh;font-size:15px}
+body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9fafb;color:#1a1a1a;min-height:100vh;font-size:16px}
 a{color:#4338ca;text-decoration:none}a:hover{text-decoration:underline}
 .hdr{background:linear-gradient(135deg,#1e1b4b 0%,#4338ca 60%,#6366f1 100%);padding:16px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
 .hdr-in{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
@@ -651,6 +651,12 @@ function runScanInBackground(){
     if(idx>=tracking.length){
       _scanResults=mismatches;_scanning=false;
       console.log('[scan] background done — '+mismatches.length+' mismatches');
+      // Always switch to report tab and render when scan completes with results
+      if(mismatches.length>0){
+        S.activeTab='report';
+        document.getElementById('searchBar').style.display='none';
+        buildTabs();
+      }
       if(S.activeTab==='report')renderReport();
       return;
     }
@@ -682,15 +688,15 @@ function renderMismatchPanel(){
   } else if(_scanning){
     h+='<div style="font-size:13px;color:#9ca3af">Checking each tracked item against GitHub...</div>';
   } else if(_scanResults.length===0){
-    h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found.</div>';
+    h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found. All checked boxes have been reviewed.</div>';
   } else {
-    h+='<div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">⚠ '+_scanResults.length+' mismatch'+(+_scanResults.length!==1?'es':'')+' found:</div>';
+    h+='<div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">⚠ '+_scanResults.length+' item'+(+_scanResults.length!==1?'s':'')+' need review:</div>';
     h+='<div style="display:flex;flex-direction:column;gap:8px">';
     _scanResults.forEach(function(r,idx){
       h+='<div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:9px;padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">';
       h+='<div style="flex:1;min-width:200px">';
       h+='<div style="font-size:12px;color:#6b7280;margin-bottom:3px">Tracking: <a href="'+esc(r.trackingIssue.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+r.trackingIssue.id+' '+esc(r.trackingIssue.title)+'</a></div>';
-      h+='<div style="font-size:13px;font-weight:600"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:'+(r.closedButChecked?'#7c3aed':'#dc2626')+'">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
+      h+='<div style="font-size:14px;font-weight:600"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:'+(r.closedButChecked?'#7c3aed':'#dc2626')+'">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
       if(r.closedButChecked){
         h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">Closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'')+' — needs review</span></div>';
       } else {
