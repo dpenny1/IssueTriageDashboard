@@ -544,6 +544,11 @@ function renderMain(){renderStats();buildTabs();hideErr('dashErr');if(S.activeTa
 
 // ── Mismatch Scanner (single shared implementation) ───────────────────────────
 var _scanResults=null,_scanning=false;
+var REVIEWED_KEY='cis_scan_reviewed_v1';
+function loadReviewed(){try{var v=localStorage.getItem(REVIEWED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+function saveReviewed(r){try{localStorage.setItem(REVIEWED_KEY,JSON.stringify(r));}catch(e){}}
+function markReviewed(trackingId,childId){var r=loadReviewed();var key=trackingId+'_'+childId;if(r.indexOf(key)===-1)r.push(key);saveReviewed(r);if(_scanResults)_scanResults=_scanResults.filter(function(x){return !(x.trackingIssue.id===trackingId&&x.childId===childId);});renderReport();}
+function isReviewed(trackingId,childId){return loadReviewed().indexOf(trackingId+'_'+childId)!==-1;}
 
 function getScanTrackingIssues(){
   return S.issues.filter(function(i){
@@ -712,7 +717,7 @@ function renderMismatchPanel(){
       if(r.closedButChecked)h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'')+' by PR — auto-checked</span></div>';
       else h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Issue still open but checked off</span></div>';
       h+='<div style="font-size:11px;color:#9ca3af;margin-top:3px;font-family:monospace">'+esc(r.lineText)+'</div></div>';
-      h+='<div style="display:flex;gap:6px;align-items:center;flex-shrink:0"><a href="'+esc(r.childUrl)+'" target="_blank" class="btn-sm" style="font-size:11px;text-decoration:none">👁 View</a><button class="btn-sm" style="font-size:11px;border-color:#f59e0b;color:#92400e;background:#fffbeb" onclick="uncheckMismatch('+idx+')">☐ Uncheck</button></div></div>';
+      h+='<div style="display:flex;gap:6px;align-items:center;flex-shrink:0"><a href="'+esc(r.childUrl)+'" target="_blank" class="btn-sm" style="font-size:11px;text-decoration:none">👁 View</a><button class="btn-sm" style="font-size:11px;border-color:#f59e0b;color:#92400e;background:#fffbeb" onclick="uncheckMismatch('+idx+')">☐ Uncheck</button><button class="btn-sm" style="font-size:11px;border-color:#86efac;color:#166534;background:#f0fdf4" onclick="markReviewed('+r.trackingIssue.id+','+r.childId+')">✓ Reviewed</button></div></div>';
     });
     h+='</div>';
   }
