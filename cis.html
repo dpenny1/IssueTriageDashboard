@@ -161,9 +161,7 @@ tr:hover td{background:#f9fafb}
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
 
-// CS_LABELS: used for closed issue filtering and loading
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
-// CS_ROUTING_LABELS: labels that route issues OUT of New Issues — 'cs item' alone does not
 var CS_ROUTING_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item'];
 
 var TAB_DEFS=[
@@ -513,11 +511,8 @@ function isException(issue){
   if(issue.state!=='open')return false;
   if(isExempt(issue))return false;
   if(issue.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';}))return false;
-  // Auto-checked in tracking issue — exception regardless of parent
   if(!issue.parent&&findAutoCheckedParents(issue.id).length>0)return true;
-  // Still in New Issues pipeline — exception regardless of parent
   if(isNIP(issue))return true;
-  // Remaining checks only apply to parentless issues
   if(issue.parent)return false;
   if(hasCS(issue))return true;
   if(getAutoClosedItems(issue).length>0)return true;
@@ -674,13 +669,20 @@ function renderExcReason(issue){
   if(!parts.length){
     var key=issue.id+'_'+issue.repo;
     parts.push(
-      '<div style="display:flex;flex-direction:column;gap:6px">'+
+      '<div style="display:flex;flex-direction:column;gap:6px" id="parentPicker_'+key+'">'+
       '<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>'+
       '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'+
-      '<input type="text" id="psearch_'+key+'" placeholder="# or title..." autocomplete="off" style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:160px" oninput="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')"/>'+
+      '<input type="text" id="psearch_'+key+'" placeholder="# or title..." autocomplete="off" '+
+        'style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:160px" '+
+        'oninput="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')"/>'+
       '<button class="btn-sm" style="font-size:11px;padding:3px 9px" onclick="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')">🔍</button>'+
       '</div>'+
       '<div id="presults_'+key+'" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:320px"></div>'+
+      '<div id="pselected_'+key+'" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 12px;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'+
+        '<span id="pselectedLabel_'+key+'" style="font-size:12px;font-weight:600;color:#166534;flex:1"></span>'+
+        '<button class="btn-sm" style="font-size:11px;border-color:#86efac;color:#166534;background:#dcfce7" onclick="clearParentSelection(\''+key+'\')">✕ Clear</button>'+
+        '<button class="btn-p" style="font-size:12px;padding:5px 14px" id="psaveBtn_'+key+'" onclick="saveParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')">💾 Save Parent</button>'+
+      '</div>'+
       '</div>'
     );
   }
@@ -707,11 +709,47 @@ async function searchParent(issueId,repo){
     if(!results.length){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">No issues found.</div>';return;}
     var h='';
     results.slice(0,8).forEach(function(r){
-      h+='<div style="padding:8px 12px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="setParent('+issueId+',\''+esc(repo)+'\','+r.number+',\''+esc(r.title.replace(/'/g,"\\'"))+'\')">'+
-      '<span style="color:#6b7280;font-weight:600">#'+r.number+'</span> <span style="color:#1e1b4b;font-weight:500">'+esc(r.title)+'</span></div>';
+      h+='<div style="padding:8px 12px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:12px" '+
+        'onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" '+
+        'onclick="selectParent(\''+key+'\','+r.number+',\''+esc(r.title.replace(/'/g,"\\'"))+'\')">'+
+        '<span style="color:#6b7280;font-weight:600">#'+r.number+'</span> '+
+        '<span style="color:#1e1b4b;font-weight:500">'+esc(r.title)+'</span></div>';
     });
     el.innerHTML=h;
   }catch(e){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#dc2626">Error: '+esc(e.message)+'</div>';}
+}
+
+function selectParent(key,parentId,parentTitle){
+  var el=document.getElementById('presults_'+key);
+  if(el)el.style.display='none';
+  var picker=document.getElementById('parentPicker_'+key);
+  if(picker){picker.dataset.selectedId=parentId;picker.dataset.selectedTitle=parentTitle;}
+  var sel=document.getElementById('pselected_'+key);
+  var lbl=document.getElementById('pselectedLabel_'+key);
+  if(sel&&lbl){
+    lbl.textContent='Selected: #'+parentId+' — '+parentTitle;
+    sel.style.display='flex';
+  }
+}
+
+function clearParentSelection(key){
+  var picker=document.getElementById('parentPicker_'+key);
+  if(picker){delete picker.dataset.selectedId;delete picker.dataset.selectedTitle;}
+  var sel=document.getElementById('pselected_'+key);
+  if(sel)sel.style.display='none';
+  var inp=document.getElementById('psearch_'+key);
+  if(inp)inp.value='';
+}
+
+async function saveParent(issueId,repo){
+  var key=issueId+'_'+repo;
+  var picker=document.getElementById('parentPicker_'+key);
+  if(!picker||!picker.dataset.selectedId){alert('No parent selected.');return;}
+  var parentId=parseInt(picker.dataset.selectedId);
+  var parentTitle=picker.dataset.selectedTitle||'';
+  var btn=document.getElementById('psaveBtn_'+key);
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spin"></span> Saving...';}
+  await setParent(issueId,repo,parentId,parentTitle);
 }
 
 async function setParent(issueId,repo,parentId,parentTitle){
@@ -885,7 +923,6 @@ async function runMismatchScan(){
           if(data&&data.state==='open'){
             mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:false});
           } else if(data&&data.state==='closed'){
-            // Only flag if auto-closed by a PR — manually closed + manually checked is legitimate
             var closedByPR=false,closedByUser='',closedAt=data.closed_at||'';
             if(data.closed_by&&data.closed_by.login)closedByUser=data.closed_by.login;
             try{
@@ -1022,7 +1059,6 @@ function loadHistoricalData(){
     renderProfileDd();
     return;
   }
-  // Single profile — go straight in
   var profile=profiles[0];
   S.activeProfile=profile;
   S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo;}):[profile.repo];
