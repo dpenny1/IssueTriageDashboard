@@ -104,21 +104,6 @@ tr:hover td{background:#f9fafb}
       <select id="profileSelect" onchange="onProfileSel()"><option value="">-- Select a project --</option></select>
       <div class="hint">Don't see your project? <a href="#" onclick="showCfg();return false">Configure projects</a></div>
     </div>
-    <div class="fg">
-      <label style="display:flex;align-items:center;gap:6px">GitHub Personal Access Token
-        <button onclick="toggleVault('gh')" id="vaultBtnGH" title="Token Vault" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;opacity:0.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">🔒</button>
-      </label>
-      <input type="password" id="ghToken" placeholder="ghp_..." autocomplete="new-password" onkeydown="if(event.key==='Enter')connect()"/>
-      <div id="vaultPanelGH" style="display:none"><div class="vault-panel" id="vaultInnerGH"></div></div>
-    </div>
-    <div class="fg">
-      <label style="display:flex;align-items:center;gap:6px">
-        ZenHub API Token <span style="font-size:11px;color:#9ca3af;font-weight:400">(optional)</span>
-        <button onclick="toggleVault('zh')" id="vaultBtnZH" title="Token Vault" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;opacity:0.5" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">🔒</button>
-      </label>
-      <input type="password" id="zhTokenInput" placeholder="ZenHub token..." autocomplete="new-password"/>
-      <div id="vaultPanelZH" style="display:none"><div class="vault-panel" id="vaultInnerZH"></div></div>
-    </div>
     <input type="hidden" id="reposInput"/>
     <div id="setupErr" style="display:none"></div>
     <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:center">
@@ -162,7 +147,6 @@ tr:hover td{background:#f9fafb}
   </div>
 </div>
 
-<!-- Label Manager Modal -->
 <div class="modal-overlay" id="labelModal">
   <div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -176,10 +160,12 @@ tr:hover td{background:#f9fafb}
 <script>
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
+
+// CS_LABELS: used for closed issue filtering and loading
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
-// Labels that actively route an issue OUT of New Issues into CS Items/other tabs
-// 'cs item' alone is just a tag and should NOT exclude from New Issues
+// CS_ROUTING_LABELS: labels that route issues OUT of New Issues — 'cs item' alone does not
 var CS_ROUTING_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item'];
+
 var TAB_DEFS=[
   {id:'newitems',label:'New Issues',color:'#0891b2'},
   {id:'exceptions',label:'Exceptions',color:'#b91c1c'},
@@ -215,15 +201,14 @@ var Vault=(function(){
 
 var _activeVaultTarget=null;
 function toggleVault(target){
-  if(_activeVaultTarget===target){_activeVaultTarget=null;document.getElementById('vaultPanel'+target.toUpperCase()).style.display='none';document.getElementById('vaultBtn'+target.toUpperCase()).textContent='🔒';return;}
-  ['GH','ZH'].forEach(function(t){document.getElementById('vaultPanel'+t).style.display='none';document.getElementById('vaultBtn'+t).textContent='🔒';});
+  if(_activeVaultTarget===target){_activeVaultTarget=null;document.getElementById('vaultPanel'+target.toUpperCase()).style.display='none';return;}
   _activeVaultTarget=target;
   document.getElementById('vaultPanel'+target.toUpperCase()).style.display='block';
-  document.getElementById('vaultBtn'+target.toUpperCase()).textContent='🔓';
   renderVaultPanel(target);
 }
 function renderVaultPanel(target){
   var el=document.getElementById('vaultInner'+target.toUpperCase());
+  if(!el)return;
   var h='';
   if(!Vault.isUnlocked()){
     h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">🔒 Unlock Vault</div>';
@@ -242,9 +227,7 @@ function renderVaultPanel(target){
     if(tokens.length){
       h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
       tokens.forEach(function(t){
-        var badge=t.type
-          ?'<span style="font-size:10px;padding:1px 6px;border-radius:999px;font-weight:700;background:'+(t.type==='gh'?'#e0e7ff':'#d1fae5')+';color:'+(t.type==='gh'?'#3730a3':'#065f46')+';margin-left:4px">'+(t.type==='gh'?'GH':'ZH')+'</span>'
-          :'<span style="font-size:10px;color:#f59e0b;font-weight:700;margin-left:4px">⚠ untagged</span>';
+        var badge=t.type?'<span style="font-size:10px;padding:1px 6px;border-radius:999px;font-weight:700;background:'+(t.type==='gh'?'#e0e7ff':'#d1fae5')+';color:'+(t.type==='gh'?'#3730a3':'#065f46')+';margin-left:4px">'+(t.type==='gh'?'GH':'ZH')+'</span>':'<span style="font-size:10px;color:#f59e0b;font-weight:700;margin-left:4px">⚠ untagged</span>';
         h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(t.name)+'\')">'+esc(t.name)+badge+' ▶</button>';
       });
       h+='</div>';
@@ -284,10 +267,10 @@ function renderVaultPanel(target){
   el.innerHTML=h;
 }
 async function vaultUnlock(target){var pw=document.getElementById('vaultPw').value;var errEl=document.getElementById('vaultErr');if(errEl)errEl.textContent='';if(!pw){if(errEl)errEl.textContent='Enter a password.';return;}try{await Vault.unlock(pw);renderVaultPanel(target);}catch(e){if(errEl)errEl.textContent=e.message;}}
-function vaultLockAll(){Vault.lock();['GH','ZH'].forEach(function(t){document.getElementById('vaultPanel'+t).style.display='none';document.getElementById('vaultBtn'+t).textContent='🔒';});_activeVaultTarget=null;}
-async function vaultUse(target,name){try{var tok=await Vault.get(name);if(target==='gh')document.getElementById('ghToken').value=tok;else document.getElementById('zhTokenInput').value=tok;toggleVault(target);}catch(e){alert('Failed to decrypt: '+e.message);}}
-async function vaultSave(target){var name=document.getElementById('vaultNewName_'+target).value.trim();var tok=document.getElementById('vaultNewTok_'+target).value.trim();var type=document.getElementById('vaultNewType_'+target).value;var msgEl=document.getElementById('vaultSaveMsg_'+target);if(!name||!tok){msgEl.style.color='#dc2626';msgEl.textContent='Name and token required.';return;}try{await Vault.add(name,tok,type);msgEl.style.color='#059669';msgEl.textContent='"'+name+'" saved!'+(type?' Tagged as '+(type==='gh'?'GitHub':'ZenHub')+'.':[]);setTimeout(function(){renderVaultPanel(target);},600);}catch(e){msgEl.style.color='#dc2626';msgEl.textContent=e.message;}}
-function vaultSetType(name,type){Vault.setType(name,type);['GH','ZH'].forEach(function(t){var inner=document.getElementById('vaultInner'+t);if(inner&&inner.innerHTML)renderVaultPanel(t.toLowerCase());});}
+function vaultLockAll(){Vault.lock();_activeVaultTarget=null;}
+async function vaultUse(target,name){try{var tok=await Vault.get(name);if(target==='gh')document.getElementById('ghToken').value=tok;else document.getElementById('zhTokenInput').value=tok;}catch(e){alert('Failed to decrypt: '+e.message);}}
+async function vaultSave(target){var name=document.getElementById('vaultNewName_'+target).value.trim();var tok=document.getElementById('vaultNewTok_'+target).value.trim();var type=document.getElementById('vaultNewType_'+target).value;var msgEl=document.getElementById('vaultSaveMsg_'+target);if(!name||!tok){msgEl.style.color='#dc2626';msgEl.textContent='Name and token required.';return;}try{await Vault.add(name,tok,type);msgEl.style.color='#059669';msgEl.textContent='"'+name+'" saved!';setTimeout(function(){renderVaultPanel(target);},600);}catch(e){msgEl.style.color='#dc2626';msgEl.textContent=e.message;}}
+function vaultSetType(name,type){Vault.setType(name,type);}
 function vaultDel(target,name){if(!confirm('Delete "'+name+'"?'))return;Vault.del(name);renderVaultPanel(target);}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -295,13 +278,12 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 function tabColor(def){if(def&&def.labelKey&&S.labelColors[def.labelKey])return '#'+S.labelColors[def.labelKey];return def?def.color:'#6b7280';}
 function lum(h){h=(h||'cccccc').replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];var r=parseInt(h.substr(0,2),16)/255,g=parseInt(h.substr(2,2),16)/255,b=parseInt(h.substr(4,2),16)/255;return 0.2126*r+0.7152*g+0.0722*b;}
 function tfb(h){return lum(h)>0.45?'#1a1a1a':'#ffffff';}
-function lblBadge(n){
-  var key=n.toLowerCase();
-  var c=S.labelColors[key]||'e5e7eb';
-  var display=S.labelNames[key]||n;
-  return '<span class="badge" style="background:#'+c+';color:'+tfb(c)+'">'+esc(display)+'</span>';
-}
-
+function lblBadge(n){var key=n.toLowerCase();var c=S.labelColors[key]||'e5e7eb';var display=S.labelNames[key]||n;return '<span class="badge" style="background:#'+c+';color:'+tfb(c)+'">'+esc(display)+'</span>';}
+function ageDays(d){return Math.floor((Date.now()-new Date(d).getTime())/86400000);}
+function ageCls(d){return d<3?'ao':d<7?'aw':'ab';}
+function todayStr(){var d=new Date();return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
+function hasCS(i){return i.labels.some(function(l){return CS_ROUTING_LABELS.indexOf(l.toLowerCase())!==-1;});}
+function lsort(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}
 function sortLbls(labels){
   return labels.slice().sort(function(a,b){
     var da=S.labelNames[a.toLowerCase()]||a;
@@ -309,13 +291,6 @@ function sortLbls(labels){
     return da.toLowerCase().localeCompare(db.toLowerCase());
   });
 }
-
-function ageDays(d){return Math.floor((Date.now()-new Date(d).getTime())/86400000);}
-function ageCls(d){return d<3?'ao':d<7?'aw':'ab';}
-function todayStr(){var d=new Date();return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();}
-function hasCS(i){return i.labels.some(function(l){return CS_ROUTING_LABELS.indexOf(l.toLowerCase())!==-1;});}
-function lsort(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}
-function sortLbls(labels){var a=labels.filter(function(l){return l.toLowerCase()==='cs item';});var b=labels.filter(function(l){return l.toLowerCase().indexOf('cs ')===0&&l.toLowerCase()!=='cs item';}).sort(lsort);var c=labels.filter(function(l){return l.toLowerCase().indexOf('cs ')!==0;}).sort(lsort);return a.concat(b).concat(c);}
 function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveIgnored(){try{localStorage.setItem(IGNORED_KEY,JSON.stringify(S.ignored));}catch(e){}}
 function loadHistory(){try{var v=localStorage.getItem(STORAGE_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
@@ -330,12 +305,11 @@ function showErr(id,msg){var el=document.getElementById(id);el.className='err';e
 function hideErr(id){document.getElementById(id).style.display='none';}
 function showEl(id){document.getElementById(id).style.display='block';}
 function hideEl(id){document.getElementById(id).style.display='none';}
-function showSetup(){stopAutoRefresh();['dash','cfgScr'].forEach(hideEl);showEl('setup');renderProfileDd();}
 function showDash(){['setup','cfgScr'].forEach(hideEl);showEl('dash');}
 function showCfg(){['setup','dash'].forEach(hideEl);showEl('cfgScr');renderCfg();}
 function backToSetup(){['cfgScr','dash'].forEach(hideEl);showEl('setup');renderProfileDd();}
 function setStatus(html){var el=document.getElementById('loadedAt');if(el)el.innerHTML=html;}
-function renderProfileDd(){var sel=document.getElementById('profileSelect');if(!sel)return;sel.innerHTML='<option value="">-- Select a project --</option>';loadProfiles().forEach(function(p){sel.innerHTML+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});loadZHCreds();}
+function renderProfileDd(){var sel=document.getElementById('profileSelect');if(!sel)return;sel.innerHTML='<option value="">-- Select a project --</option>';loadProfiles().forEach(function(p){sel.innerHTML+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});}
 function onProfileSel(){var sel=document.getElementById('profileSelect');var p=loadProfiles().find(function(x){return x.id===sel.value;});if(!p)return;S.activeProfile=p;document.getElementById('reposInput').value=p.type==='group'?(p.repos||[]).map(function(r){return r.repo;}).join(','):p.repo;}
 
 function renderCfg(){
@@ -386,14 +360,11 @@ async function zhPost(path,body){var r=await fetch('https://api.zenhub.com'+path
 async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{headers:{'X-Authentication-Token':S.zhToken}});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
 
 async function connect(){
-  var gh=document.getElementById('ghToken').value.trim();
-  var zhTok=document.getElementById('zhTokenInput').value.trim();
   var rp=document.getElementById('reposInput').value.trim();
   hideErr('setupErr');
-  if(!gh||!rp){showErr('setupErr','Please select a project and enter your GitHub token.');return;}
-  S.ghToken=gh;S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
+  if(!S.ghToken||!rp){showErr('setupErr','Please select a project.');return;}
+  S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
   S.ignored=loadIgnored();loadZHCreds();S.repoWorkspaceMap={};
-  if(zhTok){S.zhToken=zhTok;saveZHCreds();}
   if(S.activeProfile){
     if(S.activeProfile.type==='group'){(S.activeProfile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(!S.zhWorkspace&&S.activeProfile.repos&&S.activeProfile.repos[0])S.zhWorkspace=S.activeProfile.repos[0].zhWorkspace||'';}
     else if(S.activeProfile.zhWorkspace){S.zhWorkspace=S.activeProfile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=S.activeProfile.zhWorkspace;}
@@ -409,32 +380,22 @@ async function connect(){
     btn.disabled=false;btn.textContent='▶ Load Dashboard';
     bgRefresh();return;
   }
-  try{await Promise.all([loadLabelColors(),loadIssues()]);await refreshTrackingBodies();saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();}
-  catch(e){showErr('setupErr',e.message);}
+  try{
+    await Promise.all([loadLabelColors(),loadIssues()]);
+    await refreshTrackingBodies();
+    saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();
+  }catch(e){showErr('setupErr',e.message);}
   btn.disabled=false;btn.textContent='▶ Load Dashboard';
 }
 
 function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
-async function bgRefresh(){try{await Promise.all([loadLabelColors(),loadIssues()]);await refreshTrackingBodies();saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();}catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}}
 
-async function refreshTrackingBodies(){
-  var tracking=S.issues.filter(function(i){
-    return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});
-  });
-  console.log('[refreshTrackingBodies] refreshing bodies for '+tracking.length+' CS Task Item issues');
-  for(var i=0;i<tracking.length;i++){
-    try{
-      var fresh=await ghFetch('/repos/'+tracking[i].repo+'/issues/'+tracking[i].id);
-      var oldBody=tracking[i].body||'';
-      tracking[i].body=fresh.body||'';
-      var hasChecked=tracking[i].body.match(/^\s*-\s*\[x\]/im);
-      console.log('[refreshTrackingBodies] #'+tracking[i].id+' body length: '+tracking[i].body.length+(hasChecked?' *** HAS CHECKED BOXES ***':''));
-      if(oldBody!==tracking[i].body)console.log('[refreshTrackingBodies] #'+tracking[i].id+' body CHANGED');
-    }catch(e){console.error('[refreshTrackingBodies] failed for #'+tracking[i].id,e);}
-  }
-  console.log('[refreshTrackingBodies] done — re-rendering');
-  buildTabs();
-  renderMain();
+async function bgRefresh(){
+  try{
+    await Promise.all([loadLabelColors(),loadIssues()]);
+    await refreshTrackingBodies();
+    saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();
+  }catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}
 }
 
 async function doRefresh(){
@@ -457,67 +418,56 @@ function stopAutoRefresh(){if(S.autoRefreshTimer){clearInterval(S.autoRefreshTim
 
 async function loadLabelColors(){
   for(var i=0;i<S.repos.length;i++){
-    try{
-      var lb=await ghFetch('/repos/'+S.repos[i]+'/labels?per_page=100');
-      lb.forEach(function(l){S.labelColors[l.name.toLowerCase()]=l.color;S.labelNames[l.name.toLowerCase()]=l.name;});
-    }catch(e){}
+    try{var lb=await ghFetch('/repos/'+S.repos[i]+'/labels?per_page=100');lb.forEach(function(l){S.labelColors[l.name.toLowerCase()]=l.color;S.labelNames[l.name.toLowerCase()]=l.name;});}catch(e){}
   }
 }
 async function loadZHData(){S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){console.error('ZH',repo,e.message);}}S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});await loadZHDeps();}
 async function loadZHDeps(){for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace,repoId=S.repoIds[repo];if(!S.zhToken||!ws||!repoId)continue;try{var ed=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');for(var j=0;j<(ed.epic_issues||[]).length;j++){var ep=ed.epic_issues[j];try{var edet=await zhGet('/p2/workspaces/'+ws+'/repositories/'+(ep.repo_id||repoId)+'/epics/'+ep.issue_number);(edet.issues||[]).forEach(function(child){var cr=repoForId(child.repo_id)||repo;var ci=S.issues.find(function(iss){return iss.id===child.issue_number&&iss.repo===cr;});if(ci)ci.parent={issueNumber:ep.issue_number};});}catch(e){}}}catch(e){}}}
 function repoForId(id){return Object.keys(S.repoIds).find(function(r){return S.repoIds[r]===id;})||null;}
 
+async function refreshTrackingBodies(){
+  var tracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
+  console.log('[refreshTrackingBodies] refreshing '+tracking.length+' CS Task Item issues');
+  for(var i=0;i<tracking.length;i++){
+    try{
+      var fresh=await ghFetch('/repos/'+tracking[i].repo+'/issues/'+tracking[i].id);
+      tracking[i].body=fresh.body||'';
+    }catch(e){console.error('[refreshTrackingBodies] failed #'+tracking[i].id,e);}
+  }
+  console.log('[refreshTrackingBodies] done');
+}
+
 async function loadIssues(){
   var open=[],closed=[];
   for(var i=0;i<S.repos.length;i++){
     var repo=S.repos[i];
     var od=await ghFetchAll('/repos/'+repo+'/issues?state=open',10);
-    od.forEach(function(iss){if(iss.pull_request)return;open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:iss.parent_issue_url?{url:iss.parent_issue_url}:null});});
+    od.forEach(function(iss){
+      if(iss.pull_request)return;
+      open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:iss.parent_issue_url?{url:iss.parent_issue_url}:null});
+    });
     var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100');
-    if(!Array.isArray(cd))cd=[];var count=0;
-    for(var j=0;j<cd.length;j++){var iss=cd[j];if(iss.pull_request)continue;var lbls=iss.labels.map(function(l){return l.name;});if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))continue;closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:null});if(++count>=50)break;}
+    if(!Array.isArray(cd))cd=[];
+    var count=0;
+    for(var j=0;j<cd.length;j++){
+      var iss=cd[j];
+      if(iss.pull_request)continue;
+      var lbls=iss.labels.map(function(l){return l.name;});
+      if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))continue;
+      closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:null});
+      if(++count>=50)break;
+    }
   }
   S.issues=open;
   S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
   document.getElementById('dashTitle').textContent='📋 CentralView '+(S.activeProfile?S.activeProfile.name+' Issues Hub':'Issues Hub');
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
 }
-}
 
 // ── Issue logic ───────────────────────────────────────────────────────────────
 function getAutoClosedItems(issue){if(!issue.labels.some(function(l){return l.toLowerCase()==='cs task item';})||issue.state!=='open')return[];var hits=[];(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(chk&&/#\d+/.test(chk[1].trim()))hits.push(chk[1].trim());});return hits;}
 
-// Find which CS Task Item tracking issues have a checked box referencing this issue number
-// Find which CS Task Item tracking issues have a checked box referencing this issue number
-// Works for both open AND closed issues
 function findAutoCheckedParents(issueId){
-  var parents=[];
-  var taskItems=S.issues.filter(function(ti){
-    return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}) && ti.state==='open';
-  });
-  console.log('[findAutoCheckedParents] checking issueId='+issueId+' against '+taskItems.length+' CS Task Item issues');
-  taskItems.forEach(function(ti){
-    var lines=(ti.body||'').split('\n');
-    lines.forEach(function(line){
-      var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
-      if(!chk)return;
-      var ref=chk[1].trim();
-      var m=ref.match(/#(\d+)/);
-      if(m){
-        console.log('[findAutoCheckedParents] tracking #'+ti.id+' has checked ref #'+m[1]+' (looking for #'+issueId+')');
-        if(parseInt(m[1])===issueId){
-          console.log('[findAutoCheckedParents] MATCH FOUND in tracking issue #'+ti.id);
-          parents.push({trackingIssue:ti,lineText:ref,fullLine:line.trim()});
-        }
-      }
-    });
-  });
-  return parents;
-}
-
-// Same as above but scans for a specific issue number — used by mismatch scanner
-// and by isException to catch closed issues that are incorrectly checked
-function findAutoCheckedParentsForId(issueId){
   var parents=[];
   S.issues.forEach(function(ti){
     if(!ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return;
@@ -545,10 +495,7 @@ async function uncheckInParent(trackingIssueId,trackingRepo,childIssueId){
     if(!chk)return line;
     var ref=chk[2];
     var m=ref.match(/#(\d+)/);
-    if(m&&parseInt(m[1])===childIssueId){
-      changed=true;
-      return chk[1]+'[ ]'+chk[2];
-    }
+    if(m&&parseInt(m[1])===childIssueId){changed=true;return chk[1]+'[ ]'+chk[2];}
     return line;
   });
   if(!changed){alert('Could not find the checked line to uncheck.');return;}
@@ -558,14 +505,15 @@ async function uncheckInParent(trackingIssueId,trackingRepo,childIssueId){
     renderMain();
   }catch(e){alert('Failed to uncheck: '+e.message);}
 }
+
 function isNIP(issue){return issue.pipeline&&issue.pipeline.pipelineName.toLowerCase()==='new issues';}
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
+
 function isException(issue){
   if(issue.state!=='open')return false;
   if(isExempt(issue))return false;
   if(issue.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';}))return false;
-  // Only flag auto-checked if the issue has NO parent — if it has a parent it was
-  // legitimately completed and someone manually checked it off
+  // Only flag auto-checked if parentless — parented issues with checked boxes were legitimately completed
   if(!issue.parent&&findAutoCheckedParents(issue.id).length>0)return true;
   if(issue.parent)return false;
   if(hasCS(issue))return true;
@@ -573,12 +521,36 @@ function isException(issue){
   if(isNIP(issue))return true;
   return false;
 }
+
 function populateFilters(){var ls={},rs={},ps={};S.issues.concat(S.closedIssues).forEach(function(i){i.labels.forEach(function(l){ls[l]=1;});rs[i.repo]=1;if(i.pipeline)ps[i.pipeline.pipelineName]=1;});var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');fl.innerHTML='<option value="">All labels</option>';Object.keys(ls).sort(lsort).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});fr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});fp.innerHTML='<option value="">All pipelines</option>';Object.keys(ps).sort(lsort).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});}
 function clearFilters(){['searchInput','filterLabel','filterRepo','filterPipeline'].forEach(function(id){document.getElementById(id).value='';});renderMain();}
 function getExceptions(){return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isException(i);});}
-function getTabIssues(tab){var t=tab||S.activeTab;if(t==='exceptions')return getExceptions();if(t==='ignored')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;});if(t==='closed')return S.closedIssues.slice().sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});if(t==='testing'){var oT=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});var cT=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});return oT.concat(cT);}if(t==='taskitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';});});if(t==='newitems')return base.filter(function(i){return !hasCS(i);});if(t==='prod')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});});if(t==='uat')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});if(t==='csitems')return base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';});});return base;}
+function getTabIssues(tab){
+  var t=tab||S.activeTab;
+  if(t==='exceptions')return getExceptions();
+  if(t==='ignored')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;});
+  if(t==='closed')return S.closedIssues.slice().sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
+  if(t==='testing'){
+    var oT=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
+    var cT=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
+    return oT.concat(cT);
+  }
+  if(t==='taskitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
+  var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';});});
+  if(t==='newitems')return base.filter(function(i){return !hasCS(i);});
+  if(t==='prod')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});});
+  if(t==='uat')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});
+  if(t==='csitems')return base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';});});
+  return base;
+}
 function applyFilters(list){var q=(document.getElementById('searchInput').value||'').toLowerCase(),fl=(document.getElementById('filterLabel').value||'').toLowerCase(),fr=document.getElementById('filterRepo').value||'',fp=document.getElementById('filterPipeline').value||'';if(q)list=list.filter(function(i){return i.title.toLowerCase().indexOf(q)!==-1||String(i.id).indexOf(q)!==-1||i.labels.join(' ').toLowerCase().indexOf(q)!==-1||i.repo.toLowerCase().indexOf(q)!==-1||i.assignees.join(' ').toLowerCase().indexOf(q)!==-1;});if(fl)list=list.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()===fl;});});if(fr)list=list.filter(function(i){return i.repo===fr;});if(fp)list=list.filter(function(i){return i.pipeline&&i.pipeline.pipelineName===fp;});return list;}
-function sortIssues(list,tab){if(tab==='taskitem')return list.slice().sort(function(a,b){var at=a.title.toLowerCase(),bt=b.title.toLowerCase();var aP=at.indexOf('cs production issues')===0,bP=bt.indexOf('cs production issues')===0;var aF=at.indexOf('cs features')===0,bF=bt.indexOf('cs features')===0;var aCS=at.indexOf('cs ')===0,bCS=bt.indexOf('cs ')===0;if(aP&&!bP)return -1;if(!aP&&bP)return 1;if(aF&&!bF)return -1;if(!aF&&bF)return 1;if(aCS&&!bCS)return -1;if(!aCS&&bCS)return 1;return at.localeCompare(bt);});if(tab==='closed'){var col=S.sortState.col==='closed'?'closed':'closed';var dir=S.sortState.col==='closed'?S.sortState.dir:-1;return list.slice().sort(function(a,b){var av=new Date(a.closedAt||0),bv=new Date(b.closedAt||0);if(av<bv)return -dir;if(av>bv)return dir;return 0;});}var col=S.sortState.col,dir=S.sortState.dir;if(tab==='newitems'&&col==='age')dir=1;return list.slice().sort(function(a,b){var av,bv;if(col==='age'||col==='created'){av=new Date(a.createdAt);bv=new Date(b.createdAt);}else if(col==='title'){av=a.title.toLowerCase();bv=b.title.toLowerCase();}else if(col==='repo'){av=a.repo;bv=b.repo;}else if(col==='id'){av=a.id;bv=b.id;}else if(col==='closed'){av=new Date(a.closedAt||0);bv=new Date(b.closedAt||0);}else{av=new Date(a.createdAt);bv=new Date(b.createdAt);}if(av<bv)return -dir;if(av>bv)return dir;return 0;});}
+function sortIssues(list,tab){
+  if(tab==='taskitem')return list.slice().sort(function(a,b){var at=a.title.toLowerCase(),bt=b.title.toLowerCase();var aP=at.indexOf('cs production issues')===0,bP=bt.indexOf('cs production issues')===0;var aF=at.indexOf('cs features')===0,bF=bt.indexOf('cs features')===0;var aCS=at.indexOf('cs ')===0,bCS=bt.indexOf('cs ')===0;if(aP&&!bP)return -1;if(!aP&&bP)return 1;if(aF&&!bF)return -1;if(!aF&&bF)return 1;if(aCS&&!bCS)return -1;if(!aCS&&bCS)return 1;return at.localeCompare(bt);});
+  if(tab==='closed'){var dir=S.sortState.col==='closed'?S.sortState.dir:-1;return list.slice().sort(function(a,b){var av=new Date(a.closedAt||0),bv=new Date(b.closedAt||0);if(av<bv)return -dir;if(av>bv)return dir;return 0;});}
+  var col=S.sortState.col,dir=S.sortState.dir;
+  if(tab==='newitems'&&col==='age')dir=1;
+  return list.slice().sort(function(a,b){var av,bv;if(col==='age'||col==='created'){av=new Date(a.createdAt);bv=new Date(b.createdAt);}else if(col==='title'){av=a.title.toLowerCase();bv=b.title.toLowerCase();}else if(col==='repo'){av=a.repo;bv=b.repo;}else if(col==='id'){av=a.id;bv=b.id;}else if(col==='closed'){av=new Date(a.closedAt||0);bv=new Date(b.closedAt||0);}else{av=new Date(a.createdAt);bv=new Date(b.createdAt);}if(av<bv)return -dir;if(av>bv)return dir;return 0;});
+}
 function mkTh(col,label){var active=S.sortState.col===col;return '<th class="'+(active?'sorted':'')+'" onclick="doSort(\''+col+'\')">'+label+' <span class="si">'+(active?(S.sortState.dir===1?'▲':'▼'):'▲')+'</span></th>';}
 function doSort(col){if(S.sortState.col===col)S.sortState.dir*=-1;else{S.sortState.col=col;S.sortState.dir=1;}renderMain();}
 
@@ -614,9 +586,8 @@ function buildTabs(){var pN=S.issues.filter(function(i){return S.ignored.indexOf
 function switchTab(name){
   S.activeTab=name;
   document.getElementById('searchBar').style.display=name==='report'?'none':'flex';
-  if(name==='closed') S.sortState={col:'closed',dir:-1};
-  buildTabs();
-  renderMain();
+  if(name==='closed')S.sortState={col:'closed',dir:-1};
+  buildTabs();renderMain();
 }
 
 function ignoreIssue(k){if(S.ignored.indexOf(k)===-1)S.ignored.push(k);saveIgnored();buildTabs();renderMain();}
@@ -682,12 +653,9 @@ async function deleteLabel(lk){var display=S.labelNames[lk]||lk;if(!confirm('Del
 // ── Parent search & linking ───────────────────────────────────────────────────
 function renderExcReason(issue){
   var parts=[];
-
-  // Auto-checked box in a tracking issue
   var autoParents=findAutoCheckedParents(issue.id);
   if(autoParents.length){
     autoParents.forEach(function(ap){
-      var key=issue.id+'_'+issue.repo;
       var h='<div class="aci">';
       h+='<div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:4px">⚠ Auto-checked in tracking issue <a href="'+esc(ap.trackingIssue.url)+'" target="_blank" style="color:#7a4f00;text-decoration:underline">#'+ap.trackingIssue.id+'</a></div>';
       h+='<div class="acit" style="margin-bottom:6px">'+esc(ap.lineText)+'</div>';
@@ -698,11 +666,8 @@ function renderExcReason(issue){
       parts.push(h);
     });
   }
-
-  // Legacy: auto-closed items detected on the issue itself (CS Task Item with checked refs)
   var ai=getAutoClosedItems(issue);
   if(ai.length&&!autoParents.length){var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';ai.forEach(function(t){h+='<div class="acit">'+esc(t)+'</div>';});parts.push(h+'</div>');}
-
   if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
   if(!parts.length){
     var key=issue.id+'_'+issue.repo;
@@ -710,7 +675,7 @@ function renderExcReason(issue){
       '<div style="display:flex;flex-direction:column;gap:6px">'+
       '<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>'+
       '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'+
-      '<input type="text" id="psearch_'+key+'" placeholder="# or title..." style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:160px" autocomplete="off" oninput="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')"/>'+
+      '<input type="text" id="psearch_'+key+'" placeholder="# or title..." autocomplete="off" style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:160px" oninput="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')"/>'+
       '<button class="btn-sm" style="font-size:11px;padding:3px 9px" onclick="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')">🔍</button>'+
       '</div>'+
       '<div id="presults_'+key+'" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:320px"></div>'+
@@ -734,17 +699,14 @@ async function searchParent(issueId,repo){
     if(!isNaN(num)&&String(num)===q.trim()){
       try{var single=await ghFetch('/repos/'+repo+'/issues/'+num);results=single.pull_request?[]:[single];}catch(e){results=[];}
     } else {
-      var repoParam=encodeURIComponent('repo:'+repo);
-      var qParam=encodeURIComponent(q);
-      var data=await ghFetch('/search/issues?q='+qParam+'+'+repoParam+'+is:issue+is:open&per_page=10&sort=updated');
+      var data=await ghFetch('/search/issues?q='+encodeURIComponent(q)+'+'+encodeURIComponent('repo:'+repo)+'+is:issue+is:open&per_page=10&sort=updated');
       results=Array.isArray(data.items)?data.items:[];
     }
     if(!results.length){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">No issues found.</div>';return;}
     var h='';
     results.slice(0,8).forEach(function(r){
       h+='<div style="padding:8px 12px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="setParent('+issueId+',\''+esc(repo)+'\','+r.number+',\''+esc(r.title.replace(/'/g,"\\'"))+'\')">'+
-      '<span style="color:#6b7280;font-weight:600">#'+r.number+'</span> <span style="color:#1e1b4b;font-weight:500">'+esc(r.title)+'</span>'+
-      '</div>';
+      '<span style="color:#6b7280;font-weight:600">#'+r.number+'</span> <span style="color:#1e1b4b;font-weight:500">'+esc(r.title)+'</span></div>';
     });
     el.innerHTML=h;
   }catch(e){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#dc2626">Error: '+esc(e.message)+'</div>';}
@@ -753,48 +715,28 @@ async function searchParent(issueId,repo){
 async function setParent(issueId,repo,parentId,parentTitle){
   var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});
   var succeeded=false;
-
-  // Attempt 1: sub_issues beta API
   try{
     var r=await fetch('https://api.github.com/repos/'+repo+'/issues/'+parentId+'/sub_issues',{
-      method:'POST',
-      credentials:'omit',
+      method:'POST',credentials:'omit',
       headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
       body:JSON.stringify({sub_issue_id:issueId})
     });
-    if(r.ok){
-      succeeded=true;
-      console.log('Parent set via sub_issues API — #'+issueId+' → #'+parentId);
-    } else {
-      console.log('sub_issues API returned '+r.status+', trying fallback');
-    }
-  }catch(e1){
-    console.log('sub_issues API failed: '+e1.message);
-  }
-
-  // Attempt 2: PATCH the child issue body to add a parent reference line
+    if(r.ok){succeeded=true;console.log('Parent set via sub_issues API');}
+    else{console.log('sub_issues API returned '+r.status);}
+  }catch(e1){console.log('sub_issues API failed: '+e1.message);}
   if(!succeeded){
     try{
       var childData=await ghFetch('/repos/'+repo+'/issues/'+issueId);
       var existingBody=childData.body||'';
       var parentRef='\n\n**Parent:** #'+parentId+' '+parentTitle;
-      // Only add if not already there
       if(existingBody.indexOf('**Parent:** #'+parentId)===-1){
         await ghPatch('/repos/'+repo+'/issues/'+issueId,{body:existingBody.trimEnd()+parentRef});
       }
       succeeded=true;
-      console.log('Parent set via child body reference — #'+issueId+' → #'+parentId);
-    }catch(e2){
-      alert('Could not set parent:\n'+e2.message);
-      return;
-    }
+      console.log('Parent set via child body reference');
+    }catch(e2){alert('Could not set parent: '+e2.message);return;}
   }
-
-  // Update local state and save to cache so it survives refresh
-  if(issue){
-    issue.parent={issueNumber:parentId};
-    saveCache();
-  }
+  if(issue){issue.parent={issueNumber:parentId};saveCache();}
   renderMain();
 }
 
@@ -841,7 +783,6 @@ function renderTable(issues,tab,def){
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed: '+e.message);}}
 
 var _csItemsPipeline=null;
-
 function pipelineOrder(name){var n=(name||'').trim();if(n==='On Deck Priorities')return 0;if(n==='In Progress')return 1;if(n==='Icebox')return 3;return 2;}
 
 function renderCSItemsGrouped(issues,def){
@@ -849,16 +790,8 @@ function renderCSItemsGrouped(issues,def){
   var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
   var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
   var groups={};
-  issues.forEach(function(i){
-    var pn=i.pipeline?i.pipeline.pipelineName:'No Pipeline';
-    if(!groups[pn])groups[pn]=[];
-    groups[pn].push(i);
-  });
-  var sortedKeys=Object.keys(groups).sort(function(a,b){
-    var ao=pipelineOrder(a),bo=pipelineOrder(b);
-    if(ao!==bo)return ao-bo;
-    return a.toLowerCase().localeCompare(b.toLowerCase());
-  });
+  issues.forEach(function(i){var pn=i.pipeline?i.pipeline.pipelineName:'No Pipeline';if(!groups[pn])groups[pn]=[];groups[pn].push(i);});
+  var sortedKeys=Object.keys(groups).sort(function(a,b){var ao=pipelineOrder(a),bo=pipelineOrder(b);if(ao!==bo)return ao-bo;return a.toLowerCase().localeCompare(b.toLowerCase());});
   if(!_csItemsPipeline||!groups[_csItemsPipeline])_csItemsPipeline=sortedKeys[0]||null;
   var activeGroup=_csItemsPipeline;
   var activeIssues=(groups[activeGroup]||[]).slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
@@ -866,11 +799,7 @@ function renderCSItemsGrouped(issues,def){
   if(S.zhToken&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\'csitems\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
   h+='</div>';
   h+='<div style="display:flex;gap:0;border-bottom:2px solid #e5e7eb;background:#fff;flex-wrap:wrap">';
-  sortedKeys.forEach(function(pn){
-    var isActive=pn===activeGroup;
-    var cnt=groups[pn].length;
-    h+='<button onclick="setCsItemsPipeline(\''+esc(pn)+'\')" style="padding:10px 16px;font-size:12px;font-weight:700;border:none;border-bottom:'+(isActive?'2px solid #4338ca':'2px solid transparent')+';background:'+(isActive?'#f9fafb':'transparent')+';color:'+(isActive?'#4338ca':'#6b7280')+';cursor:pointer;white-space:nowrap;margin-bottom:-2px">'+esc(pn)+' <span style="font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;background:'+(isActive?'#e0e7ff':'#f3f4f6')+';color:'+(isActive?'#4338ca':'#6b7280')+'">'+cnt+'</span></button>';
-  });
+  sortedKeys.forEach(function(pn){var isActive=pn===activeGroup;var cnt=groups[pn].length;h+='<button onclick="setCsItemsPipeline(\''+esc(pn)+'\')" style="padding:10px 16px;font-size:12px;font-weight:700;border:none;border-bottom:'+(isActive?'2px solid #4338ca':'2px solid transparent')+';background:'+(isActive?'#f9fafb':'transparent')+';color:'+(isActive?'#4338ca':'#6b7280')+';cursor:pointer;white-space:nowrap;margin-bottom:-2px">'+esc(pn)+' <span style="font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;background:'+(isActive?'#e0e7ff':'#f3f4f6')+';color:'+(isActive?'#4338ca':'#6b7280')+'">'+cnt+'</span></button>';});
   h+='</div>';
   h+='<div class="tw2" style="border-top:none;border-radius:0 0 10px 10px"><table><thead><tr>';
   h+=mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th>';
@@ -918,15 +847,13 @@ function delRptRow(idx){if(!confirm('Remove this row?'))return;var h=loadHistory
 function importCSV(){var inp=document.createElement('input');inp.type='file';inp.accept='.csv';inp.onchange=function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){var lines=ev.target.result.split('\n').map(function(l){return l.trim();}).filter(Boolean);if(!lines.length){alert('Empty file.');return;}var start=lines[0].toLowerCase().indexOf('date')!==-1?1:0,imported=[],skipped=0;for(var i=start;i<lines.length;i++){var cols=lines[i].split(',');if(cols.length<5){skipped++;continue;}var row={date:(cols[0]||'').trim(),tracking:(cols[1]||'').trim(),total:parseInt(cols[2])||0,closed:parseInt(cols[3])||0,open:parseInt(cols[4])||0,noIssue:parseInt(cols[5])||0};if(!row.date){skipped++;continue;}imported.push(row);}if(!imported.length){alert('No valid rows found.');return;}var history=loadHistory(),existing={},added=0,dupes=0;history.forEach(function(r){existing[r.date]=1;});imported.forEach(function(r){if(existing[r.date])dupes++;else{history.push(r);added++;}});history.sort(function(a,b){return new Date(a.date)-new Date(b.date);});saveHistory(history);alert('Imported '+added+' row(s).'+(dupes?' Skipped '+dupes+' duplicate(s).':''));renderReport();};reader.readAsText(file);};inp.click();}
 function exportCSV(){var history=loadHistory(),rows=['Date,Tracking Issues,Total,Closed,Open,No Issue Raised'];history.forEach(function(row){rows.push([row.date,row.tracking,row.total,row.closed,row.open,row.noIssue||0].join(','));});var blob=new Blob([rows.join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cs_report.csv';a.click();}
 function clearHistory(){if(!confirm('Clear all report history?'))return;localStorage.removeItem(STORAGE_KEY);renderReport();}
+
 // ── Mismatch Scanner ──────────────────────────────────────────────────────────
 var _scanResults=null,_scanning=false;
 
 async function runMismatchScan(){
   if(_scanning)return;
-  _scanning=true;
-  _scanResults=null;
-  renderReport();
-
+  _scanning=true;_scanResults=null;renderReport();
   var tracking=S.issues.filter(function(i){
     if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
     var t=i.title.trim().toLowerCase();
@@ -935,9 +862,7 @@ async function runMismatchScan(){
     if(t.indexOf('cs ba ')===0)return false;
     return true;
   });
-
   var mismatches=[];
-
   for(var t=0;t<tracking.length;t++){
     var ti=tracking[t];
     var lines=(ti.body||'').split('\n');
@@ -949,113 +874,81 @@ async function runMismatchScan(){
       var m=ref.match(/#(\d+)/);
       if(!m)continue;
       var issueNum=parseInt(m[1]);
-      // Check open issues first
       var openIssue=S.issues.find(function(i){return i.id===issueNum&&i.repo===ti.repo;});
       if(openIssue){
-        mismatches.push({
-          trackingIssue:ti,
-          childId:issueNum,
-          childRepo:ti.repo,
-          childTitle:openIssue.title,
-          childUrl:openIssue.url,
-          lineText:ref,
-          lineIndex:l
-        });
+        mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:openIssue.title,childUrl:openIssue.url,lineText:ref,lineIndex:l,closedButChecked:false});
       } else {
-        // Not in open issues — fetch from GitHub to confirm current state
         try{
           var data=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum);
           if(data&&data.state==='open'){
-            mismatches.push({
-              trackingIssue:ti,
-              childId:issueNum,
-              childRepo:ti.repo,
-              childTitle:data.title,
-              childUrl:data.html_url,
-              lineText:ref,
-              lineIndex:l
-            });
+            mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:false});
           } else if(data&&data.state==='closed'){
-            // Closed but still checked — this is the key scenario we need to catch
-            mismatches.push({
-              trackingIssue:ti,
-              childId:issueNum,
-              childRepo:ti.repo,
-              childTitle:data.title,
-              childUrl:data.html_url,
-              lineText:ref,
-              lineIndex:l,
-              closedButChecked:true
-            });
+            // Only flag if auto-closed by a PR — manually closed + manually checked is legitimate
+            var closedByPR=false,closedByUser='',closedAt=data.closed_at||'';
+            if(data.closed_by&&data.closed_by.login)closedByUser=data.closed_by.login;
+            try{
+              var tl=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum+'/timeline?per_page=100');
+              if(Array.isArray(tl)){tl.forEach(function(ev){if(ev.event==='closed'&&ev.commit_id)closedByPR=true;if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;});}
+            }catch(e){}
+            if(closedByPR){
+              mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:true,closedByPR:true,closedByUser:closedByUser,closedAt:closedAt});
+            }
           }
         }catch(e){}
       }
     }
   }
-
-  _scanResults=mismatches;
-  _scanning=false;
-  renderReport();
+  _scanResults=mismatches;_scanning=false;renderReport();
 }
 
 function renderMismatchPanel(){
   var h='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #f59e0b">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
   h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Mismatch Scanner</div>';
-      h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds boxes checked on open issues, or boxes auto-checked by a PR closing keyword on closed issues</div></div>';
-
+  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds boxes checked on open issues, or auto-checked by a PR closing keyword on closed issues</div></div>';
   if(_scanning){
     h+='<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>';
   } else {
     h+='<button class="btn-p" onclick="runMismatchScan()" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
   }
   h+='</div>';
-
   if(_scanResults===null&&!_scanning){
     h+='<div style="font-size:13px;color:#9ca3af">Click Run Scan to check all tracking issues for incorrectly checked boxes.</div>';
   } else if(_scanning){
     h+='<div style="font-size:13px;color:#9ca3af">Checking each checked item against GitHub...</div>';
   } else if(_scanResults.length===0){
-    h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found — all checked boxes reference closed issues.</div>';
+    h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found.</div>';
   } else {
-    h+='<div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">⚠ '+_scanResults.length+' mismatch'+(+_scanResults.length!==1?'es':'')+' found — these issues are checked off but still open:</div>';
+    h+='<div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">⚠ '+_scanResults.length+' mismatch'+(+_scanResults.length!==1?'es':'')+' found:</div>';
     h+='<div style="display:flex;flex-direction:column;gap:8px">';
     _scanResults.forEach(function(r,idx){
       h+='<div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:9px;padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">';
       h+='<div style="flex:1;min-width:200px">';
-      h+='<div style="font-size:12px;color:#6b7280;margin-bottom:3px">Tracking issue: <a href="'+esc(r.trackingIssue.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+r.trackingIssue.id+' '+esc(r.trackingIssue.title)+'</a></div>';
-      h+='<div style="font-size:13px;font-weight:600;color:#1e1b4b"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:'+(r.closedButChecked?'#7c3aed':'#dc2626')+'">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
+      h+='<div style="font-size:12px;color:#6b7280;margin-bottom:3px">Tracking: <a href="'+esc(r.trackingIssue.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+r.trackingIssue.id+' '+esc(r.trackingIssue.title)+'</a></div>';
+      h+='<div style="font-size:13px;font-weight:600"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:'+(r.closedButChecked?'#7c3aed':'#dc2626')+'">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
       if(r.closedButChecked){
-        var closedInfo='Issue is closed';
-        if(r.closedAt)closedInfo+=' on '+new Date(r.closedAt).toLocaleDateString();
-        if(r.closedByPR)closedInfo+=' — <strong>auto-closed by a PR</strong> (box was likely checked automatically)';
-        else if(r.closedByUser)closedInfo+=' by '+esc(r.closedByUser);
-        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">⚠ '+closedInfo+'</span></div>';
+        var info='Closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'')+' — auto-closed by a PR';
+        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">⚠ '+info+'</span></div>';
       } else {
         h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Issue is still open but checked off</span></div>';
       }
       h+='<div style="font-size:11px;color:#9ca3af;margin-top:3px;font-family:monospace">'+esc(r.lineText)+'</div>';
       h+='</div>';
       h+='<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">';
-      h+='<a href="'+esc(r.childUrl)+'" target="_blank" class="btn-sm" style="font-size:11px;text-decoration:none">👁 View Issue</a>';
+      h+='<a href="'+esc(r.childUrl)+'" target="_blank" class="btn-sm" style="font-size:11px;text-decoration:none">👁 View</a>';
       h+='<button class="btn-sm" style="font-size:11px;border-color:#f59e0b;color:#92400e;background:#fffbeb" onclick="uncheckMismatch('+idx+')">☐ Uncheck</button>';
-      h+='</div>';
-      h+='</div>';
+      h+='</div></div>';
     });
     h+='</div>';
   }
-
   h+='</div>';
   return h;
 }
 
 async function uncheckMismatch(idx){
-  var r=_scanResults[idx];
-  if(!r)return;
+  var r=_scanResults[idx];if(!r)return;
   await uncheckInParent(r.trackingIssue.id,r.trackingIssue.repo,r.childId);
-  // Remove from scan results immediately
-  _scanResults.splice(idx,1);
-  renderReport();
+  _scanResults.splice(idx,1);renderReport();
 }
 
 function renderReport(){
@@ -1093,19 +986,18 @@ function renderReport(){
   }
   document.getElementById('mainContent').innerHTML=h;
 }
+
 function loadHistoricalData(){
   if(!confirm('This will replace all existing history. Continue?'))return;
   var rows=[{date:'3/3/2023',tracking:'2837',total:80,closed:0,open:80,noIssue:0},{date:'3/10/2023',tracking:'2837',total:131,closed:13,open:118,noIssue:0},{date:'3/19/2023',tracking:'2837',total:131,closed:24,open:107,noIssue:0},{date:'3/24/2023',tracking:'2837',total:131,closed:25,open:106,noIssue:0},{date:'3/30/2023',tracking:'2837/2996',total:152,closed:54,open:98,noIssue:0},{date:'4/7/2023',tracking:'2996',total:105,closed:19,open:86,noIssue:0},{date:'4/14/2023',tracking:'2996',total:112,closed:20,open:92,noIssue:0},{date:'4/21/2023',tracking:'2996',total:123,closed:61,open:62,noIssue:0},{date:'4/28/2023',tracking:'2996/3221',total:130,closed:66,open:64,noIssue:0},{date:'5/5/2023',tracking:'3221',total:82,closed:17,open:65,noIssue:0},{date:'5/12/2023',tracking:'3221',total:83,closed:31,open:52,noIssue:0},{date:'5/19/2023',tracking:'3221',total:101,closed:41,open:60,noIssue:0},{date:'5/26/2023',tracking:'3221',total:108,closed:60,open:48,noIssue:0},{date:'5/31/2023',tracking:'3221/3495',total:127,closed:60,open:67,noIssue:0},{date:'6/2/2023',tracking:'3495',total:68,closed:3,open:65,noIssue:0},{date:'6/9/2023',tracking:'3495',total:76,closed:27,open:49,noIssue:0},{date:'6/16/2023',tracking:'3495/3583',total:77,closed:28,open:49,noIssue:0},{date:'6/23/2023',tracking:'3583',total:49,closed:6,open:43,noIssue:0},{date:'6/30/2023',tracking:'3583',total:49,closed:6,open:43,noIssue:0},{date:'7/7/2023',tracking:'3583',total:51,closed:16,open:35,noIssue:0},{date:'7/14/2023',tracking:'3583',total:57,closed:16,open:41,noIssue:0},{date:'7/21/2023',tracking:'3583',total:59,closed:23,open:36,noIssue:0},{date:'7/28/2023',tracking:'3583',total:118,closed:31,open:87,noIssue:0},{date:'8/4/2023',tracking:'3583/3924',total:98,closed:8,open:90,noIssue:0},{date:'8/11/2023',tracking:'3924/2458/2635',total:346,closed:100,open:246,noIssue:0},{date:'8/18/2023',tracking:'3924/2458/2635',total:346,closed:107,open:239,noIssue:0},{date:'8/25/2023',tracking:'3924/2458/2635',total:349,closed:127,open:72,noIssue:150},{date:'9/1/2023',tracking:'3924/4178/2458/2635',total:375,closed:131,open:89,noIssue:155},{date:'9/8/2023',tracking:'4178/2458/2635',total:309,closed:67,open:107,noIssue:135},{date:'9/15/2023',tracking:'4178/2458/2635',total:320,closed:75,open:107,noIssue:138},{date:'9/22/2023',tracking:'4178/2458/2635',total:324,closed:80,open:114,noIssue:130},{date:'9/29/2023',tracking:'4178/2458/2635',total:324,closed:82,open:127,noIssue:115},{date:'10/5/2023',tracking:'4178/2458/2635',total:316,closed:81,open:131,noIssue:104},{date:'10/10/2023',tracking:'4178/4449/2458/2635',total:329,closed:81,open:150,noIssue:98},{date:'10/13/2023',tracking:'4449/2458/2635',total:317,closed:106,open:126,noIssue:85},{date:'10/20/2023',tracking:'4449/2458/2635',total:321,closed:136,open:121,noIssue:64},{date:'10/27/2023',tracking:'4449/2458/2635',total:346,closed:149,open:131,noIssue:66},{date:'11/3/2023',tracking:'4449/4600/2458/2635',total:350,closed:177,open:108,noIssue:65},{date:'11/10/2023',tracking:'4600/2458/2635',total:310,closed:139,open:106,noIssue:65},{date:'11/17/2023',tracking:'4600/2458/2635',total:329,closed:152,open:130,noIssue:47},{date:'11/22/2023',tracking:'4600/2458/2635',total:330,closed:152,open:131,noIssue:47},{date:'11/30/2023',tracking:'4600/2458/2635',total:337,closed:153,open:139,noIssue:45},{date:'12/8/2023',tracking:'4600/4785/2458/4786/2635',total:348,closed:166,open:134,noIssue:48},{date:'12/15/2023',tracking:'4785/4786/2635',total:219,closed:46,open:124,noIssue:49},{date:'12/22/2023',tracking:'4785/4786/2635',total:221,closed:60,open:122,noIssue:39},{date:'12/29/2023',tracking:'4785/4786/2635',total:223,closed:67,open:117,noIssue:39},{date:'1/5/2024',tracking:'4785/4878/4786/2635',total:223,closed:74,open:112,noIssue:37},{date:'1/12/2024',tracking:'4878/4786/2635',total:197,closed:50,open:108,noIssue:39},{date:'1/19/2024',tracking:'4878/4786/2635',total:197,closed:57,open:107,noIssue:33},{date:'1/26/2024',tracking:'4878/4786/2635',total:194,closed:72,open:100,noIssue:22},{date:'2/2/2024',tracking:'4878/5034/4786/2635',total:194,closed:73,open:112,noIssue:9},{date:'2/9/2024',tracking:'5034/4786/2635',total:231,closed:59,open:164,noIssue:8},{date:'2/16/2024',tracking:'5034/4786/2635',total:237,closed:83,open:146,noIssue:8},{date:'2/23/2024',tracking:'5034/4786/2635',total:260,closed:102,open:136,noIssue:22},{date:'3/1/2024',tracking:'5034/5390/4786/2635',total:278,closed:131,open:139,noIssue:8},{date:'3/8/2024',tracking:'5390/4786/2635',total:225,closed:96,open:121,noIssue:8},{date:'3/15/2024',tracking:'5390/4786/2635',total:230,closed:98,open:124,noIssue:8},{date:'3/22/2024',tracking:'5390/4786/2635',total:245,closed:106,open:128,noIssue:11},{date:'3/29/2024',tracking:'5390/4786/2635',total:251,closed:131,open:109,noIssue:11},{date:'4/5/2024',tracking:'5390/5728/4786/2635',total:276,closed:152,open:116,noIssue:8},{date:'4/12/2024',tracking:'5728/4786/2635',total:207,closed:97,open:101,noIssue:9},{date:'4/19/2024',tracking:'5728/4786/2635',total:217,closed:101,open:107,noIssue:9},{date:'4/26/2024',tracking:'5728/4786/2635',total:238,closed:133,open:95,noIssue:10},{date:'5/3/2024',tracking:'5728/6010/4786/2635',total:249,closed:134,open:103,noIssue:12},{date:'5/10/2024',tracking:'6010/4786/2635',total:203,closed:130,open:61,noIssue:12},{date:'5/17/2024',tracking:'6010/4786/2635',total:212,closed:135,open:65,noIssue:12},{date:'5/24/2024',tracking:'6232/6010/4786/2635',total:232,closed:151,open:69,noIssue:12},{date:'5/31/2024',tracking:'6232/6308/6010/4786/2635',total:246,closed:174,open:60,noIssue:12},{date:'6/7/2024',tracking:'6232/6317/6308/4786/2635',total:194,closed:98,open:83,noIssue:13},{date:'6/14/2024',tracking:'2635/4786/6308/6317/6428',total:202,closed:110,open:78,noIssue:14},{date:'6/21/2024',tracking:'2635/4786/6308/6428',total:214,closed:121,open:78,noIssue:15},{date:'6/28/2024',tracking:'2635/4786/6308/6428/6568',total:238,closed:156,open:66,noIssue:16},{date:'7/5/2024',tracking:'2635/4786/6428/6568/6596',total:193,closed:117,open:59,noIssue:17},{date:'7/12/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6596/6706',total:293,closed:121,open:94,noIssue:78},{date:'7/19/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6596/6706',total:294,closed:122,open:94,noIssue:78},{date:'7/26/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6706/6745',total:300,closed:129,open:92,noIssue:79},{date:'8/2/2024',tracking:'2424/2613/2614/2615/2635/4786/6568/6706/6745/6833',total:308,closed:143,open:86,noIssue:79},{date:'8/9/2024',tracking:'2424/2613/2614/2615/2635/4786/6745/6833/6846',total:282,closed:143,open:59,noIssue:80},{date:'8/16/2024',tracking:'2424/2613/2614/2615/2635/4786/6745/6833/6846',total:289,closed:145,open:64,noIssue:80},{date:'8/23/2024',tracking:'2424/2613/2614/2615/2635/4786/6745/6833/6846/6935',total:314,closed:165,open:64,noIssue:85},{date:'8/30/2024',tracking:'2424/2613/2614/2615/2635/4786/6833/6846/6935',total:310,closed:161,open:63,noIssue:86},{date:'9/2/2024',tracking:'2424/2613/2614/2615/2635/4786/6935/7033',total:271,closed:119,open:66,noIssue:86},{date:'9/6/2024',tracking:'2424/2613/2614/2615/2635/4786/6935/7033',total:275,closed:136,open:53,noIssue:86},{date:'9/13/2024',tracking:'2424/2613/2614/2615/2635/4786/6935/7033/7117',total:287,closed:145,open:60,noIssue:82},{date:'9/20/2024',tracking:'2424/2613/2614/2615/2635/4786/7033/7117/7172',total:291,closed:143,open:66,noIssue:82},{date:'9/27/2024',tracking:'2424/2613/2614/2615/2635/7033/7172',total:250,closed:85,open:83,noIssue:82},{date:'10/4/2024',tracking:'2424/2613/2614/2615/2635/7172/7265',total:269,closed:111,open:76,noIssue:82},{date:'10/11/2024',tracking:'2424/2613/2614/2615/7172/7265/7358',total:210,closed:52,open:76,noIssue:82},{date:'10/25/2024',tracking:'2424/2613/2614/2615/7265/7358/7486',total:216,closed:62,open:72,noIssue:82},{date:'11/1/2024',tracking:'2424/2613/2614/2615/7265/7486',total:204,closed:65,open:57,noIssue:82},{date:'11/8/2024',tracking:'2424/2613/2614/2615/7265/7486/7583',total:215,closed:75,open:58,noIssue:82},{date:'11/15/2024',tracking:'2424/2613/2614/2615/7583/7612',total:172,closed:38,open:50,noIssue:84},{date:'11/22/2024',tracking:'2424/2613/2614/2615/7583/7612',total:177,closed:42,open:50,noIssue:85},{date:'11/29/2024',tracking:'2424/2613/2614/2615/7612/7672/7714/7715',total:169,closed:33,open:51,noIssue:85},{date:'12/6/2024',tracking:'2424/2613/2614/2615/7672/7714/7715',total:204,closed:38,open:65,noIssue:101},{date:'12/13/2024',tracking:'2424/2613/2614/2615/7714/7715',total:201,closed:33,open:67,noIssue:101},{date:'12/19/2024',tracking:'2424/2613/2614/2615/7714/7715',total:206,closed:48,open:57,noIssue:101},{date:'12/27/2024',tracking:'2424/2613/2614/2615/7714/7715',total:208,closed:49,open:58,noIssue:101},{date:'1/3/2025',tracking:'2424/2613/2614/2615/7714/7715/7865',total:210,closed:49,open:60,noIssue:101},{date:'1/10/2025',tracking:'2424/2613/2614/2615/7865/7887',total:195,closed:28,open:64,noIssue:103},{date:'1/17/2025',tracking:'2424/2613/2614/2615/7865/7887',total:205,closed:52,open:59,noIssue:94},{date:'1/24/2025',tracking:'2424/2613/2614/2615/7865/7887/7947',total:212,closed:55,open:65,noIssue:92},{date:'1/31/2025',tracking:'2424/2613/2614/2615/7865/7887/7947',total:223,closed:72,open:58,noIssue:93},{date:'2/7/2025',tracking:'2424/2613/2614/2615/8029/8030',total:202,closed:52,open:59,noIssue:91},{date:'2/14/2025',tracking:'2424/2613/2614/2615/8029/8030',total:205,closed:66,open:47,noIssue:92},{date:'2/21/2025',tracking:'2424/2613/2614/2615/8030/8164',total:196,closed:57,open:60,noIssue:79},{date:'2/28/2025',tracking:'2424/2613/2614/2615/8030/8164',total:204,closed:68,open:55,noIssue:81},{date:'3/7/2025',tracking:'2424/2613/2614/2615/8247/8255',total:193,closed:63,open:50,noIssue:80},{date:'3/14/2025',tracking:'2424/2613/2614/2615/8247/8255',total:204,closed:68,open:56,noIssue:80},{date:'3/21/2025',tracking:'2424/2613/2614/2615/8247/8255/8352',total:222,closed:75,open:66,noIssue:81},{date:'3/28/2025',tracking:'2424/2613/2614/2615/8255/8352',total:227,closed:79,open:68,noIssue:80},{date:'3/29/2025',tracking:'2424/2613/2614/2615/8433/8434',total:203,closed:55,open:68,noIssue:80},{date:'4/4/2025',tracking:'2424/2613/2614/2615/8433/8434',total:217,closed:66,open:69,noIssue:82},{date:'4/11/2025',tracking:'2424/2613/2614/2615/8433/8434',total:234,closed:90,open:65,noIssue:79},{date:'4/18/2025',tracking:'2424/2613/2614/2615/8433/8434/8552',total:246,closed:100,open:62,noIssue:84},{date:'4/25/2025',tracking:'2424/2613/2614/2615/8434/8552',total:240,closed:93,open:68,noIssue:79},{date:'5/2/2025',tracking:'2424/2613/2614/2615/8434/8552/8705',total:255,closed:115,open:61,noIssue:79},{date:'5/9/2025',tracking:'2424/2613/2614/2615/8434/8705/8761',total:251,closed:108,open:64,noIssue:79},{date:'5/14/2025',tracking:'2424/2613/2614/2615/8705/8761/8847',total:237,closed:85,open:74,noIssue:78},{date:'5/23/2025',tracking:'2424/2613/2614/2615/8761/8847',total:239,closed:93,open:68,noIssue:78},{date:'5/31/2025',tracking:'2424/2613/2614/2615/8761/8847/8952/8978',total:254,closed:108,open:66,noIssue:80},{date:'6/1/2025',tracking:'2424/2613/2614/2615/8952/8978',total:230,closed:84,open:66,noIssue:80},{date:'6/6/2025',tracking:'2424/2613/2614/2615/8952/8978',total:251,closed:96,open:74,noIssue:81},{date:'6/13/2025',tracking:'2424/2613/2614/2615/8952/8978/9042',total:261,closed:108,open:72,noIssue:81},{date:'6/20/2025',tracking:'2424/2613/2614/2615/8978/9042',total:249,closed:97,open:71,noIssue:81},{date:'6/27/2025',tracking:'2424/2613/2614/2615/8978/9042',total:250,closed:97,open:72,noIssue:81},{date:'7/4/2025',tracking:'2424/2613/2614/2615/8978/9042',total:258,closed:121,open:56,noIssue:81},{date:'7/5/2025',tracking:'2424/2613/2614/2615/8978/9042/9158',total:259,closed:121,open:56,noIssue:82},{date:'7/10/2025',tracking:'2424/2613/2614/2615/8978/9042/9158/9192',total:269,closed:135,open:52,noIssue:82},{date:'7/11/2025',tracking:'2424/2613/2614/2615/8978/9158/9192',total:231,closed:91,open:58,noIssue:82},{date:'7/17/2025',tracking:'2424/2613/2614/2615/8978/9158/9192',total:270,closed:84,open:65,noIssue:121},{date:'7/25/2025',tracking:'2424/2613/2614/2615/9158/9192/9280',total:293,closed:93,open:82,noIssue:118},{date:'8/1/2025',tracking:'2424/2615/9158/9280',total:286,closed:97,open:71,noIssue:118},{date:'8/2/2025',tracking:'2424/2615/9380/9381',total:255,closed:69,open:68,noIssue:118},{date:'8/8/2025',tracking:'2424/2615/9380/9381',total:258,closed:69,open:71,noIssue:118},{date:'8/15/2025',tracking:'2424/2615/9380/9381',total:272,closed:86,open:68,noIssue:118},{date:'8/21/2025',tracking:'2424/2615/9380/9381/9532',total:283,closed:93,open:72,noIssue:118},{date:'8/22/2025',tracking:'2424/2615/9380/9532',total:277,closed:85,open:74,noIssue:118},{date:'8/29/2025',tracking:'2424/2615/9380/9532',total:287,closed:94,open:75,noIssue:118},{date:'9/1/2025',tracking:'2424/2615/2617/9380/9532/9621',total:302,closed:94,open:90,noIssue:118},{date:'9/5/2025',tracking:'2424/2615/2617/9611/9627',total:285,closed:73,open:94,noIssue:118},{date:'9/12/2025',tracking:'2424/2615/2617/9611/9627',total:297,closed:84,open:95,noIssue:118},{date:'9/18/2025',tracking:'2424/2615/2617/9611/9627/9748',total:321,closed:97,open:106,noIssue:118},{date:'9/26/2025',tracking:'2424/2615/2617/9611/9748',total:335,closed:99,open:115,noIssue:121},{date:'10/3/2025',tracking:'2424/2615/2617/9611/9748/9852/9853',total:359,closed:124,open:109,noIssue:126},{date:'10/10/2025',tracking:'2424/2615/2617/9852/9853',total:326,closed:95,open:105,noIssue:126},{date:'10/17/2025',tracking:'2424/2615/2617/9852/9853/9945',total:328,closed:102,open:100,noIssue:126},{date:'10/24/2025',tracking:'2424/2615/2617/9853/9945',total:359,closed:108,open:125,noIssue:126},{date:'10/31/2025',tracking:'2424/2615/2617/9853/9945/10067',total:369,closed:130,open:113,noIssue:126},{date:'11/7/2025',tracking:'2424/2615/2617/9853/10067/10011',total:349,closed:117,open:105,noIssue:127},{date:'11/14/2025',tracking:'2424/2615/2617/10067/10011/10147',total:341,closed:104,open:110,noIssue:127},{date:'11/21/2025',tracking:'2424/2615/2617/10011/10147',total:343,closed:105,open:111,noIssue:127},{date:'11/28/2025',tracking:'2424/2615/2617/10011/10147',total:370,closed:106,open:137,noIssue:127},{date:'12/5/2025',tracking:'2424/2615/2617/10011/10147/10301',total:376,closed:121,open:128,noIssue:127},{date:'12/12/2025',tracking:'2424/2615/2617/10147/10301/10320',total:390,closed:130,open:137,noIssue:123},{date:'12/19/2025',tracking:'2424/2615/2617/10301/10320',total:374,closed:98,open:156,noIssue:120},{date:'12/24/2025',tracking:'2424/2615/2617/10301/10320/10394',total:374,closed:105,open:150,noIssue:119},{date:'12/31/2025',tracking:'2615/2617/10301/10320/10394',total:300,closed:35,open:146,noIssue:119},{date:'1/9/2026',tracking:'2615/2617/10301/10320/10394/10445/10468',total:311,closed:53,open:139,noIssue:119},{date:'1/16/2026',tracking:'2615/2617/2622/10394/10445/10468',total:324,closed:51,open:152,noIssue:121},{date:'1/25/2026',tracking:'2615/2617/2622/10394/10445/10468/10640',total:340,closed:71,open:148,noIssue:121},{date:'1/30/2026',tracking:'2615/2617/2622/10394/10445/10640',total:310,closed:39,open:150,noIssue:121},{date:'2/6/2026',tracking:'2615/2617/2622/10394/10445/10640/10713/10714',total:323,closed:44,open:158,noIssue:121},{date:'2/16/2026',tracking:'2615/2617/2622/10394/10713/10714',total:317,closed:48,open:148,noIssue:121},{date:'2/20/2026',tracking:'2615/2617/2622/10394/10713/10714/10826',total:326,closed:47,open:161,noIssue:118},{date:'2/27/2026',tracking:'2615/2617/2622/10394/10713/10826',total:318,closed:36,open:164,noIssue:118},{date:'3/6/2026',tracking:'2615/2617/2622/10394/10713/10826/10917/10958',total:349,closed:63,open:168,noIssue:118},{date:'3/13/2026',tracking:'2615/2617/2622/10394/10917/10958',total:343,closed:50,open:175,noIssue:118},{date:'3/20/2026',tracking:'2615/2617/2622/10394/10917/10958/11113',total:360,closed:72,open:170,noIssue:118},{date:'3/27/2026',tracking:'2615/2617/2622/10394/10917/11113',total:361,closed:71,open:172,noIssue:118}];
   saveHistory(rows);alert('Loaded '+rows.length+' historical rows.');renderReport();
 }
 
-// ── Session token bootstrap ───────────────────────────────────────────────────
+// ── Session bootstrap ─────────────────────────────────────────────────────────
 (function(){
   var gh=sessionStorage.getItem('cv_session_gh');
   var zh=sessionStorage.getItem('cv_session_zh');
-
   if(!gh){
-    // No session token — send back to index to unlock vault
     document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;gap:16px;font-family:ui-sans-serif,system-ui,sans-serif">'
       +'<div style="background:#fff;border-radius:14px;padding:40px 48px;box-shadow:0 2px 12px rgba(0,0,0,0.08);text-align:center;max-width:400px">'
       +'<div style="font-size:2.5rem;margin-bottom:12px">🔒</div>'
@@ -1115,32 +1007,23 @@ function loadHistoricalData(){
       +'</div></div>';
     return;
   }
-
-  // Tokens available — wire them up and auto-connect
   S.ghToken=gh;
-  if(zh) S.zhToken=zh;
-
-  // Load saved profile — use first one if only one exists
+  if(zh)S.zhToken=zh;
   var profiles=loadProfiles();
   if(!profiles.length){
-    // No profiles configured — show setup to add one
     showEl('setup');
     renderProfileDd();
-    // Pre-fill tokens so user just needs to pick a project
-    var ghEl=document.getElementById('ghToken');
-    var zhEl=document.getElementById('zhTokenInput');
-    if(ghEl)ghEl.value=gh;
-    if(zhEl&&zh)zhEl.value=zh;
     return;
   }
-
-  // Auto-select first profile and connect
+  if(profiles.length>1){
+    showEl('setup');
+    renderProfileDd();
+    return;
+  }
+  // Single profile — go straight in
   var profile=profiles[0];
   S.activeProfile=profile;
-  S.repos=profile.type==='group'
-    ?(profile.repos||[]).map(function(r){return r.repo;})
-    :[profile.repo];
-
+  S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo;}):[profile.repo];
   if(profile.type==='group'){
     (profile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});
     if(!S.zhWorkspace&&profile.repos&&profile.repos[0])S.zhWorkspace=profile.repos[0].zhWorkspace||'';
@@ -1148,29 +1031,7 @@ function loadHistoricalData(){
     S.zhWorkspace=profile.zhWorkspace;
     if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=profile.zhWorkspace;
   }
-
   S.ignored=loadIgnored();
-
-  // If multiple profiles, show a simple picker instead of full token form
-  if(profiles.length>1){
-    showEl('setup');
-    renderProfileDd();
-    var ghEl=document.getElementById('ghToken');
-    var zhEl=document.getElementById('zhTokenInput');
-    if(ghEl)ghEl.value=gh;
-    if(zhEl&&zh)zhEl.value=zh;
-    // Hide the token fields since they're already set
-    var tokenFields=document.querySelectorAll('#setup .fg');
-    tokenFields.forEach(function(el){
-      var label=el.querySelector('label');
-      if(label&&(label.textContent.indexOf('GitHub')!==-1||label.textContent.indexOf('ZenHub')!==-1)){
-        el.style.display='none';
-      }
-    });
-    return;
-  }
-
-  // Single profile — go straight to loading
   var cache=loadCache();
   if(cache&&cache.issues){
     S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];
@@ -1183,8 +1044,6 @@ function loadHistoricalData(){
     bgRefresh();
     return;
   }
-
-  // No cache — show loading screen and fetch
   showDash();
   document.getElementById('dashTitle').textContent='📋 CentralView '+profile.name+' Issues Hub';
   document.getElementById('dashMeta').textContent='Loading...';
@@ -1192,9 +1051,7 @@ function loadHistoricalData(){
   Promise.all([loadLabelColors(),loadIssues()])
     .then(function(){return refreshTrackingBodies();})
     .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();})
-    .catch(function(e){
-      document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';
-    });
+    .catch(function(e){document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
 })();
 </script>
 </body>
