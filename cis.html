@@ -598,19 +598,6 @@ async function scanTrackingIssue(ti){
   try{var fresh=await ghFetch('/repos/'+ti.repo+'/issues/'+ti.id);freshBody=fresh.body||'';}
   catch(e){freshBody=ti.body||'';}
 
-  // Get timestamps of all body edits on the tracking issue
-  var bodyEditTimes=[];
-  try{
-    var tl=await ghFetch('/repos/'+ti.repo+'/issues/'+ti.id+'/timeline?per_page=100');
-    if(Array.isArray(tl)){
-      tl.forEach(function(ev){
-        if(ev.event==='edited'&&ev.changes&&ev.changes.body){
-          bodyEditTimes.push(new Date(ev.created_at).getTime());
-        }
-      });
-    }
-  }catch(e){}
-
   var reviewed=loadReviewed();
   var mismatches=[];
   var lines=freshBody.split('\n');
@@ -629,22 +616,9 @@ async function scanTrackingIssue(ti){
       if(data.state==='open'){
         console.log('[scan] FLAGGING #'+issueNum+' — open but checked off');
         mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:false});
-        continue;
-      }
-      if(data.state==='closed'){
-        var closedAt=new Date(data.closed_at||0).getTime();
-        var closedByUser=(data.closed_by&&data.closed_by.login)||'';
-        // Flag if tracking issue body was edited within 10s of the issue being closed
-        var autoChecked=bodyEditTimes.some(function(editTime){
-          return Math.abs(editTime-closedAt)<=PR_AUTO_CHECK_WINDOW_MS;
-        });
-        console.log('[scan] #'+issueNum+' closedAt='+new Date(closedAt).toISOString()+' autoChecked='+autoChecked);
-        if(autoChecked){
-          console.log('[scan] FLAGGING #'+issueNum+' — body edited within 10s of close');
-          mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:true,closedByUser:closedByUser,closedAt:data.closed_at||''});
-        } else {
-          console.log('[scan] #'+issueNum+' — no edit within 10s of close, skipping');
-        }
+      } else if(data.state==='closed'){
+        console.log('[scan] FLAGGING #'+issueNum+' — closed and checked, needs review');
+        mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:true,closedAt:data.closed_at||'',closedByUser:(data.closed_by&&data.closed_by.login)||''});
       }
     }catch(e){console.warn('[scan] fetch failed for #'+issueNum,e.message);}
   }
@@ -699,7 +673,7 @@ function renderMismatchPanel(){
   var h='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #f59e0b">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
   h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Mismatch Scanner</div>';
-  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Flags checked boxes where the issue was closed within 10 seconds of the tracking body being edited (likely auto-checked by GitHub)</div></div>';
+  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Shows all checked boxes where the linked issue is closed. Click ✓ Reviewed to dismiss ones that are correct — dismissals are saved permanently.</div></div>';
   if(_scanning)h+='<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>';
   else h+='<button class="btn-p" onclick="runMismatchScan()" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
   h+='</div>';
@@ -718,7 +692,7 @@ function renderMismatchPanel(){
       h+='<div style="font-size:12px;color:#6b7280;margin-bottom:3px">Tracking: <a href="'+esc(r.trackingIssue.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+r.trackingIssue.id+' '+esc(r.trackingIssue.title)+'</a></div>';
       h+='<div style="font-size:13px;font-weight:600"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:'+(r.closedButChecked?'#7c3aed':'#dc2626')+'">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
       if(r.closedButChecked){
-        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'')+' — likely auto-checked by GitHub</span></div>';
+        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">Closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'')+' — needs review</span></div>';
       } else {
         h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Issue still open but checked off</span></div>';
       }
