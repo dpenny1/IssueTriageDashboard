@@ -1086,16 +1086,103 @@ function loadHistoricalData(){
   saveHistory(rows);alert('Loaded '+rows.length+' historical rows.');renderReport();
 }
 
-// Auto-fill tokens from index page session vault
+// ── Session token bootstrap ───────────────────────────────────────────────────
 (function(){
   var gh=sessionStorage.getItem('cv_session_gh');
   var zh=sessionStorage.getItem('cv_session_zh');
-  if(gh){var el=document.getElementById('ghToken');if(el)el.value=gh;}
-  if(zh){var el=document.getElementById('zhTokenInput');if(el)el.value=zh;}
-})();
 
-showEl('setup');
-renderProfileDd();
+  if(!gh){
+    // No session token — send back to index to unlock vault
+    document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;gap:16px;font-family:ui-sans-serif,system-ui,sans-serif">'
+      +'<div style="background:#fff;border-radius:14px;padding:40px 48px;box-shadow:0 2px 12px rgba(0,0,0,0.08);text-align:center;max-width:400px">'
+      +'<div style="font-size:2.5rem;margin-bottom:12px">🔒</div>'
+      +'<div style="font-size:1.1rem;font-weight:700;color:#1e1b4b;margin-bottom:8px">Tokens required</div>'
+      +'<div style="font-size:14px;color:#6b7280;margin-bottom:24px">Please unlock your vault on the hub page and select your GitHub token before opening this dashboard.</div>'
+      +'<a href="index.html" style="display:inline-block;background:#4338ca;color:#fff;border-radius:9px;padding:11px 28px;font-size:14px;font-weight:700;text-decoration:none">← Go to Hub</a>'
+      +'</div></div>';
+    return;
+  }
+
+  // Tokens available — wire them up and auto-connect
+  S.ghToken=gh;
+  if(zh) S.zhToken=zh;
+
+  // Load saved profile — use first one if only one exists
+  var profiles=loadProfiles();
+  if(!profiles.length){
+    // No profiles configured — show setup to add one
+    showEl('setup');
+    renderProfileDd();
+    // Pre-fill tokens so user just needs to pick a project
+    var ghEl=document.getElementById('ghToken');
+    var zhEl=document.getElementById('zhTokenInput');
+    if(ghEl)ghEl.value=gh;
+    if(zhEl&&zh)zhEl.value=zh;
+    return;
+  }
+
+  // Auto-select first profile and connect
+  var profile=profiles[0];
+  S.activeProfile=profile;
+  S.repos=profile.type==='group'
+    ?(profile.repos||[]).map(function(r){return r.repo;})
+    :[profile.repo];
+
+  if(profile.type==='group'){
+    (profile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});
+    if(!S.zhWorkspace&&profile.repos&&profile.repos[0])S.zhWorkspace=profile.repos[0].zhWorkspace||'';
+  } else if(profile.zhWorkspace){
+    S.zhWorkspace=profile.zhWorkspace;
+    if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=profile.zhWorkspace;
+  }
+
+  S.ignored=loadIgnored();
+
+  // If multiple profiles, show a simple picker instead of full token form
+  if(profiles.length>1){
+    showEl('setup');
+    renderProfileDd();
+    var ghEl=document.getElementById('ghToken');
+    var zhEl=document.getElementById('zhTokenInput');
+    if(ghEl)ghEl.value=gh;
+    if(zhEl&&zh)zhEl.value=zh;
+    // Hide the token fields since they're already set
+    var tokenFields=document.querySelectorAll('#setup .fg');
+    tokenFields.forEach(function(el){
+      var label=el.querySelector('label');
+      if(label&&(label.textContent.indexOf('GitHub')!==-1||label.textContent.indexOf('ZenHub')!==-1)){
+        el.style.display='none';
+      }
+    });
+    return;
+  }
+
+  // Single profile — go straight to loading
+  var cache=loadCache();
+  if(cache&&cache.issues){
+    S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];
+    S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
+    var age=Math.round((Date.now()-cache.savedAt)/60000);
+    populateFilters();showDash();buildTabs();renderMain();
+    document.getElementById('dashTitle').textContent='📋 CentralView '+profile.name+' Issues Hub';
+    document.getElementById('dashMeta').textContent=S.issues.length+' open issues — '+todayStr();
+    setStatus('<span style="color:#fbbf24;font-size:14px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
+    bgRefresh();
+    return;
+  }
+
+  // No cache — show loading screen and fetch
+  showDash();
+  document.getElementById('dashTitle').textContent='📋 CentralView '+profile.name+' Issues Hub';
+  document.getElementById('dashMeta').textContent='Loading...';
+  setStatus('<span style="color:#fbbf24">⏳ Loading...</span>');
+  Promise.all([loadLabelColors(),loadIssues()])
+    .then(function(){return refreshTrackingBodies();})
+    .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();})
+    .catch(function(e){
+      document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';
+    });
+})();
 </script>
 </body>
 </html>
