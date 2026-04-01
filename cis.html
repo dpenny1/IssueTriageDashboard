@@ -942,41 +942,56 @@ async function runMismatchScan(){
     if(t.indexOf('cs ba ')===0)return false;
     return true;
   });
+  console.log('[mismatch] scanning '+tracking.length+' tracking issues');
   var mismatches=[];
   for(var t=0;t<tracking.length;t++){
     var ti=tracking[t];
     var lines=(ti.body||'').split('\n');
+    console.log('[mismatch] #'+ti.id+' "'+ti.title+'" — '+lines.length+' lines, body length='+ti.body.length);
+    var checkedCount=0;
     for(var l=0;l<lines.length;l++){
       var line=lines[l];
+      // Match both [x] and [X]
       var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
       if(!chk)continue;
+      checkedCount++;
       var ref=chk[1].trim();
       var m=ref.match(/#(\d+)/);
-      if(!m)continue;
-      var issueNum=parseInt(m[1]);
-      var openIssue=S.issues.find(function(i){return i.id===issueNum&&i.repo===ti.repo;});
-      if(openIssue){
-        mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:openIssue.title,childUrl:openIssue.url,lineText:ref,lineIndex:l,closedButChecked:false});
-      } else {
-        try{
-          var data=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum);
-          if(data&&data.state==='open'){
-            mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:false});
-          } else if(data&&data.state==='closed'){
-            var closedByPR=false,closedByUser='',closedAt=data.closed_at||'';
-            if(data.closed_by&&data.closed_by.login)closedByUser=data.closed_by.login;
-            try{
-              var tl=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum+'/timeline?per_page=100');
-              if(Array.isArray(tl)){tl.forEach(function(ev){if(ev.event==='closed'&&ev.commit_id)closedByPR=true;if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;});}
-            }catch(e){}
-            if(closedByPR){
-              mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:true,closedByPR:true,closedByUser:closedByUser,closedAt:closedAt});
-            }
-          }
-        }catch(e){}
+      if(!m){
+        console.log('[mismatch] #'+ti.id+' checked line has no issue ref: '+line.trim());
+        continue;
       }
+      var issueNum=parseInt(m[1]);
+      console.log('[mismatch] #'+ti.id+' checked ref #'+issueNum);
+      // Always fetch fresh from GitHub to get current state
+      try{
+        var data=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum);
+        console.log('[mismatch] #'+issueNum+' state='+data.state);
+        if(data&&data.state==='open'){
+          console.log('[mismatch] FLAGGING #'+issueNum+' — open but checked off');
+          mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:false});
+        } else if(data&&data.state==='closed'){
+          var closedByPR=false,closedByUser='',closedAt=data.closed_at||'';
+          if(data.closed_by&&data.closed_by.login)closedByUser=data.closed_by.login;
+          try{
+            var tl=await ghFetch('/repos/'+ti.repo+'/issues/'+issueNum+'/timeline?per_page=100');
+            if(Array.isArray(tl)){tl.forEach(function(ev){
+              if(ev.event==='closed'&&ev.commit_id)closedByPR=true;
+              if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;
+            });}
+          }catch(e){console.warn('[mismatch] timeline fetch failed for #'+issueNum,e.message);}
+          if(closedByPR){
+            console.log('[mismatch] FLAGGING #'+issueNum+' — closed by PR but checked off');
+            mismatches.push({trackingIssue:ti,childId:issueNum,childRepo:ti.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,lineIndex:l,closedButChecked:true,closedByPR:true,closedByUser:closedByUser,closedAt:closedAt});
+          } else {
+            console.log('[mismatch] #'+issueNum+' closed manually — skipping (legitimate)');
+          }
+        }
+      }catch(e){console.warn('[mismatch] fetch failed for #'+issueNum,e.message);}
     }
+    console.log('[mismatch] #'+ti.id+' had '+checkedCount+' checked lines');
   }
+  console.log('[mismatch] done — '+mismatches.length+' mismatches found');
   _scanResults=mismatches;_scanning=false;renderReport();
 }
 
