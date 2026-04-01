@@ -559,9 +559,9 @@ function isException(issue){
   if(issue.state!=='open')return false;
   if(isExempt(issue))return false;
   if(issue.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';}))return false;
-  // Auto-checked in a tracking issue is always an exception, even if the issue has a parent
-  if(findAutoCheckedParents(issue.id).length>0)return true;
-  // The remaining checks only apply to parentless issues
+  // Only flag auto-checked if the issue has NO parent — if it has a parent it was
+  // legitimately completed and someone manually checked it off
+  if(!issue.parent&&findAutoCheckedParents(issue.id).length>0)return true;
   if(issue.parent)return false;
   if(hasCS(issue))return true;
   if(getAutoClosedItems(issue).length>0)return true;
@@ -997,7 +997,7 @@ function renderMismatchPanel(){
   var h='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #f59e0b">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
   h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Mismatch Scanner</div>';
-      h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds tracking issues where a box is checked but the issue is still open, OR was closed via PR and needs review</div></div>';
+      h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds boxes checked on open issues, or boxes auto-checked by a PR closing keyword on closed issues</div></div>';
 
   if(_scanning){
     h+='<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>';
