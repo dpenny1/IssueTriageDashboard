@@ -392,6 +392,19 @@ function findAutoCheckedParents(issueId){var parents=[];S.issues.forEach(functio
 async function uncheckInParent(trackingIssueId,trackingRepo,childIssueId){var ti=S.issues.find(function(i){return i.id===trackingIssueId&&i.repo===trackingRepo;});if(!ti){alert('Tracking issue not found.');return;}var lines=(ti.body||'').split('\n');var changed=false;var newLines=lines.map(function(line){var chk=line.match(/^(\s*-\s*)\[x\](\s*.+)/i);if(!chk)return line;var ref=chk[2];var m=ref.match(/#(\d+)/);if(m&&parseInt(m[1])===childIssueId){changed=true;return chk[1]+'[ ]'+chk[2];}return line;});if(!changed){alert('Could not find the checked line.');return;}try{await ghPatch('/repos/'+trackingRepo+'/issues/'+trackingIssueId,{body:newLines.join('\n')});ti.body=newLines.join('\n');renderMain();}catch(e){alert('Failed to uncheck: '+e.message);}}
 function isNIP(issue){return issue.pipeline&&issue.pipeline.pipelineName.toLowerCase()==='new issues';}
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
+function isReferencedInTaskItem(issueId){
+  return S.issues.some(function(ti){
+    if(!ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
+    return (ti.body||'').split('\n').some(function(line){
+      var m=line.match(/^\s*-\s*\[[ x]\]\s*(.+)/i);
+      if(!m)return false;
+      var ref=m[1].trim();
+      var n=ref.match(/#(\d+)/);
+      return n&&parseInt(n[1])===issueId;
+    });
+  });
+}
+
 function isException(issue){
   if(issue.state!=='open')return false;
   if(isExempt(issue))return false;
@@ -401,6 +414,10 @@ function isException(issue){
   if(issue.parent)return false;
   if(hasCS(issue))return true;
   if(getAutoClosedItems(issue).length>0)return true;
+  // CS Item with no parent and not referenced in any CS Task Item
+  if(issue.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';})){
+    if(!isReferencedInTaskItem(issue.id))return true;
+  }
   return false;
 }
 function populateFilters(){var ls={},rs={},ps={};S.issues.concat(S.closedIssues).forEach(function(i){i.labels.forEach(function(l){ls[l]=1;});rs[i.repo]=1;if(i.pipeline)ps[i.pipeline.pipelineName]=1;});var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');fl.innerHTML='<option value="">All labels</option>';Object.keys(ls).sort(lsort).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});fr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});fp.innerHTML='<option value="">All pipelines</option>';Object.keys(ps).sort(lsort).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});}
@@ -468,6 +485,28 @@ function renderExcReason(issue){
   if(ai.length&&!autoParents.length){var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';ai.forEach(function(t){h+='<div class="acit">'+esc(t)+'</div>';});parts.push(h+'</div>');}
   if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
   if(!parts.length){
+    // Check if it's a CS Item not referenced in any task item
+    var isCsUntracked=issue.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';})||hasCS(issue);
+    if(isCsUntracked&&!isReferencedInTaskItem(issue.id)){
+      var key=issue.id+'_'+issue.repo;
+      parts.push(
+        '<div style="display:flex;flex-direction:column;gap:6px" id="parentPicker_'+key+'">'+
+        '<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not tracked in any CS Task Item</span>'+
+        '<div style="font-size:11px;color:#6b7280">This issue has a CS label but is not referenced in any open CS Task Item checklist.</div>'+
+        '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'+
+        '<input type="text" id="psearch_'+key+'" placeholder="# or title..." autocomplete="off" style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:160px" oninput="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')"/>'+
+        '<button class="btn-sm" style="font-size:11px;padding:3px 9px" onclick="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')">🔍 Find Task Item</button>'+
+        '</div>'+
+        '<div id="presults_'+key+'" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:320px"></div>'+
+        '<div id="pselected_'+key+'" style="display:none;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 12px;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'+
+          '<span id="pselectedLabel_'+key+'" style="font-size:12px;font-weight:600;color:#166534;flex:1"></span>'+
+          '<button class="btn-sm" style="font-size:11px;border-color:#86efac;color:#166534;background:#dcfce7" onclick="clearParentSelection(\''+key+'\')">✕ Clear</button>'+
+          '<button class="btn-p" style="font-size:12px;padding:5px 14px" id="psaveBtn_'+key+'" onclick="saveParent('+issue.id+',\''+esc(issue.repo)+'\')">💾 Save Parent</button>'+
+        '</div>'+
+        '<div id="pstatus_'+key+'" style="display:none;font-size:12px;color:#dc2626;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:6px 10px"></div>'+
+        '</div>'
+      );
+    } else {
     var key=issue.id+'_'+issue.repo;
     parts.push(
       '<div style="display:flex;flex-direction:column;gap:6px" id="parentPicker_'+key+'">'+
