@@ -680,9 +680,11 @@ async function searchParent(issueId,repo){
     var results;
     var num=parseInt(q);
     if(!isNaN(num)&&String(num)===q.trim()){
+      // Exact issue number — fetch directly
       try{var single=await ghFetch('/repos/'+repo+'/issues/'+num);results=single.pull_request?[]:[single];}catch(e){results=[];}
     } else {
-      var data=await ghFetch('/search/issues?q='+encodeURIComponent(q)+'+'+encodeURIComponent('repo:'+repo)+'+is:issue+is:open&per_page=10&sort=updated');
+      // Search by title using GitHub Search API
+      var data=await ghFetch('/search/issues?q='+encodeURIComponent(q+' repo:'+repo)+'+is:issue+is:open&per_page=10&sort=updated');
       results=Array.isArray(data.items)?data.items:[];
     }
     if(!results.length){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">No issues found.</div>';return;}
@@ -771,32 +773,23 @@ function renderOnDeckBanner(issues){
   var onDeck=issues.filter(function(i){return i.pipeline&&i.pipeline.pipelineName==='On Deck Priorities';});
   if(!onDeck.length)return '';
   var assigned=onDeck.filter(function(i){return i.assignees&&i.assignees.length>0;});
-  var unassigned=onDeck.filter(function(i){return !i.assignees||i.assignees.length===0;});
   var h='<div style="background:#fff;border:1px solid #c7d2fe;border-radius:10px;padding:14px 18px;margin-bottom:16px;border-left:4px solid #4338ca">';
   h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">';
   h+='<div style="font-size:14px;font-weight:700;color:#1e1b4b">📋 On Deck Priorities</div>';
   h+='<span style="font-size:12px;padding:2px 9px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-weight:700">'+onDeck.length+' total</span>';
   if(assigned.length)h+='<span style="font-size:12px;padding:2px 9px;border-radius:999px;background:#d1fae5;color:#065f46;font-weight:700">'+assigned.length+' assigned</span>';
-  if(unassigned.length)h+='<span style="font-size:12px;padding:2px 9px;border-radius:999px;background:#fee2e2;color:#991b1b;font-weight:700">'+unassigned.length+' unassigned</span>';
   h+='</div>';
   if(assigned.length){
     h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Assigned:</div>';
-    h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:'+(unassigned.length?'10px':'0')+'">';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
     assigned.forEach(function(i){
       h+='<a href="'+esc(i.url)+'" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#1e1b4b;text-decoration:none">';
       h+='<span style="color:#6b7280">#'+i.id+'</span> '+esc(i.title.length>40?i.title.substring(0,40)+'…':i.title);
       h+=' <span style="color:#059669;font-size:11px">→ '+esc(i.assignees.join(', '))+'</span></a>';
     });
     h+='</div>';
-  }
-  if(unassigned.length){
-    h+='<div style="font-size:12px;font-weight:600;color:#991b1b;margin-bottom:6px">⚠ Unassigned:</div>';
-    h+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
-    unassigned.forEach(function(i){
-      h+='<a href="'+esc(i.url)+'" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#fff5f5;border:1px solid #fca5a5;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#991b1b;text-decoration:none">';
-      h+='<span style="color:#6b7280">#'+i.id+'</span> '+esc(i.title.length>40?i.title.substring(0,40)+'…':i.title)+'</a>';
-    });
-    h+='</div>';
+  } else {
+    h+='<div style="font-size:13px;color:#9ca3af">No assigned issues in On Deck Priorities.</div>';
   }
   h+='</div>';
   return h;
