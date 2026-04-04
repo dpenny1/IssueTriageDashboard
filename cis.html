@@ -454,9 +454,14 @@ function findAutoCheckedParents(issueId){
 
 function isReferencedInTracking(issueId){
   var found=false;
-  var trackingIssues=S.issues.filter(function(ti){
-    return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&ti.state==='open';
+  // Check both open and closed CS Task Item issues
+  var openTracking=S.issues.filter(function(ti){
+    return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});
   });
+  var closedTracking=S.closedIssues.filter(function(ti){
+    return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});
+  });
+  var trackingIssues=openTracking.concat(closedTracking);
   for(var i=0;i<trackingIssues.length;i++){
     var lines=(trackingIssues[i].body||'').split('\n');
     for(var j=0;j<lines.length;j++){
