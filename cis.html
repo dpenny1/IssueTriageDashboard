@@ -157,8 +157,8 @@ tr:hover td{background:#f9fafb}
 </div>
 
 <script>
-var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
-var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
+var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],closedExcIgnored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
+var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',CLOSED_EXC_IGNORED_KEY='cis_closed_exc_ignored_v1',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
 var TAB_DEFS=[
   {id:'newitems',label:'New Issues',color:'#0891b2'},
@@ -278,6 +278,8 @@ function lsort(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}
 function sortLbls(labels){return labels.slice().sort(function(a,b){var da=S.labelNames[a.toLowerCase()]||a;var db=S.labelNames[b.toLowerCase()]||b;return da.toLowerCase().localeCompare(db.toLowerCase());});}
 function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveIgnored(){try{localStorage.setItem(IGNORED_KEY,JSON.stringify(S.ignored));}catch(e){}}
+function loadClosedExcIgnored(){try{var v=localStorage.getItem(CLOSED_EXC_IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+function saveClosedExcIgnored(){try{localStorage.setItem(CLOSED_EXC_IGNORED_KEY,JSON.stringify(S.closedExcIgnored));}catch(e){}}
 function loadHistory(){try{var v=localStorage.getItem(STORAGE_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveHistory(h){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(h));}catch(e){}}
 function loadZHCreds(){try{var v=localStorage.getItem(ZH_STORAGE);if(v){var d=JSON.parse(v);S.zhToken=d.token||'';S.zhWorkspace=d.workspace||'';}}catch(e){}}
@@ -349,7 +351,7 @@ async function connect(){
   hideErr('setupErr');
   if(!S.ghToken||!rp){showErr('setupErr','Please select a project.');return;}
   S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
-  S.ignored=loadIgnored();loadZHCreds();S.repoWorkspaceMap={};
+  S.ignored=loadIgnored();S.closedExcIgnored=loadClosedExcIgnored();loadZHCreds();S.repoWorkspaceMap={};
   if(S.activeProfile){
     if(S.activeProfile.type==='group'){(S.activeProfile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(!S.zhWorkspace&&S.activeProfile.repos&&S.activeProfile.repos[0])S.zhWorkspace=S.activeProfile.repos[0].zhWorkspace||'';}
     else if(S.activeProfile.zhWorkspace){S.zhWorkspace=S.activeProfile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=S.activeProfile.zhWorkspace;}
@@ -427,6 +429,20 @@ async function loadIssues(){
   S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
   document.getElementById('dashTitle').textContent='📋 CentralView '+(S.activeProfile?S.activeProfile.name+' Issues Hub':'Issues Hub');
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
+  // Debug — direct fetch for missing issues
+  [11302,11179].forEach(function(id){
+    var inOpen=open.find(function(i){return i.id===id;});
+    if(inOpen){
+      console.log('DEBUG #'+id+': IN open array. labels='+JSON.stringify(inOpen.labels)+' parent='+JSON.stringify(inOpen.parent)+' isException='+isException(inOpen));
+    } else {
+      console.log('DEBUG #'+id+': NOT in open array — fetching directly from GitHub...');
+      ghFetch('/repos/'+S.repos[0]+'/issues/'+id).then(function(d){
+        console.log('DEBUG #'+id+' direct fetch: state='+d.state+' isPR='+(!!d.pull_request)+' labels='+JSON.stringify((d.labels||[]).map(function(l){return l.name;})));
+      }).catch(function(e){
+        console.log('DEBUG #'+id+' direct fetch FAILED: '+e.message);
+      });
+    }
+  });
 }
 
 // ── Issue logic ───────────────────────────────────────────────────────────────
@@ -487,7 +503,31 @@ async function uncheckInParent(trackingIssueId,trackingRepo,childIssueId){
   }catch(e){alert('Failed to uncheck: '+e.message);}
 }
 
-function isNIP(issue){return issue.pipeline&&issue.pipeline.pipelineName.toLowerCase()==='new issues';}
+function isClosedException(issue){
+  if(issue.state!=='closed')return false;
+  if(S.closedExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;
+  var lbls=issue.labels.map(function(l){return l.toLowerCase();});
+  var hasCSItem=lbls.indexOf('cs item')!==-1;
+  var hasTesting=lbls.indexOf('cs in testing')!==-1;
+  var hasCSLabel=lbls.some(function(l){return CS_LABELS.indexOf(l)!==-1;});
+  if(!hasCSLabel)return false;
+  // CS Item not referenced in any tracking issue
+  if(hasCSItem&&!isReferencedInTracking(issue.id))return true;
+  // CS Item with no parent
+  if(hasCSItem&&!issue.parent)return true;
+  // CS-labeled issue closed without ever having CS In Testing
+  if(hasCSLabel&&!hasTesting)return true;
+  return false;
+}
+
+function getClosedExceptions(){
+  return S.closedIssues.filter(function(i){return isClosedException(i);});
+}
+
+function ignoreClosedExc(key){
+  if(S.closedExcIgnored.indexOf(key)===-1)S.closedExcIgnored.push(key);
+  saveClosedExcIgnored();renderMain();
+}
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
 
 function isException(issue){
@@ -548,7 +588,7 @@ function renderStats(){
   var tN=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length+S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
   var stats=[
     {n:base.filter(function(i){return !hasCS(i);}).length,tab:'newitems'},
-    {n:getExceptions().length,tab:'exceptions'},
+    {n:getExceptions().length+getClosedExceptions().length,tab:'exceptions'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length,tab:'prod'},
     {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,tab:'uat'},
     {n:base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});}).length,tab:'csitems'},
@@ -854,7 +894,38 @@ function renderCSItemsGrouped(issues,def){
   return h;
 }
 
-function setCsItemsPipeline(name){_csItemsPipeline=name;renderMain();}
+function renderClosedExceptionsSection(issues){
+  var h='<div style="margin-top:20px">';
+  h+='<div class="gh" style="background:#7c3aed;border-radius:10px 10px 0 0"><span class="gt">⚠ Closed Issue Exceptions<span class="gc">'+issues.length+'</span></span></div>';
+  h+='<div class="tw2"><table><thead><tr>';
+  h+=mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th><th>Reason</th>';
+  h+=mkTh('closed','Closed')+'<th>Closed By</th><th></th></tr></thead><tbody>';
+  issues.forEach(function(issue){
+    var lbls=issue.labels.map(function(l){return l.toLowerCase();});
+    var hasCSItem=lbls.indexOf('cs item')!==-1;
+    var hasTesting=lbls.indexOf('cs in testing')!==-1;
+    var reasons=[];
+    if(hasCSItem&&!issue.parent)reasons.push('No parent issue');
+    if(hasCSItem&&!isReferencedInTracking(issue.id))reasons.push('Not in any tracking issue');
+    if(!hasTesting)reasons.push('Never had CS In Testing label');
+    var ikey=issue.id+'_'+issue.repo;
+    h+='<tr style="background:#faf5ff">';
+    h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
+    h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
+    h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';
+    sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
+    h+='</div></td>';
+    h+='<td style="min-width:180px">';
+    reasons.forEach(function(r){h+='<div><span class="badge" style="background:#ede9fe;color:#5b21b6;margin-bottom:2px">⚠ '+esc(r)+'</span></div>';});
+    h+='</td>';
+    h+='<td style="font-size:12px;color:#059669;font-weight:600">'+(issue.closedAt?new Date(issue.closedAt).toLocaleDateString():'—')+'</td>';
+    h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.closedBy||'—')+'</td>';
+    h+='<td><button class="btn-ig" onclick="ignoreClosedExc(\''+ikey+'\')">Dismiss</button></td>';
+    h+='</tr>';
+  });
+  h+='</tbody></table></div></div>';
+  return h;
+}
 async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});if(!list.length){sel.value='';return;}if(!confirm('Move '+list.length+' issues?')){sel.value='';return;}for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}
 
 function renderMain(){
@@ -865,6 +936,14 @@ function renderMain(){
   if(S.activeTab==='csitems'&&S.zhToken&&!filterPipeline){
     var csIssues=applyFilters(getTabIssues('csitems'));
     document.getElementById('mainContent').innerHTML=renderOnDeckBanner(csIssues)+renderCSItemsGrouped(csIssues,def);
+  } else if(S.activeTab==='exceptions'){
+    var openExc=applyFilters(sortIssues(getExceptions(),'exceptions'));
+    var closedExc=getClosedExceptions();
+    var html=renderTable(openExc,'exceptions',def);
+    if(closedExc.length){
+      html+=renderClosedExceptionsSection(closedExc);
+    }
+    document.getElementById('mainContent').innerHTML=html;
   } else {
     var issues=applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab));
     document.getElementById('mainContent').innerHTML=renderTable(issues,S.activeTab,def);
@@ -1060,7 +1139,7 @@ function loadHistoricalData(){
   S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo;}):[profile.repo];
   if(profile.type==='group'){(profile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(!S.zhWorkspace&&profile.repos&&profile.repos[0])S.zhWorkspace=profile.repos[0].zhWorkspace||'';}
   else if(profile.zhWorkspace){S.zhWorkspace=profile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=profile.zhWorkspace;}
-  S.ignored=loadIgnored();
+  S.ignored=loadIgnored();S.closedExcIgnored=loadClosedExcIgnored();
   var cache=loadCache();
   if(cache&&cache.issues){
     S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
