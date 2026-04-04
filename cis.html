@@ -679,12 +679,19 @@ async function searchParent(issueId,repo){
   try{
     var results;
     var num=parseInt(q);
-    if(!isNaN(num)&&String(num)===q.trim()){
+    var isExactNum=!isNaN(num)&&String(num)===q.trim()&&q.trim().length>2;
+    if(isExactNum){
       // Exact issue number — fetch directly
       try{var single=await ghFetch('/repos/'+repo+'/issues/'+num);results=single.pull_request?[]:[single];}catch(e){results=[];}
+      // Also run a text search in case they want more context
+      if(!results.length){
+        var fd=await ghFetch('/search/issues?q='+encodeURIComponent(q)+'&repository_id='+encodeURIComponent('repo:'+repo)+'&per_page=10');
+        results=Array.isArray(fd.items)?fd.items:[];
+      }
     } else {
-      // Search by title using GitHub Search API
-      var data=await ghFetch('/search/issues?q='+encodeURIComponent(q+' repo:'+repo)+'+is:issue+is:open&per_page=10&sort=updated');
+      // Text search — searches title AND body via GitHub Search API
+      var qStr=encodeURIComponent(q)+'+repo:'+encodeURIComponent(repo)+'+is:issue+is:open';
+      var data=await ghFetch('/search/issues?q='+qStr+'&per_page=10&sort=updated');
       results=Array.isArray(data.items)?data.items:[];
     }
     if(!results.length){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">No issues found.</div>';return;}
