@@ -158,7 +158,7 @@ tr:hover td{background:#f9fafb}
 </div>
 
 <script>
-var APP_VERSION='2026-04-04 v3';
+var APP_VERSION='2026-04-04 v4';
 
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],closedExcIgnored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',CLOSED_EXC_IGNORED_KEY='cis_closed_exc_ignored_v1',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
@@ -341,7 +341,7 @@ function delProfile(id){if(!confirm('Delete?'))return;saveProfiles(loadProfiles(
 function editProfile(id){var p=loadProfiles(),pr=p.find(function(x){return x.id===id;});if(!pr)return;var n=prompt('Name:',pr.name);if(n===null)return;var r=prompt('Repo:',pr.repo);if(r===null)return;var w=prompt('ZenHub workspace ID:',pr.zhWorkspace||'');if(w===null)return;pr.name=n.trim();pr.repo=r.trim();pr.zhWorkspace=w.trim();saveProfiles(p);renderCfg();}
 
 // ── API helpers ───────────────────────────────────────────────────────────────
-async function ghFetch(path){var r=await fetch('https://api.github.com'+path,{headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json'}});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);return r.json();}
+async function ghFetch(path){var r=await fetch('https://api.github.com'+path,{headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);return r.json();}
 async function ghFetchAll(path,maxPages){maxPages=maxPages||10;var results=[],per=100;for(var page=1;page<=maxPages;page++){var sep=path.indexOf('?')!==-1?'&':'?';var batch=await ghFetch(path+sep+'per_page='+per+'&page='+page);if(!Array.isArray(batch)||!batch.length)break;results=results.concat(batch);if(batch.length<per)break;}return results;}
 async function ghPatch(path,body){var r=await fetch('https://api.github.com'+path,{method:'PATCH',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);return r.json();}
 async function ghPost(path,body){var r=await fetch('https://api.github.com'+path,{method:'POST',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);return r.json();}
@@ -411,7 +411,7 @@ async function loadIssues(){
       if(iss.pull_request)return;
       var bodyParent=null;
       if(iss.body){var pm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(pm)bodyParent={issueNumber:parseInt(pm[1])};}
-      open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:iss.parent_issue_url?{url:iss.parent_issue_url}:(bodyParent||null)});
+      open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:(iss.parent_issue_id?{issueNumber:iss.parent_issue_id}:(bodyParent||null))});
     });
     var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100');
     if(!Array.isArray(cd))cd=[];
