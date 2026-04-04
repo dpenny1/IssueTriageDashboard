@@ -530,6 +530,10 @@ function ignoreClosedExc(key){
 }
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
 
+function isNIP(issue){
+  return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');
+}
+
 function isException(issue){
   if(issue.state!=='open')return false;
   if(isExempt(issue))return false;
