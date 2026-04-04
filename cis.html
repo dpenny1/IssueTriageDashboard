@@ -488,16 +488,19 @@ function findAutoCheckedParents(issueId){
 // Check if an issue number is referenced in ANY open CS Task Item tracking issue
 // (checked or unchecked — just needs to be listed)
 function isReferencedInTracking(issueId){
-  return S.issues.some(function(ti){
-    if(!ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
-    if(ti.state!=='open')return false;
-    return (ti.body||'').split('\n').some(function(line){
-      var m=line.match(/^\s*-\s*\[[ x]\]\s*(.+)/i);
-      if(!m)return false;
-      var ref=m[1].match(/#(\d+)/);
-      return ref&&parseInt(ref[1])===issueId;
-    });
+  var trackingIssues=S.issues.filter(function(ti){
+    return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&ti.state==='open';
   });
+  for(var t=0;t<trackingIssues.length;t++){
+    var lines=(trackingIssues[t].body||'').split('\n');
+    for(var l=0;l<lines.length;l++){
+      var m=lines[l].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);
+      if(!m)continue;
+      var ref=m[1].match(/#(\d+)/);
+      if(ref&&parseInt(ref[1])===issueId)return true;
+    }
+  }
+  return false;
 }
   var ti=S.issues.find(function(i){return i.id===trackingIssueId&&i.repo===trackingRepo;});
   if(!ti){alert('Tracking issue not found in local state.');return;}
