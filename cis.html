@@ -124,6 +124,7 @@ tr:hover td{background:#f9fafb}
   <div class="hdr"><div class="hdr-in">
     <div><h1 id="dashTitle">📋 CentralView</h1><p id="dashMeta">Loading...</p></div>
     <div class="hdr-btns">
+      <span id="versionBadge" style="font-size:11px;color:#c7d2fe;opacity:0.8"></span>
       <span id="loadedAt" style="font-size:12px"></span>
       <a href="index.html" class="btn btn-w">← All Projects</a>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-w">🛠 PM Tools</a>
@@ -157,6 +158,8 @@ tr:hover td{background:#f9fafb}
 </div>
 
 <script>
+var APP_VERSION='2026-04-04 v1';
+
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],closedExcIgnored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',CLOSED_EXC_IGNORED_KEY='cis_closed_exc_ignored_v1',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
@@ -406,12 +409,8 @@ async function loadIssues(){
     var od=await ghFetchAll('/repos/'+repo+'/issues?state=open',10);
     od.forEach(function(iss){
       if(iss.pull_request)return;
-      // Check body for manual parent reference we added as fallback
       var bodyParent=null;
-      if(iss.body){
-        var pm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);
-        if(pm)bodyParent={issueNumber:parseInt(pm[1])};
-      }
+      if(iss.body){var pm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(pm)bodyParent={issueNumber:parseInt(pm[1])};}
       open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:iss.parent_issue_url?{url:iss.parent_issue_url}:(bodyParent||null)});
     });
     var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100');
@@ -429,20 +428,6 @@ async function loadIssues(){
   S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
   document.getElementById('dashTitle').textContent='📋 CentralView '+(S.activeProfile?S.activeProfile.name+' Issues Hub':'Issues Hub');
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
-  // Debug — direct fetch for missing issues
-  [11302,11179].forEach(function(id){
-    var inOpen=open.find(function(i){return i.id===id;});
-    if(inOpen){
-      console.log('DEBUG #'+id+': IN open array. labels='+JSON.stringify(inOpen.labels)+' parent='+JSON.stringify(inOpen.parent)+' isException='+isException(inOpen));
-    } else {
-      console.log('DEBUG #'+id+': NOT in open array — fetching directly from GitHub...');
-      ghFetch('/repos/'+S.repos[0]+'/issues/'+id).then(function(d){
-        console.log('DEBUG #'+id+' direct fetch: state='+d.state+' isPR='+(!!d.pull_request)+' labels='+JSON.stringify((d.labels||[]).map(function(l){return l.name;})));
-      }).catch(function(e){
-        console.log('DEBUG #'+id+' direct fetch FAILED: '+e.message);
-      });
-    }
-  });
 }
 
 // ── Issue logic ───────────────────────────────────────────────────────────────
@@ -511,11 +496,8 @@ function isClosedException(issue){
   var hasTesting=lbls.indexOf('cs in testing')!==-1;
   var hasCSLabel=lbls.some(function(l){return CS_LABELS.indexOf(l)!==-1;});
   if(!hasCSLabel)return false;
-  // CS Item not referenced in any tracking issue
   if(hasCSItem&&!isReferencedInTracking(issue.id))return true;
-  // CS Item with no parent
   if(hasCSItem&&!issue.parent)return true;
-  // CS-labeled issue closed without ever having CS In Testing
   if(hasCSLabel&&!hasTesting)return true;
   return false;
 }
@@ -528,6 +510,7 @@ function ignoreClosedExc(key){
   if(S.closedExcIgnored.indexOf(key)===-1)S.closedExcIgnored.push(key);
   saveClosedExcIgnored();renderMain();
 }
+
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
 
 function isNIP(issue){
@@ -537,17 +520,18 @@ function isNIP(issue){
 function isException(issue){
   if(issue.state!=='open')return false;
   if(isExempt(issue))return false;
-  if(issue.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';}))return false;
-  // Auto-checked in tracking issue — exception regardless of parent
-  if(!issue.parent&&findAutoCheckedParents(issue.id).length>0)return true;
-  // Still in New Issues pipeline — exception regardless of parent
+  // Has a parent — never an exception
+  if(issue.parent)return false;
+  // CS Task Items are never exceptions
+  if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
+  // Checked [x] in a tracking issue AND currently has cs in testing label → exception
+  if(findAutoCheckedParents(issue.id).length>0&&issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';}))return true;
+  // Still in New Issues pipeline
   if(isNIP(issue))return true;
   // CS Item not referenced in any tracking issue
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id))return true;
-  // Remaining checks only apply to parentless issues
-  if(issue.parent)return false;
+  // Has any CS label
   if(hasCS(issue))return true;
-  if(getAutoClosedItems(issue).length>0)return true;
   return false;
 }
 
@@ -686,10 +670,10 @@ async function deleteLabel(lk){var display=S.labelNames[lk]||lk;if(!confirm('Del
 function renderExcReason(issue){
   var parts=[];
   var autoParents=findAutoCheckedParents(issue.id);
-  if(autoParents.length){
+  if(autoParents.length&&issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';})){
     autoParents.forEach(function(ap){
       var h='<div class="aci">';
-      h+='<div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:4px">⚠ Auto-checked in tracking issue <a href="'+esc(ap.trackingIssue.url)+'" target="_blank" style="color:#7a4f00;text-decoration:underline">#'+ap.trackingIssue.id+'</a></div>';
+      h+='<div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:4px">⚠ Checked in tracking issue <a href="'+esc(ap.trackingIssue.url)+'" target="_blank" style="color:#7a4f00;text-decoration:underline">#'+ap.trackingIssue.id+'</a> but still has CS In Testing</div>';
       h+='<div class="acit" style="margin-bottom:6px">'+esc(ap.lineText)+'</div>';
       h+='<div style="display:flex;gap:6px;align-items:center">';
       h+='<a href="'+esc(ap.trackingIssue.url)+'" target="_blank" class="btn-sm" style="font-size:11px;padding:3px 9px;text-decoration:none;display:inline-block">👁 Review #'+ap.trackingIssue.id+'</a>';
@@ -698,24 +682,12 @@ function renderExcReason(issue){
       parts.push(h);
     });
   }
-  var ai=getAutoClosedItems(issue);
-  if(ai.length&&!autoParents.length){var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:3px">⚠ Auto-closed via PR:</div>';ai.forEach(function(t){h+='<div class="acit">'+esc(t)+'</div>';});parts.push(h+'</div>');}
   if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id)){
     parts.push('<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not in any tracking issue</span>');
   }
   if(!parts.length){
-    var key=issue.id+'_'+issue.repo;
-    parts.push(
-      '<div style="display:flex;flex-direction:column;gap:6px">'+
-      '<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ No parent</span>'+
-      '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">'+
-      '<input type="text" id="psearch_'+key+'" placeholder="# or title..." autocomplete="off" style="padding:4px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none;width:160px" oninput="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')"/>'+
-      '<button class="btn-sm" style="font-size:11px;padding:3px 9px" onclick="searchParent(\''+esc(issue.id)+'\',\''+esc(issue.repo)+'\')">🔍</button>'+
-      '</div>'+
-      '<div id="presults_'+key+'" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:320px"></div>'+
-      '</div>'
-    );
+    parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Has CS label but no parent</span>');
   }
   return parts.join('<div style="margin-top:4px"></div>');
 }
@@ -734,18 +706,8 @@ async function searchParent(issueId,repo){
       try{var single=await ghFetch('/repos/'+repo+'/issues/'+num);results=single.pull_request?[]:[single];}catch(e){results=[];}
     }
     if(!results||!results.length){
-      // Use GitHub Search API — searches title and body
-      // repo: qualifier must NOT be encoded, only the search term is encoded
       var searchUrl='/search/issues?q='+encodeURIComponent(q)+'+repo:'+repo+'+is:issue+is:open&per_page=10&sort=updated';
-      console.log('[searchParent] searching:', searchUrl);
-      try{
-        var data=await ghFetch(searchUrl);
-        console.log('[searchParent] results:', data.total_count, 'items:', (data.items||[]).length);
-        results=Array.isArray(data.items)?data.items:[];
-      }catch(e){
-        console.error('[searchParent] search failed:', e.message);
-        results=[];
-      }
+      try{var data=await ghFetch(searchUrl);results=Array.isArray(data.items)?data.items:[];}catch(e){results=[];}
     }
     if(!results.length){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">No issues found.</div>';return;}
     var h='';
@@ -766,9 +728,8 @@ async function setParent(issueId,repo,parentId,parentTitle){
       headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
       body:JSON.stringify({sub_issue_id:issueId})
     });
-    if(r.ok){succeeded=true;console.log('Parent set via sub_issues API');}
-    else{console.log('sub_issues API returned '+r.status);}
-  }catch(e1){console.log('sub_issues API failed: '+e1.message);}
+    if(r.ok){succeeded=true;}
+  }catch(e1){}
   if(!succeeded){
     try{
       var childData=await ghFetch('/repos/'+repo+'/issues/'+issueId);
@@ -777,7 +738,7 @@ async function setParent(issueId,repo,parentId,parentTitle){
       if(existingBody.indexOf('**Parent:** #'+parentId)===-1){
         await ghPatch('/repos/'+repo+'/issues/'+issueId,{body:existingBody.trimEnd()+parentRef});
       }
-      succeeded=true;console.log('Parent set via child body reference');
+      succeeded=true;
     }catch(e2){alert('Could not set parent: '+e2.message);return;}
   }
   if(issue){issue.parent={issueNumber:parentId};saveCache();}
@@ -898,6 +859,8 @@ function renderCSItemsGrouped(issues,def){
   return h;
 }
 
+function setCsItemsPipeline(pn){_csItemsPipeline=pn;renderMain();}
+
 function renderClosedExceptionsSection(issues){
   var h='<div style="margin-top:20px">';
   h+='<div class="gh" style="background:#7c3aed;border-radius:10px 10px 0 0"><span class="gt">⚠ Closed Issue Exceptions<span class="gc">'+issues.length+'</span></span></div>';
@@ -930,6 +893,7 @@ function renderClosedExceptionsSection(issues){
   h+='</tbody></table></div></div>';
   return h;
 }
+
 async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});if(!list.length){sel.value='';return;}if(!confirm('Move '+list.length+' issues?')){sel.value='';return;}for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}
 
 function renderMain(){
@@ -944,9 +908,7 @@ function renderMain(){
     var openExc=applyFilters(sortIssues(getExceptions(),'exceptions'));
     var closedExc=getClosedExceptions();
     var html=renderTable(openExc,'exceptions',def);
-    if(closedExc.length){
-      html+=renderClosedExceptionsSection(closedExc);
-    }
+    if(closedExc.length)html+=renderClosedExceptionsSection(closedExc);
     document.getElementById('mainContent').innerHTML=html;
   } else {
     var issues=applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab));
@@ -983,7 +945,6 @@ function getCurrentSnapshot(){
     total+=r.total;closed+=r.closed;open+=r.open;noIssue+=r.noIssue;
   });
   rows.sort(function(a,b){return b.id-a.id;});
-  // total saved = total + noIssue so it matches what's displayed
   return{date:todayStr(),tracking:nums.join('/'),total:total+noIssue,closed:closed,open:open,noIssue:noIssue,rows:rows};
 }
 
@@ -1025,10 +986,7 @@ async function runMismatchScan(){
           } else if(data&&data.state==='closed'){
             var closedByPR=false,closedByUser='',closedAt=data.closed_at||'';
             if(data.closed_by&&data.closed_by.login)closedByUser=data.closed_by.login;
-            try{
-              var tl=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum+'/timeline?per_page=100');
-              if(Array.isArray(tl)){tl.forEach(function(ev){if(ev.event==='closed'&&ev.commit_id)closedByPR=true;if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;});}
-            }catch(e){}
+            try{var tl=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum+'/timeline?per_page=100');if(Array.isArray(tl)){tl.forEach(function(ev){if(ev.event==='closed'&&ev.commit_id)closedByPR=true;if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;});}}catch(e){}
             if(closedByPR){mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:true,closedByPR:true,closedByUser:closedByUser,closedAt:closedAt});}
           }
         }catch(e){}
@@ -1045,13 +1003,10 @@ function renderMismatchPanel(){
   h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds boxes checked on open issues, or auto-checked by a PR on closed issues</div></div>';
   h+=_scanning?'<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>':'<button class="btn-p" onclick="runMismatchScan()" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
   h+='</div>';
-  if(_scanResults===null&&!_scanning){
-    h+='<div style="font-size:13px;color:#9ca3af">Click Run Scan to check all tracking issues for incorrectly checked boxes.</div>';
-  } else if(_scanning){
-    h+='<div style="font-size:13px;color:#9ca3af">Checking each checked item against GitHub...</div>';
-  } else if(_scanResults.length===0){
-    h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found.</div>';
-  } else {
+  if(_scanResults===null&&!_scanning){h+='<div style="font-size:13px;color:#9ca3af">Click Run Scan to check all tracking issues for incorrectly checked boxes.</div>';}
+  else if(_scanning){h+='<div style="font-size:13px;color:#9ca3af">Checking each checked item against GitHub...</div>';}
+  else if(_scanResults.length===0){h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found.</div>';}
+  else{
     h+='<div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">⚠ '+_scanResults.length+' mismatch'+(+_scanResults.length!==1?'es':'')+' found:</div>';
     h+='<div style="display:flex;flex-direction:column;gap:8px">';
     _scanResults.forEach(function(r,idx){
@@ -1136,6 +1091,7 @@ function loadHistoricalData(){
   }
   S.ghToken=gh;
   if(zh)S.zhToken=zh;
+  var vb=document.getElementById('versionBadge');if(vb)vb.textContent='v '+APP_VERSION;
   var profiles=loadProfiles();
   if(!profiles.length||profiles.length>1){showEl('setup');renderProfileDd();return;}
   var profile=profiles[0];
