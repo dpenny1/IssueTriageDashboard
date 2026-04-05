@@ -169,7 +169,7 @@ tr:hover td{background:#f9fafb}
 </div>
 
 <script>
-var APP_VERSION='2026-04-04 v17';
+var APP_VERSION='2026-04-04 v18';
 
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],closedExcIgnored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',CLOSED_EXC_IGNORED_KEY='cis_closed_exc_ignored_v1',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
@@ -405,10 +405,6 @@ async function loadZHDeps(){for(var i=0;i<S.repos.length;i++){var repo=S.repos[i
 function repoForId(id){return Object.keys(S.repoIds).find(function(r){return S.repoIds[r]===id;})||null;}
 
 async function loadSubIssueParents(){
-  // Find all open issues that have sub-issues (sub_issues_summary.total > 0)
-  // These are stored on the raw issue objects during loadIssues — we re-fetch the list
-  // to check sub_issues_summary since we don't store it. Instead we use a smarter approach:
-  // fetch /repos/:repo/issues/:number/sub_issues for any issue whose sub_issues_summary.total > 0
   var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});
   console.log('[loadSubIssueParents] found '+parents.length+' parent issues');
   for(var i=0;i<parents.length;i++){
@@ -444,7 +440,6 @@ async function loadIssues(){
       var bodyParent=null;
       if(iss.body){var pm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(pm)bodyParent={issueNumber:parseInt(pm[1])};}
       open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:bodyParent||null,subIssuesTotal:(iss.sub_issues_summary&&iss.sub_issues_summary.total)||0});
-
     });
     var since60=new Date(Date.now()-60*24*60*60*1000).toISOString();
     var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100&labels=cs+task+item&since='+since60);
@@ -498,7 +493,6 @@ function findAutoCheckedParents(issueId){
 
 function isReferencedInTracking(issueId){
   var found=false;
-  // Check both open and closed CS Task Item issues
   var openTracking=S.issues.filter(function(ti){
     return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});
   });
@@ -541,7 +535,6 @@ function isClosedException(issue){
   if(issue.state!=='closed')return false;
   if(S.closedExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;
   var lbls=issue.labels.map(function(l){return l.toLowerCase();});
-  // CS Task Items are tracking issues themselves — never flag them
   if(lbls.indexOf('cs task item')!==-1)return false;
   var hasCSItem=lbls.indexOf('cs item')!==-1;
   var hasTesting=lbls.indexOf('cs in testing')!==-1;
@@ -568,20 +561,22 @@ function isNIP(issue){
   return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');
 }
 
+// FIX 1: If issue has a parent (set by sub-issue API or body), it is never an exception
+// UNLESS it's checked [x] in a tracking issue while still having CS In Testing label.
 function isException(issue){
   if(issue.state!=='open')return false;
   if(isExempt(issue))return false;
-  // Has a parent — never an exception
-  if(issue.parent)return false;
   // CS Task Items are never exceptions
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
-  // Checked [x] in a tracking issue AND currently has cs in testing label → exception
+  // Checked [x] in a tracking issue AND currently has cs in testing label → exception regardless of parent
   if(findAutoCheckedParents(issue.id).length>0&&issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';}))return true;
+  // Has a verified parent → not an exception (parent resolves all other concerns)
+  if(issue.parent)return false;
   // Still in New Issues pipeline
   if(isNIP(issue))return true;
   // CS Item not referenced in any tracking issue
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id))return true;
-  // Has any CS label
+  // Has any CS label but no parent
   if(hasCS(issue))return true;
   return false;
 }
@@ -718,6 +713,37 @@ async function updateLabel(oldKey){var newName=document.getElementById('leName_'
 async function deleteLabel(lk){var display=S.labelNames[lk]||lk;if(!confirm('Delete label "'+display+'"? This cannot be undone.'))return;try{await ghDel('/repos/'+S.repos[0]+'/labels/'+encodeURIComponent(display));delete S.labelColors[lk];delete S.labelNames[lk];S.issues.concat(S.closedIssues).forEach(function(i){i.labels=i.labels.filter(function(l){return l.toLowerCase()!==lk;});});renderLabelManager();renderMain();}catch(e){alert('Failed: '+e.message);}}
 
 // ── Parent search & linking ───────────────────────────────────────────────────
+// FIX 3: renderParentSearch is now a standalone function called from every table row
+// (not just exceptions). Renders inline under the issue title cell.
+function renderParentSearch(issueId, repo) {
+  var key = issueId + '_' + repo;
+  var issue = S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});
+  var parentInfo = issue && issue.parent ? '🔗 Parent: #'+issue.parent.issueNumber : '';
+  var h = '<div style="margin-top:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px">';
+  if(parentInfo) h += '<div style="font-size:11px;color:#059669;font-weight:600;margin-bottom:5px">'+parentInfo+'</div>';
+  h += '<div style="display:flex;gap:6px;align-items:center">';
+  h += '<input type="text" id="psearch_'+key+'" placeholder="Search or enter # to set parent..." style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none" oninput="searchParent('+issueId+',\''+esc(repo)+'\')" onkeydown="if(event.key===\'Escape\'){document.getElementById(\'presults_'+key+'\').style.display=\'none\';}"/>';
+  h += '</div>';
+  h += '<div id="presults_'+key+'" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-top:4px;max-height:180px;overflow-y:auto"></div>';
+  h += '</div>';
+  return h;
+}
+
+var _openParentPanel = null;
+function toggleParentSearch(issueId, repo) {
+  var key = issueId + '_' + repo;
+  var panelId = 'parentpanel_' + key;
+  if (_openParentPanel && _openParentPanel !== panelId) {
+    var old = document.getElementById(_openParentPanel);
+    if (old) old.style.display = 'none';
+  }
+  var panel = document.getElementById(panelId);
+  if (!panel) return;
+  var isOpen = panel.style.display === 'block';
+  panel.style.display = isOpen ? 'none' : 'block';
+  _openParentPanel = isOpen ? null : panelId;
+}
+
 function renderExcReason(issue){
   var parts=[];
   var autoParents=findAutoCheckedParents(issue.id);
@@ -732,7 +758,6 @@ function renderExcReason(issue){
       h+='</div></div>';
       parts.push(h);
     });
-    // Stop here — don't add any further reasons
     return parts.join('<div style="margin-top:4px"></div>');
   }
   if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
@@ -795,6 +820,10 @@ async function setParent(issueId,repo,parentId,parentTitle){
     }catch(e2){alert('Could not set parent: '+e2.message);return;}
   }
   if(issue){issue.parent={issueNumber:parentId};saveCache();}
+  // Close the parent panel
+  var key=issueId+'_'+repo;
+  var panel=document.getElementById('parentpanel_'+key);if(panel)panel.style.display='none';
+  _openParentPanel=null;
   renderMain();
 }
 
@@ -817,9 +846,18 @@ function renderTable(issues,tab,def){
   if(!issues.length)h+='<tr><td colspan="99" class="er">No issues found.</td></tr>';
   issues.forEach(function(issue){
     var ikey=issue.id+'_'+issue.repo,days=issue.state==='closed'?null:ageDays(issue.createdAt),isOT=isTesting&&issue.state==='open';
+    var pkey=issue.id+'_'+issue.repo;
     h+='<tr'+(isOT||isExc?' style="background:#fff5f5"':'')+'>'; 
     h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
-    h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
+    // FIX 3: Add parent toggle button in title cell for all open issues
+    h+='<td style="min-width:200px">';
+    h+='<a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>';
+    if(issue.parent)h+=' <span style="font-size:11px;color:#059669;font-weight:600">🔗#'+issue.parent.issueNumber+'</span>';
+    if(issue.state==='open'&&!isClosed){
+      h+=' <button onclick="toggleParentSearch('+issue.id+',\''+esc(issue.repo)+'\')" title="Set parent" style="background:none;border:none;cursor:pointer;font-size:11px;padding:1px 5px;color:#9ca3af;border-radius:4px;border:1px solid #e5e7eb;margin-left:3px" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">🔗 Parent</button>';
+      h+='<div id="parentpanel_'+pkey+'" style="display:none">'+renderParentSearch(issue.id,issue.repo)+'</div>';
+    }
+    h+='</td>';
     h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
     sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
     h+='<button onclick="toggleLabelEdit('+issue.id+',\''+esc(issue.repo)+'\')" title="Edit labels" style="background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;color:#9ca3af;border-radius:4px;line-height:1" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">✏️</button>';
@@ -894,9 +932,15 @@ function renderCSItemsGrouped(issues,def){
   if(!activeIssues.length)h+='<tr><td colspan="99" class="er">No issues in this pipeline.</td></tr>';
   activeIssues.forEach(function(issue){
     var ikey=issue.id+'_'+issue.repo,days=ageDays(issue.createdAt);
+    var pkey=issue.id+'_'+issue.repo;
     h+='<tr>';
     h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
-    h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
+    h+='<td style="min-width:200px">';
+    h+='<a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>';
+    if(issue.parent)h+=' <span style="font-size:11px;color:#059669;font-weight:600">🔗#'+issue.parent.issueNumber+'</span>';
+    h+=' <button onclick="toggleParentSearch('+issue.id+',\''+esc(issue.repo)+'\')" title="Set parent" style="background:none;border:none;cursor:pointer;font-size:11px;padding:1px 5px;color:#9ca3af;border-radius:4px;border:1px solid #e5e7eb;margin-left:3px" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">🔗 Parent</button>';
+    h+='<div id="parentpanel_'+pkey+'" style="display:none">'+renderParentSearch(issue.id,issue.repo)+'</div>';
+    h+='</td>';
     h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
     sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
     h+='<button onclick="toggleLabelEdit('+issue.id+',\''+esc(issue.repo)+'\')" title="Edit labels" style="background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;color:#9ca3af;border-radius:4px;line-height:1" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">✏️</button>';
@@ -999,7 +1043,6 @@ function drawReleaseModal(loadingHtml){
 
   var h='';
 
-  // Release picker
   h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px">';
   h+='<select id="releasePicker" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;color:#374151"><option value="">— Select a release —</option>';
   _releases.forEach(function(r){h+='<option value="'+esc(r.id)+'">'+esc(r.name||r.tag_name)+'</option>';});
@@ -1007,7 +1050,6 @@ function drawReleaseModal(loadingHtml){
   h+='<button class="btn-p" onclick="loadReleaseIssues()">Load Issues</button>';
   h+='</div>';
 
-  // Assignee selector
   h+='<div style="margin-bottom:20px">';
   h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Assignees</div>';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">';
@@ -1023,7 +1065,6 @@ function drawReleaseModal(loadingHtml){
   h+='<button class="btn-sm" style="border-color:#4338ca;color:#4338ca" onclick="saveAsDefault()">💾 Save as Default</button>';
   h+='</div></div>';
 
-  // Issues list
   if(_releaseIssues.length){
     var csIssues=_releaseIssues.filter(function(i){return i.isCS;});
     var nonCS=_releaseIssues.filter(function(i){return !i.isCS;});
@@ -1035,7 +1076,6 @@ function drawReleaseModal(loadingHtml){
     h+='<button class="btn-p" onclick="applyRelease()" id="applyReleaseBtn">✓ Apply to Selected</button>';
     h+='</div></div>';
 
-    // Status bar
     h+='<div id="releaseStatusBar" style="display:none;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:10px 14px;margin-bottom:12px">';
     h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">';
     h+='<span class="spin spd" id="releaseSpinner"></span>';
@@ -1162,7 +1202,6 @@ async function applyRelease(){
 
   for(var i=0;i<selected.length;i++){
     var issue=selected[i];
-    // update row status to processing
     var rowEl=document.getElementById('releaseRowStatus_'+issue.id);
     if(rowEl)rowEl.innerHTML='<span style="font-size:12px;color:#6b7280"><span class="spin spd"></span> Processing...</span>';
     try{
@@ -1188,7 +1227,6 @@ async function applyRelease(){
     updateProgress();
   }
 
-  // Final status
   if(prog)prog.style.width='100%';
   if(prog)prog.style.background=failed?'#f59e0b':'#059669';
   if(spinner)spinner.style.display='none';
@@ -1259,21 +1297,59 @@ async function runMismatchScan(){
       var chk=lines[li].match(/^\s*-\s*\[x\]\s*(.+)/i);if(!chk)continue;
       var ref=chk[1].trim();var mm=ref.match(/#(\d+)/);if(!mm)continue;
       var issueNum=parseInt(mm[1]);
+      // FIX 2: Always fetch from GitHub to get ground-truth state, don't rely on S.issues only
       var openIssue=S.issues.find(function(i){return i.id===issueNum&&i.repo===track.repo;});
       if(openIssue){
+        // It's in our open issues list — definitely still open, flag it
         mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:openIssue.title,childUrl:openIssue.url,lineText:ref,closedButChecked:false});
       } else {
+        // Not in open issues — could be closed or just not loaded; fetch directly
         try{
           var data=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum);
           if(data&&data.state==='open'){
+            // Open but not in our local list (shouldn't normally happen, but catch it)
             mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:false});
           } else if(data&&data.state==='closed'){
+            // Closed — check if it was auto-closed by a PR
             var closedByPR=false,closedByUser='',closedAt=data.closed_at||'';
             if(data.closed_by&&data.closed_by.login)closedByUser=data.closed_by.login;
-            try{var tl=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum+'/timeline?per_page=100');if(Array.isArray(tl)){tl.forEach(function(ev){if(ev.event==='closed'&&ev.commit_id)closedByPR=true;if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;});}}catch(e){}
-            if(closedByPR){mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:true,closedByPR:true,closedByUser:closedByUser,closedAt:closedAt});}
+            try{
+              var tl=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum+'/timeline?per_page=100');
+              if(Array.isArray(tl)){
+                tl.forEach(function(ev){
+                  if(ev.event==='closed'&&ev.commit_id)closedByPR=true;
+                  if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;
+                });
+              }
+            }catch(e){}
+            // FIX 2: Report ALL closed issues that are checked, not just PR-closed ones.
+            // If closedByPR → note it. If manually closed → also flag (it wasn't verified through the process).
+            mismatches.push({
+              trackingIssue:track,
+              childId:issueNum,
+              childRepo:track.repo,
+              childTitle:data.title,
+              childUrl:data.html_url,
+              lineText:ref,
+              closedButChecked:true,
+              closedByPR:closedByPR,
+              closedByUser:closedByUser,
+              closedAt:closedAt
+            });
           }
-        }catch(e){}
+        }catch(e){
+          // Issue fetch failed — flag it as unknown for manual review
+          mismatches.push({
+            trackingIssue:track,
+            childId:issueNum,
+            childRepo:track.repo,
+            childTitle:'(could not load)',
+            childUrl:'https://github.com/'+track.repo+'/issues/'+issueNum,
+            lineText:ref,
+            closedButChecked:false,
+            fetchError:true
+          });
+        }
       }
     }
   }
@@ -1284,26 +1360,36 @@ function renderMismatchPanel(){
   var h='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #f59e0b">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
   h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Mismatch Scanner</div>';
-  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds boxes checked on open issues, or auto-checked by a PR on closed issues</div></div>';
+  h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds all checked boxes — open issues not yet closed, and closed issues to verify they went through proper process</div></div>';
   h+=_scanning?'<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>':'<button class="btn-p" onclick="runMismatchScan()" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
   h+='</div>';
-  if(_scanResults===null&&!_scanning){h+='<div style="font-size:13px;color:#9ca3af">Click Run Scan to check all tracking issues for incorrectly checked boxes.</div>';}
+  if(_scanResults===null&&!_scanning){h+='<div style="font-size:13px;color:#9ca3af">Click Run Scan to check all tracking issues for boxes that may need review.</div>';}
   else if(_scanning){h+='<div style="font-size:13px;color:#9ca3af">Checking each checked item against GitHub...</div>';}
   else if(_scanResults.length===0){h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found.</div>';}
   else{
-    h+='<div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">⚠ '+_scanResults.length+' mismatch'+(+_scanResults.length!==1?'es':'')+' found:</div>';
+    h+='<div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">⚠ '+_scanResults.length+' item'+(+_scanResults.length!==1?'s':'')+' to review:</div>';
     h+='<div style="display:flex;flex-direction:column;gap:8px">';
     _scanResults.forEach(function(r,idx){
-      h+='<div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:9px;padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">';
+      var isStillOpen=!r.closedButChecked&&!r.fetchError;
+      var bgColor=isStillOpen?'#fff5f5':r.fetchError?'#fffbeb':'#f5f3ff';
+      var borderColor=isStillOpen?'#fca5a5':r.fetchError?'#fcd34d':'#c4b5fd';
+      h+='<div style="background:'+bgColor+';border:1px solid '+borderColor+';border-radius:9px;padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">';
       h+='<div style="flex:1;min-width:200px">';
       h+='<div style="font-size:12px;color:#6b7280;margin-bottom:3px">Tracking: <a href="'+esc(r.trackingIssue.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+r.trackingIssue.id+' '+esc(r.trackingIssue.title)+'</a></div>';
-      h+='<div style="font-size:13px;font-weight:600"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:'+(r.closedButChecked?'#7c3aed':'#dc2626')+'">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
-      if(r.closedButChecked){h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'')+' — auto-closed by PR</span></div>';}
-      else{h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Issue is still open but checked off</span></div>';}
+      h+='<div style="font-size:13px;font-weight:600"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:'+(isStillOpen?'#dc2626':r.fetchError?'#92400e':'#7c3aed')+'">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
+      if(isStillOpen){
+        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Issue is still open but checked off</span></div>';
+      } else if(r.fetchError){
+        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Could not load issue — review manually</span></div>';
+      } else {
+        var label=r.closedByPR?'Closed by PR'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():''):'Manually closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'');
+        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">'+label+' — verify process was followed</span></div>';
+      }
       h+='<div style="font-size:11px;color:#9ca3af;margin-top:3px;font-family:monospace">'+esc(r.lineText)+'</div>';
       h+='</div><div style="display:flex;gap:6px;align-items:center;flex-shrink:0">';
       h+='<a href="'+esc(r.childUrl)+'" target="_blank" class="btn-sm" style="font-size:11px;text-decoration:none">👁 View</a>';
-      h+='<button class="btn-sm" style="font-size:11px;border-color:#f59e0b;color:#92400e;background:#fffbeb" onclick="uncheckMismatch('+idx+')">☐ Uncheck</button>';
+      if(!r.fetchError)h+='<button class="btn-sm" style="font-size:11px;border-color:#f59e0b;color:#92400e;background:#fffbeb" onclick="uncheckMismatch('+idx+')">☐ Uncheck</button>';
+      h+='<button class="btn-sm" style="font-size:11px;border-color:#d1fae5;color:#065f46;background:#f0fdf4" onclick="dismissMismatch('+idx+')">✓ OK</button>';
       h+='</div></div>';
     });
     h+='</div>';
@@ -1313,6 +1399,7 @@ function renderMismatchPanel(){
 }
 
 async function uncheckMismatch(idx){var r=_scanResults[idx];if(!r)return;await uncheckInParent(r.trackingIssue.id,r.trackingIssue.repo,r.childId);_scanResults.splice(idx,1);renderReport();}
+function dismissMismatch(idx){_scanResults.splice(idx,1);renderReport();}
 
 function renderReport(){
   var snap=getCurrentSnapshot(),history=loadHistory(),excCount=getExceptions().length,canSave=snap&&excCount===0;
