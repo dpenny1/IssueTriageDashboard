@@ -390,7 +390,7 @@ async function connect(){
 function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
 async function bgRefresh(){try{await Promise.all([loadLabelColors(),loadIssues()]);await loadSubIssueParents();await refreshTrackingBodies();saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();}catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}setTimeout(function(){runMismatchScanBackground();},0);}
 
-function runMismatchScanBackground(){runMismatchScan().then(function(){renderStats();if(S.activeTab==='report')renderReport();}).catch(function(){});}
+function runMismatchScanBackground(){runMismatchScan().then(function(){renderStats();if(S.activeTab==='report')renderReport();}).catch(function(e){console.error('Mismatch scan failed:',e);});}
 async function doRefresh(){
   var btn=document.getElementById('refreshBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{localStorage.removeItem(CACHE_KEY);}catch(e){}
@@ -1464,7 +1464,7 @@ function renderMismatchPanel(){
   h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds all checked boxes — open issues not yet closed, and closed issues to verify they went through proper process</div></div>';
   var dismissedCount=Object.keys(_scanDismissed).length;
   h+='<div style="display:flex;gap:8px;align-items:center">';
-  h+=_scanning?'<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>':'<button class="btn-p" onclick="runMismatchScanBackground().then(function(){renderStats();renderReport();})" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
+  h+=_scanning?'<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>':'<button class="btn-p" onclick="runMismatchScanBackground()" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
   if(dismissedCount)h+='<button class="btn-sm" onclick="clearScanDismissed()" title="Re-show all dismissed items on next scan">↩ Clear '+dismissedCount+' dismissed</button>';
   h+='</div>';
   h+='</div>';
