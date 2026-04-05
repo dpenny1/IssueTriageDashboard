@@ -129,7 +129,7 @@ tr:hover td{background:#f9fafb}
       <a href="index.html" class="btn btn-w">← All Projects</a>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-w">🛠 PM Tools</a>
       <button class="btn btn-w" id="refreshBtn" onclick="doRefresh()">↻ Refresh</button>
-      <button class="btn btn-w" onclick="showLabelManager()">🏷️ Labels</button>
+      <button class="btn btn-w" onclick="showReleaseModal()">🚀 Release</button>
       <button class="btn btn-w" onclick="showCfg()">⚙ Projects</button>
     </div>
   </div></div>
@@ -158,8 +158,18 @@ tr:hover td{background:#f9fafb}
   </div>
 </div>
 
+<div class="modal-overlay" id="releaseModal">
+  <div class="modal-box" style="max-width:780px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-size:15px;font-weight:700;color:#1e1b4b">🚀 Release CS Item Triage</span>
+      <button class="btn-sm" onclick="hideReleaseModal()">✕ Close</button>
+    </div>
+    <div id="releaseModalContent"></div>
+  </div>
+</div>
+
 <script>
-var APP_VERSION='2026-04-04 v15';
+var APP_VERSION='2026-04-04 v17';
 
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],closedExcIgnored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',CLOSED_EXC_IGNORED_KEY='cis_closed_exc_ignored_v1',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
@@ -174,8 +184,7 @@ var TAB_DEFS=[
   {id:'taskitem',label:'CS Task Items',color:'#7c3aed',labelKey:'cs task item'},
   {id:'closed',label:'Recently Closed',color:'#374151'},
   {id:'ignored',label:'Ignored',color:'#6b7280'},
-  {id:'report',label:'Weekly Report',color:'#1e1b4b'},
-  {id:'release',label:'Release',color:'#0891b2'}
+  {id:'report',label:'Weekly Report',color:'#1e1b4b'}
 ];
 
 // ── Token Vault ───────────────────────────────────────────────────────────────
@@ -437,10 +446,11 @@ async function loadIssues(){
       open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:bodyParent||null,subIssuesTotal:(iss.sub_issues_summary&&iss.sub_issues_summary.total)||0});
 
     });
-    var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100&labels=cs+task+item');
+    var since60=new Date(Date.now()-60*24*60*60*1000).toISOString();
+    var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100&labels=cs+task+item&since='+since60);
     if(!Array.isArray(cd))cd=[];
     var taskItems=cd.filter(function(iss){return !iss.pull_request;}).slice(0,100);
-    var cd2=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=50&since='+new Date(Date.now()-60*24*60*60*1000).toISOString());
+    var cd2=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=50&since='+since60);
     if(!Array.isArray(cd2))cd2=[];
     var count=0;
     var seenIds={};
@@ -643,7 +653,7 @@ function buildTabs(){var pN=S.issues.filter(function(i){return S.ignored.indexOf
 
 function switchTab(name){
   S.activeTab=name;
-  document.getElementById('searchBar').style.display=(name==='report'||name==='release')?'none':'flex';
+  document.getElementById('searchBar').style.display=name==='report'?'none':'flex';
   if(name==='closed')S.sortState={col:'closed',dir:-1};
   buildTabs();renderMain();
 }
@@ -942,7 +952,6 @@ async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTa
 function renderMain(){
   renderStats();buildTabs();hideErr('dashErr');
   if(S.activeTab==='report'){renderReport();return;}
-  if(S.activeTab==='release'){renderRelease();return;}
   var def=TAB_DEFS.find(function(d){return d.id===S.activeTab;});
   var filterPipeline=document.getElementById('filterPipeline').value||'';
   if(S.activeTab==='csitems'&&S.zhToken&&!filterPipeline){
@@ -960,28 +969,35 @@ function renderMain(){
   }
 }
 
-// ── Release Tab ───────────────────────────────────────────────────────────────
+// ── Release Modal ─────────────────────────────────────────────────────────────
 var _releases=[],_releaseIssues=[],_releaseSelected={},_releaseAssignees=[],_collaborators=[],_defaultAssignees=[];
 var RELEASE_ASSIGNEES_KEY='cis_release_assignees_v1';
 
 function loadDefaultAssignees(){try{var v=localStorage.getItem(RELEASE_ASSIGNEES_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveDefaultAssignees(){try{localStorage.setItem(RELEASE_ASSIGNEES_KEY,JSON.stringify(_defaultAssignees));}catch(e){}}
 
-async function renderRelease(){
-  var el=document.getElementById('mainContent');
-  el.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af"><span class="spin spd"></span> Loading releases...</div>';
+function showReleaseModal(){
+  document.getElementById('releaseModal').style.display='block';
   _defaultAssignees=loadDefaultAssignees();
-  try{
-    _releases=await ghFetch('/repos/'+S.repos[0]+'/releases?per_page=20');
-  }catch(e){el.innerHTML='<div class="err">Failed to load releases: '+esc(e.message)+'</div>';return;}
-  _releaseIssues=[];_releaseSelected={};_releaseAssignees=_defaultAssignees.slice();
-  drawRelease();
+  _releaseAssignees=_defaultAssignees.slice();
+  _releases=[];_releaseIssues=[];_releaseSelected={};
+  drawReleaseModal('<div style="text-align:center;padding:30px;color:#9ca3af"><span class="spin spd"></span> Loading releases...</div>');
+  ghFetch('/repos/'+S.repos[0]+'/releases?per_page=20').then(function(r){
+    _releases=r;drawReleaseModal();
+  }).catch(function(e){
+    drawReleaseModal('<div class="err">Failed to load releases: '+esc(e.message)+'</div>');
+  });
 }
 
-function drawRelease(){
-  var el=document.getElementById('mainContent');
-  var h='<div style="background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px">';
-  h+='<div style="font-size:15px;font-weight:700;color:#1e1b4b;margin-bottom:16px">🚀 Release CS Item Triage</div>';
+function hideReleaseModal(){
+  document.getElementById('releaseModal').style.display='none';
+}
+
+function drawReleaseModal(loadingHtml){
+  var el=document.getElementById('releaseModalContent');
+  if(loadingHtml){el.innerHTML=loadingHtml;return;}
+
+  var h='';
 
   // Release picker
   h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px">';
@@ -994,16 +1010,16 @@ function drawRelease(){
   // Assignee selector
   h+='<div style="margin-bottom:20px">';
   h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Assignees</div>';
-  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px" id="assigneeChips">';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">';
   _releaseAssignees.forEach(function(a){
     h+='<div style="display:inline-flex;align-items:center;gap:5px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3">';
     h+=esc(a)+'<button onclick="removeAssignee(\''+esc(a)+'\')" style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:12px;line-height:1">✕</button></div>';
   });
   if(!_releaseAssignees.length)h+='<span style="font-size:12px;color:#9ca3af">No assignees selected</span>';
   h+='</div>';
-  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative">';
   h+='<input type="text" id="assigneeSearch" placeholder="Search collaborators..." style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;width:220px" oninput="searchCollaborators(this.value)"/>';
-  h+='<div id="collaboratorResults" style="display:none;position:absolute;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:220px;z-index:100"></div>';
+  h+='<div id="collaboratorResults" style="display:none;position:absolute;top:38px;left:0;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:220px;z-index:200"></div>';
   h+='<button class="btn-sm" style="border-color:#4338ca;color:#4338ca" onclick="saveAsDefault()">💾 Save as Default</button>';
   h+='</div></div>';
 
@@ -1013,13 +1029,23 @@ function drawRelease(){
     var nonCS=_releaseIssues.filter(function(i){return !i.isCS;});
     h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">';
     h+='<div style="font-size:13px;font-weight:700;color:#1e1b4b">'+csIssues.length+' CS Issues found <span style="font-weight:400;color:#9ca3af">('+nonCS.length+' non-CS skipped)</span></div>';
-    h+='<div style="display:flex;gap:8px">';
+    h+='<div style="display:flex;gap:8px;align-items:center">';
     h+='<button class="btn-sm" onclick="selectAllRelease(true)">Select All</button>';
     h+='<button class="btn-sm" onclick="selectAllRelease(false)">Deselect All</button>';
     h+='<button class="btn-p" onclick="applyRelease()" id="applyReleaseBtn">✓ Apply to Selected</button>';
     h+='</div></div>';
-    h+='<div id="releaseApplyMsg" style="font-size:13px;margin-bottom:10px;min-height:18px"></div>';
-    h+='<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">';
+
+    // Status bar
+    h+='<div id="releaseStatusBar" style="display:none;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:10px 14px;margin-bottom:12px">';
+    h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">';
+    h+='<span class="spin spd" id="releaseSpinner"></span>';
+    h+='<span id="releaseStatusText" style="font-size:13px;font-weight:600;color:#1e1b4b"></span>';
+    h+='</div>';
+    h+='<div style="background:#e5e7eb;border-radius:999px;height:6px;overflow:hidden">';
+    h+='<div id="releaseProgressBar" style="background:#4338ca;height:6px;border-radius:999px;width:0%;transition:width 0.3s"></div>';
+    h+='</div></div>';
+
+    h+='<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;max-height:360px;overflow-y:auto">';
     h+='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb">';
     h+='<th style="padding:9px 13px;width:36px"><input type="checkbox" id="releaseCheckAll" onchange="selectAllRelease(this.checked)" checked/></th>';
     h+='<th style="padding:9px 13px;text-align:left">#</th>';
@@ -1033,17 +1059,16 @@ function drawRelease(){
       h+='<tr style="border-bottom:1px solid #f3f4f6'+(hasTesting?';background:#f0fdf4':'')+'">';
       h+='<td style="padding:8px 13px"><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleReleaseIssue('+issue.id+',this.checked)"/></td>';
       h+='<td style="padding:8px 13px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;font-weight:600">#'+issue.id+'</a></td>';
-      h+='<td style="padding:8px 13px;font-weight:600;color:#1e1b4b;min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#1e1b4b;text-decoration:none">'+esc(issue.title)+'</a></td>';
+      h+='<td style="padding:8px 13px;font-weight:600;color:#1e1b4b;min-width:160px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#1e1b4b;text-decoration:none">'+esc(issue.title)+'</a></td>';
       h+='<td style="padding:8px 13px"><div style="display:flex;flex-wrap:wrap;gap:3px">';
       issue.labels.forEach(function(l){h+=lblBadge(l);});
       h+='</div></td>';
-      h+='<td style="padding:8px 13px">'+(hasTesting?'<span class="badge" style="background:#d1fae5;color:#065f46">✓ CS In Testing</span>':'<span style="font-size:12px;color:#9ca3af">Pending</span>')+'</td>';
+      h+='<td style="padding:8px 13px" id="releaseRowStatus_'+issue.id+'">'+(hasTesting?'<span class="badge" style="background:#d1fae5;color:#065f46">✓ CS In Testing</span>':'<span style="font-size:12px;color:#9ca3af">Pending</span>')+'</td>';
       h+='</tr>';
     });
     h+='</tbody></table></div>';
   }
 
-  h+='</div>';
   el.innerHTML=h;
 }
 
@@ -1053,9 +1078,7 @@ async function loadReleaseIssues(){
   if(!releaseId)return;
   var release=_releases.find(function(r){return String(r.id)===String(releaseId);});
   if(!release)return;
-  var el=document.getElementById('mainContent');
-  el.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af"><span class="spin spd"></span> Parsing release notes...</div>';
-  // Extract issue numbers from release body
+  drawReleaseModal('<div style="text-align:center;padding:30px;color:#9ca3af"><span class="spin spd"></span> Parsing release notes...</div>');
   var body=release.body||'';
   var matches=body.match(/#(\d+)/g)||[];
   var ids=[...new Set(matches.map(function(m){return parseInt(m.replace('#',''));}))];
@@ -1070,8 +1093,7 @@ async function loadReleaseIssues(){
       _releaseSelected[iss.number]=isCS;
     }catch(e){}
   }
-  drawRelease();
-  // restore picker selection
+  drawReleaseModal();
   setTimeout(function(){var s=document.getElementById('releasePicker');if(s)s.value=releaseId;},0);
 }
 
@@ -1088,75 +1110,94 @@ async function searchCollaborators(q){
     return '<div style="padding:8px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f3f4f6" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="addAssignee(\''+esc(c.login)+'\')">'+
     '<img src="'+esc(c.avatar_url)+'" style="width:20px;height:20px;border-radius:50%"/> '+esc(c.login)+'</div>';
   }).join('');
-  // position below the input
-  var inp=document.getElementById('assigneeSearch');
-  if(inp){var r=inp.getBoundingClientRect();el.style.position='fixed';el.style.top=(r.bottom+4)+'px';el.style.left=r.left+'px';el.style.width=r.width+'px';}
 }
 
 function addAssignee(login){
   if(_releaseAssignees.indexOf(login)===-1)_releaseAssignees.push(login);
   var el=document.getElementById('collaboratorResults');if(el)el.style.display='none';
   var inp=document.getElementById('assigneeSearch');if(inp)inp.value='';
-  drawRelease();
+  drawReleaseModal();
   setTimeout(function(){var s=document.getElementById('releasePicker');if(s&&_releaseIssues.length)s.value=String(_releases[0]&&_releases[0].id);},0);
 }
 
 function removeAssignee(login){
   _releaseAssignees=_releaseAssignees.filter(function(a){return a!==login;});
-  drawRelease();
+  drawReleaseModal();
 }
 
 function saveAsDefault(){
   _defaultAssignees=_releaseAssignees.slice();
   saveDefaultAssignees();
-  var msg=document.getElementById('releaseApplyMsg');
-  if(msg){msg.style.color='#059669';msg.textContent='Default assignees saved!';}
-  setTimeout(function(){var m=document.getElementById('releaseApplyMsg');if(m&&m.textContent==='Default assignees saved!')m.textContent='';},2000);
+  alert('Default assignees saved!');
 }
 
 function toggleReleaseIssue(id,checked){_releaseSelected[id]=checked;}
 
 function selectAllRelease(checked){
   _releaseIssues.filter(function(i){return i.isCS;}).forEach(function(i){_releaseSelected[i.id]=checked;});
-  drawRelease();
+  drawReleaseModal();
+  setTimeout(function(){var s=document.getElementById('releasePicker');if(s&&_releaseIssues.length)s.value=String(_releases[0]&&_releases[0].id);},0);
 }
 
 async function applyRelease(){
   var selected=_releaseIssues.filter(function(i){return i.isCS&&_releaseSelected[i.id]!==false;});
   if(!selected.length){alert('No issues selected.');return;}
   if(!_releaseAssignees.length&&!confirm('No assignees selected. Continue with just adding the CS In Testing label?'))return;
+
   var btn=document.getElementById('applyReleaseBtn');if(btn){btn.disabled=true;btn.textContent='Applying...';}
-  var msg=document.getElementById('releaseApplyMsg');if(msg){msg.style.color='#6b7280';msg.textContent='Processing '+selected.length+' issues...';}
-  var done=0,failed=0;
+  var bar=document.getElementById('releaseStatusBar');if(bar)bar.style.display='block';
+  var prog=document.getElementById('releaseProgressBar');
+  var txt=document.getElementById('releaseStatusText');
+  var spinner=document.getElementById('releaseSpinner');
+
+  var done=0,failed=0,total=selected.length;
+
+  function updateProgress(){
+    var pct=Math.round(((done+failed)/total)*100);
+    if(prog)prog.style.width=pct+'%';
+    if(txt)txt.textContent='Processing '+( done+failed)+' of '+total+'...';
+  }
+
+  updateProgress();
+
   for(var i=0;i<selected.length;i++){
     var issue=selected[i];
+    // update row status to processing
+    var rowEl=document.getElementById('releaseRowStatus_'+issue.id);
+    if(rowEl)rowEl.innerHTML='<span style="font-size:12px;color:#6b7280"><span class="spin spd"></span> Processing...</span>';
     try{
-      // Add cs in testing label
       var newLabels=issue.labels.slice();
       var hasLabel=newLabels.some(function(l){return l.toLowerCase()==='cs in testing';});
       if(!hasLabel){
-        // find correct case from labelNames
         var labelName=S.labelNames['cs in testing']||'CS In Testing';
         newLabels.push(labelName);
         await ghPatch('/repos/'+S.repos[0]+'/issues/'+issue.id,{labels:newLabels});
         issue.labels=newLabels;
       }
-      // Assign users
       if(_releaseAssignees.length){
         await ghPost('/repos/'+S.repos[0]+'/issues/'+issue.id+'/assignees',{assignees:_releaseAssignees});
         issue.assignees=_releaseAssignees.slice();
       }
       done++;
-    }catch(e){failed++;console.error('Failed #'+issue.id,e);}
-    if(msg)msg.textContent='Processing... '+( done+failed)+'/'+selected.length;
+      if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#d1fae5;color:#065f46">✓ Done</span>';
+    }catch(e){
+      failed++;
+      if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#fee2e2;color:#991b1b">✕ Failed</span>';
+      console.error('Failed #'+issue.id,e);
+    }
+    updateProgress();
   }
-  if(msg){
-    msg.style.color=failed?'#d97706':'#059669';
-    msg.textContent=done+' issue'+(done!==1?'s':'')+' updated'+(failed?' ('+failed+' failed)':'')+'!';
+
+  // Final status
+  if(prog)prog.style.width='100%';
+  if(prog)prog.style.background=failed?'#f59e0b':'#059669';
+  if(spinner)spinner.style.display='none';
+  if(txt){
+    txt.style.color=failed?'#d97706':'#059669';
+    txt.textContent=done+' issue'+(done!==1?'s':'')+' updated successfully'+(failed?' · '+failed+' failed':'')+'!';
   }
   if(btn){btn.disabled=false;btn.textContent='✓ Apply to Selected';}
-  // refresh local S.issues labels
-  await doRefresh();
+  doRefresh();
 }
 
 // ── Report ────────────────────────────────────────────────────────────────────
