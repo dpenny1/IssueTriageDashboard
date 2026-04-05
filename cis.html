@@ -366,7 +366,7 @@ async function connect(){
   hideErr('setupErr');
   if(!S.ghToken||!rp){showErr('setupErr','Please select a project.');return;}
   S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
-  S.ignored=loadIgnored();S.closedExcIgnored=loadClosedExcIgnored();loadZHCreds();S.repoWorkspaceMap={};
+  S.ignored=loadIgnored();S.closedExcIgnored=loadClosedExcIgnored();loadScanDismissed();loadZHCreds();S.repoWorkspaceMap={};
   if(S.activeProfile){
     if(S.activeProfile.type==='group'){(S.activeProfile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(!S.zhWorkspace&&S.activeProfile.repos&&S.activeProfile.repos[0])S.zhWorkspace=S.activeProfile.repos[0].zhWorkspace||'';}
     else if(S.activeProfile.zhWorkspace){S.zhWorkspace=S.activeProfile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=S.activeProfile.zhWorkspace;}
@@ -1372,7 +1372,10 @@ function exportCSV(){var history=loadHistory(),rows=['Date,Tracking Issues,Total
 function clearHistory(){if(!confirm('Clear all report history?'))return;localStorage.removeItem(STORAGE_KEY);renderReport();}
 
 // ── Mismatch Scanner ──────────────────────────────────────────────────────────
-var _scanResults=null,_scanning=false;
+var _scanResults=null,_scanning=false,_scanDismissed={};
+var SCAN_DISMISSED_KEY='cis_scan_dismissed_v1';
+function loadScanDismissed(){try{var v=localStorage.getItem(SCAN_DISMISSED_KEY);_scanDismissed=v?JSON.parse(v):{};}catch(e){_scanDismissed={};}}
+function saveScanDismissed(){try{localStorage.setItem(SCAN_DISMISSED_KEY,JSON.stringify(_scanDismissed));}catch(e){}}
 async function runMismatchScan(){
   if(_scanning)return;
   _scanning=true;_scanResults=null;renderReport();
@@ -1393,6 +1396,9 @@ async function runMismatchScan(){
       var ref=chk[1].trim();var mm=ref.match(/#(\d+)/);if(!mm)continue;
       var issueNum=parseInt(mm[1]);
       // FIX 2: Always fetch from GitHub to get ground-truth state, don't rely on S.issues only
+      // Skip if previously dismissed
+      var dkey=track.id+'_'+issueNum;
+      if(_scanDismissed[dkey])continue;
       var openIssue=S.issues.find(function(i){return i.id===issueNum&&i.repo===track.repo;});
       if(openIssue){
         // It's in our open issues list — definitely still open, flag it
@@ -1456,7 +1462,11 @@ function renderMismatchPanel(){
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
   h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Mismatch Scanner</div>';
   h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Finds all checked boxes — open issues not yet closed, and closed issues to verify they went through proper process</div></div>';
-  h+=_scanning?'<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>':'<button class="btn-p" onclick="runMismatchScan()" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
+  var dismissedCount=Object.keys(_scanDismissed).length;
+  h+='<div style="display:flex;gap:8px;align-items:center">';
+  h+=_scanning?'<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>':'<button class="btn-p" onclick="runMismatchScanBackground().then(function(){renderStats();renderReport();})" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
+  if(dismissedCount)h+='<button class="btn-sm" onclick="clearScanDismissed()" title="Re-show all dismissed items on next scan">↩ Clear '+dismissedCount+' dismissed</button>';
+  h+='</div>';
   h+='</div>';
   if(_scanResults===null&&!_scanning){h+='<div style="font-size:13px;color:#9ca3af">Click Run Scan to check all tracking issues for boxes that may need review.</div>';}
   else if(_scanning){h+='<div style="font-size:13px;color:#9ca3af">Checking each checked item against GitHub...</div>';}
@@ -1493,8 +1503,17 @@ function renderMismatchPanel(){
   return h;
 }
 
+function clearScanDismissed(){_scanDismissed={};saveScanDismissed();renderReport();}
+
 async function uncheckMismatch(idx){var r=_scanResults[idx];if(!r)return;await uncheckInParent(r.trackingIssue.id,r.trackingIssue.repo,r.childId);_scanResults.splice(idx,1);renderReport();}
-function dismissMismatch(idx){_scanResults.splice(idx,1);renderReport();}
+function dismissMismatch(idx){
+  var r=_scanResults[idx];if(!r)return;
+  var key=r.trackingIssue.id+'_'+r.childId;
+  _scanDismissed[key]=true;
+  saveScanDismissed();
+  _scanResults.splice(idx,1);
+  renderReport();
+}
 
 function renderReport(){
   var snap=getCurrentSnapshot(),history=loadHistory(),excCount=getExceptions().length,canSave=snap&&excCount===0;
