@@ -964,6 +964,97 @@ function renderCSItemsGrouped(issues,def){
 
 function setCsItemsPipeline(pn){_csItemsPipeline=pn;renderMain();}
 
+var _excTab='open';
+function switchExcTab(t){_excTab=t;renderMain();}
+
+function renderExceptionsView(){
+  var def=TAB_DEFS.find(function(d){return d.id==='exceptions';});
+  var color=tabColor(def);
+  var openExc=applyFilters(sortIssues(getExceptions(),'exceptions'));
+  var closedExc=getClosedExceptions();
+  var h='';
+  // Sub-tab bar
+  h+='<div style="display:flex;border-bottom:2px solid #e5e7eb;margin-bottom:16px;background:#fff;border-radius:10px 10px 0 0;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">';
+  h+='<button onclick="switchExcTab(\'open\')" style="flex:1;padding:13px 0;font-size:13px;font-weight:700;border:none;border-bottom:'+(_excTab==='open'?'3px solid '+color:'3px solid transparent')+';background:'+(_excTab==='open'?'#fff5f5':'transparent')+';color:'+(_excTab==='open'?color:'#6b7280')+';cursor:pointer">Open Exceptions <span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700;background:'+(_excTab==='open'?'#fee2e2':'#f3f4f6')+';color:'+(_excTab==='open'?color:'#6b7280')+';margin-left:4px">'+openExc.length+'</span></button>';
+  h+='<button onclick="switchExcTab(\'closed\')" style="flex:1;padding:13px 0;font-size:13px;font-weight:700;border:none;border-bottom:'+(_excTab==='closed'?'3px solid #7c3aed':'3px solid transparent')+';background:'+(_excTab==='closed'?'#faf5ff':'transparent')+';color:'+(_excTab==='closed'?'#7c3aed':'#6b7280')+';cursor:pointer">Closed Exceptions <span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700;background:'+(_excTab==='closed'?'#ede9fe':'#f3f4f6')+';color:'+(_excTab==='closed'?'#7c3aed':'#6b7280')+';margin-left:4px">'+closedExc.length+'</span></button>';
+  h+='</div>';
+  if(_excTab==='open'){
+    h+=renderExcOpenTable(openExc,color);
+  } else {
+    h+=renderExcClosedTable(closedExc);
+  }
+  return h;
+}
+
+function renderExcOpenTable(issues,color){
+  var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
+  var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+  var h='<div class="gh" style="background:'+color+'"><span class="gt">Open Exceptions<span class="gc">'+issues.length+'</span></span>';
+  if(S.zhToken&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\'exceptions\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
+  h+='</div><div class="tw2"><table><thead><tr>';
+  h+=mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th>';
+  if(S.repos.length>1)h+=mkTh('repo','Repo');
+  h+='<th>Assignee</th><th>Exception Reason</th>';
+  if(S.zhToken)h+='<th>Pipeline</th>';
+  h+=mkTh('age','Age')+'<th></th></tr></thead><tbody>';
+  if(!issues.length)h+='<tr><td colspan="99" class="er">No open exceptions.</td></tr>';
+  issues.forEach(function(issue){
+    var ikey=issue.id+'_'+issue.repo,days=ageDays(issue.createdAt);
+    h+='<tr style="background:#fff5f5">';
+    h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
+    h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>';
+    if(issue.parent)h+=' <span style="font-size:11px;color:#059669;font-weight:600">🔗#'+issue.parent.issueNumber+'</span>';
+    h+='</td>';
+    h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
+    sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
+    h+='<button onclick="toggleLabelEdit('+issue.id+',\''+esc(issue.repo)+'\')" title="Edit labels" style="background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;color:#9ca3af;border-radius:4px;line-height:1" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">✏️</button>';
+    h+='</div><div id="lblpanel_'+issue.id+'_'+esc(issue.repo)+'" style="display:none"></div></td>';
+    if(S.repos.length>1)h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.repo.split('/')[1])+'</td>';
+    h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
+    h+='<td style="min-width:220px">'+renderExcReason(issue)+'</td>';
+    if(S.zhToken){var rp=S.zhPipelines[issue.repo]||[],cur=issue.pipeline?issue.pipeline.pipelineId:'',curN=issue.pipeline?issue.pipeline.pipelineName:'—';var srp=rp.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});if(srp.length){h+='<td><select class="ps" onchange="movePipeline('+issue.id+',\''+esc(issue.repo)+'\',this.value)"><option value="">'+esc(curN)+'</option>';srp.forEach(function(p){h+='<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>';});h+='</select></td>';}else h+='<td style="font-size:12px;color:#6b7280">'+esc(curN)+'</td>';}
+    h+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td>';
+    h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
+    h+='</tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+
+function renderExcClosedTable(issues){
+  var h='<div class="gh" style="background:#7c3aed"><span class="gt">Closed Exceptions<span class="gc">'+issues.length+'</span></span></div>';
+  h+='<div class="tw2"><table><thead><tr>';
+  h+=mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th><th>Reason</th>';
+  h+='<th>Assignee</th>'+mkTh('closed','Closed')+'<th>Closed By</th><th></th></tr></thead><tbody>';
+  if(!issues.length)h+='<tr><td colspan="99" class="er">No closed exceptions.</td></tr>';
+  issues.forEach(function(issue){
+    var lbls=issue.labels.map(function(l){return l.toLowerCase();});
+    var hasCSItem=lbls.indexOf('cs item')!==-1;
+    var hasTesting=lbls.indexOf('cs in testing')!==-1;
+    var reasons=[];
+    if(hasCSItem&&!issue.parent)reasons.push('No parent issue');
+    if(hasCSItem&&!isReferencedInTracking(issue.id))reasons.push('Not in any tracking issue');
+    if(!hasTesting)reasons.push('Never had CS In Testing label');
+    var ikey=issue.id+'_'+issue.repo;
+    h+='<tr style="background:#faf5ff">';
+    h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
+    h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>';
+    if(issue.parent)h+=' <span style="font-size:11px;color:#059669;font-weight:600">🔗#'+issue.parent.issueNumber+'</span>';
+    h+='</td>';
+    h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';
+    sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
+    h+='</div></td>';
+    h+='<td style="min-width:180px">';
+    reasons.forEach(function(r){h+='<div><span class="badge" style="background:#ede9fe;color:#5b21b6;margin-bottom:2px">⚠ '+esc(r)+'</span></div>';});
+    h+='</td>';
+    h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
+    h+='<td style="font-size:12px;color:#059669;font-weight:600">'+(issue.closedAt?new Date(issue.closedAt).toLocaleDateString():'—')+'</td>';
+    h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.closedBy||'—')+'</td>';
+    h+='<td><button class="btn-ig" onclick="ignoreClosedExc(\''+ikey+'\')">Dismiss</button></td>';
+    h+='</tr>';
+  });
+  return h+'</tbody></table></div>';
+}
+
 function renderClosedExceptionsSection(issues){
   var h='<div style="margin-top:20px">';
   h+='<div class="gh" style="background:#7c3aed;border-radius:10px 10px 0 0"><span class="gt">⚠ Closed Issue Exceptions<span class="gc">'+issues.length+'</span></span></div>';
@@ -1010,11 +1101,7 @@ function renderMain(){
     var csIssues=applyFilters(getTabIssues('csitems'));
     document.getElementById('mainContent').innerHTML=renderOnDeckBanner(csIssues)+renderCSItemsGrouped(csIssues,def);
   } else if(S.activeTab==='exceptions'){
-    var openExc=applyFilters(sortIssues(getExceptions(),'exceptions'));
-    var closedExc=getClosedExceptions();
-    var html=renderTable(openExc,'exceptions',def);
-    if(closedExc.length)html+=renderClosedExceptionsSection(closedExc);
-    document.getElementById('mainContent').innerHTML=html;
+    document.getElementById('mainContent').innerHTML=renderExceptionsView();
   } else {
     var issues=applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab));
     document.getElementById('mainContent').innerHTML=renderTable(issues,S.activeTab,def);
