@@ -975,7 +975,13 @@ function renderClosedExceptionsSection(issues){
     var ikey=issue.id+'_'+issue.repo;
     h+='<tr style="background:#faf5ff">';
     h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
-    h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a></td>';
+    var cikey=issue.id+'_'+issue.repo;
+    h+='<td style="min-width:200px">';
+    h+='<a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>';
+    if(issue.parent)h+=' <span style="font-size:11px;color:#059669;font-weight:600">🔗#'+issue.parent.issueNumber+'</span>';
+    h+=' <button onclick="toggleParentSearch('+issue.id+',\''+esc(issue.repo)+'\')" title="Set parent" style="background:none;border:none;cursor:pointer;font-size:11px;padding:1px 5px;color:#9ca3af;border-radius:4px;border:1px solid #e5e7eb;margin-left:3px" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">🔗 Parent</button>';
+    h+='<div id="parentpanel_'+cikey+'" style="display:none">'+renderParentSearch(issue.id,issue.repo)+'</div>';
+    h+='</td>';
     h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';
     sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
     h+='</div></td>';
