@@ -159,7 +159,7 @@ tr:hover td{background:#f9fafb}
 </div>
 
 <script>
-var APP_VERSION='2026-04-04 v10';
+var APP_VERSION='2026-04-04 v11';
 
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],closedExcIgnored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',CLOSED_EXC_IGNORED_KEY='cis_closed_exc_ignored_v1',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
@@ -436,11 +436,21 @@ async function loadIssues(){
       open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:bodyParent||null,subIssuesTotal:(iss.sub_issues_summary&&iss.sub_issues_summary.total)||0});
 
     });
-    var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100');
+    var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100&labels=cs+task+item');
     if(!Array.isArray(cd))cd=[];
+    var taskItems=cd.filter(function(iss){return !iss.pull_request;}).slice(0,100);
+    var cd2=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=50');
+    if(!Array.isArray(cd2))cd2=[];
     var count=0;
-    for(var j=0;j<cd.length;j++){
-      var iss=cd[j];if(iss.pull_request)continue;
+    var seenIds={};
+    taskItems.forEach(function(iss){seenIds[iss.number]=1;});
+    for(var j=0;j<taskItems.length;j++){
+      var iss=taskItems[j];
+      var lbls=iss.labels.map(function(l){return l.name;});
+      closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:null});
+    }
+    for(var j=0;j<cd2.length;j++){
+      var iss=cd2[j];if(iss.pull_request||seenIds[iss.number])continue;
       var lbls=iss.labels.map(function(l){return l.name;});
       if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))continue;
       closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:null});
