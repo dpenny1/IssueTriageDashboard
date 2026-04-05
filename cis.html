@@ -159,7 +159,7 @@ tr:hover td{background:#f9fafb}
 </div>
 
 <script>
-var APP_VERSION='2026-04-04 v13';
+var APP_VERSION='2026-04-04 v14';
 
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],closedExcIgnored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',CLOSED_EXC_IGNORED_KEY='cis_closed_exc_ignored_v1',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
@@ -291,7 +291,7 @@ function loadZHCreds(){try{var v=localStorage.getItem(ZH_STORAGE);if(v){var d=JS
 function saveZHCreds(){try{localStorage.setItem(ZH_STORAGE,JSON.stringify({token:S.zhToken,workspace:S.zhWorkspace}));}catch(e){}}
 function loadProfiles(){try{var v=localStorage.getItem(PROFILES_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveProfiles(p){try{localStorage.setItem(PROFILES_KEY,JSON.stringify(p));}catch(e){}}
-function saveCache(){try{localStorage.setItem(CACHE_KEY,JSON.stringify({issues:S.issues,closedIssues:S.closedIssues,labelColors:S.labelColors,labelNames:S.labelNames,savedAt:Date.now()}));}catch(e){}}
+function saveCache(){try{localStorage.setItem(CACHE_KEY,JSON.stringify({issues:S.issues,closedIssues:S.closedIssues,labelColors:S.labelColors,labelNames:S.labelNames,savedAt:Date.now(),parentsLoaded:true}));}catch(e){}}
 function loadCache(){try{var v=localStorage.getItem(CACHE_KEY);return v?JSON.parse(v):null;}catch(e){return null;}}
 function showErr(id,msg){var el=document.getElementById(id);el.className='err';el.textContent=msg;el.style.display='block';}
 function hideErr(id){document.getElementById(id).style.display='none';}
@@ -364,7 +364,7 @@ async function connect(){
   }
   var btn=document.getElementById('connectBtn');btn.disabled=true;btn.innerHTML='<span class="spin spd"></span>Loading...';
   var cache=loadCache();
-  if(cache&&cache.issues){
+  if(cache&&cache.issues&&cache.parentsLoaded){
     S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
     var age=Math.round((Date.now()-cache.savedAt)/60000);
     populateFilters();showDash();buildTabs();renderMain();
@@ -1344,7 +1344,7 @@ function loadHistoricalData(){
   else if(profile.zhWorkspace){S.zhWorkspace=profile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=profile.zhWorkspace;}
   S.ignored=loadIgnored();S.closedExcIgnored=loadClosedExcIgnored();
   var cache=loadCache();
-  if(cache&&cache.issues){
+  if(cache&&cache.issues&&cache.parentsLoaded){
     S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
     var age=Math.round((Date.now()-cache.savedAt)/60000);
     populateFilters();showDash();buildTabs();renderMain();
