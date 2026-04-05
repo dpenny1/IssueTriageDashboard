@@ -411,7 +411,7 @@ async function loadIssues(){
       if(iss.pull_request)return;
       var bodyParent=null;
       if(iss.body){var pm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(pm)bodyParent={issueNumber:parseInt(pm[1])};}
-      if(open.length<5){console.log('DEBUG #'+iss.number+' parent_issue_id='+iss.parent_issue_id+' parent_issue_url='+iss.parent_issue_url+' parent='+JSON.stringify(iss.parent));}
+      if(open.length<2){console.log('DEBUG #'+iss.number+' keys='+JSON.stringify(Object.keys(iss)));}
       open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:(iss.parent_issue_id?{issueNumber:iss.parent_issue_id}:(bodyParent||null))});
     });
     var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100');
