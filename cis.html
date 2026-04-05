@@ -387,7 +387,7 @@ async function connect(){
 }
 
 function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
-async function bgRefresh(){try{await Promise.all([loadLabelColors(),loadIssues()]);await loadSubIssueParents();await refreshTrackingBodies();saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();}catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}}
+async function bgRefresh(){try{await Promise.all([loadLabelColors(),loadIssues()]);await loadSubIssueParents();await refreshTrackingBodies();saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();runMismatchScan();}catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}}
 async function doRefresh(){
   var btn=document.getElementById('refreshBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{localStorage.removeItem(CACHE_KEY);}catch(e){}
@@ -630,7 +630,7 @@ function renderStats(){
     {n:S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,tab:'taskitem'},
     {n:S.closedIssues.length,tab:'closed'},
     {n:S.ignored.length,tab:'ignored'},
-    {n:'',tab:'report'}
+    {n:'',tab:'report',mismatch:true}
   ];
   var h='';
   stats.forEach(function(s){
@@ -638,7 +638,13 @@ function renderStats(){
     var def=TAB_DEFS.find(function(d){return d.id===s.tab;}),c=tabColor(def),l=def?def.label:s.tab;
     var isActive=S.activeTab===s.tab;
     h+='<div class="sc2" style="border-top-color:'+c+';'+(isActive?'box-shadow:0 0 0 2px '+c+';':'')+'" onclick="switchTab(\''+s.tab+'\')">';
-    h+=s.tab==='report'?'<div class="sn" style="color:'+c+';font-size:2rem">📋</div>':'<div class="sn" style="color:'+c+'">'+s.n+'</div>';
+    if(s.tab==='report'){
+      h+='<div class="sn" style="color:'+c+';font-size:2rem;position:relative;display:inline-block">📋';
+      if(_scanResults!==null&&_scanResults.length>0)h+='<span style="position:absolute;top:-6px;right:-14px;background:#dc2626;color:#fff;font-size:11px;font-weight:800;padding:1px 6px;border-radius:999px;min-width:18px;text-align:center">'+_scanResults.length+'</span>';
+      h+='</div>';
+    } else {
+      h+='<div class="sn" style="color:'+c+'">'+s.n+'</div>';
+    }
     h+='<div class="sl">'+esc(l)+'</div></div>';
   });
   document.getElementById('statGrid').innerHTML=h;
@@ -1494,7 +1500,7 @@ function loadHistoricalData(){
   Promise.all([loadLabelColors(),loadIssues()])
     .then(function(){return loadSubIssueParents();})
     .then(function(){return refreshTrackingBodies();})
-    .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();})
+    .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();runMismatchScan();})
     .catch(function(e){document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
 })();
 </script>
