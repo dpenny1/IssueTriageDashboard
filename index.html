@@ -1,3 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CentralView Issue Triage Hub</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9fafb;color:#1a1a1a;min-height:100vh;font-size:15px}
+.hdr{background:linear-gradient(135deg,#1e1b4b 0%,#4338ca 60%,#6366f1 100%);padding:16px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
+.hdr-in{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.hdr h1{color:#fff;font-size:1.3rem;font-weight:800;margin:0}
+.hdr p{color:#c7d2fe;font-size:0.85rem;margin-top:2px}
+.btn-w{background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:9px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:all 0.15s}
+.btn-w:hover{background:rgba(255,255,255,0.32);transform:translateY(-1px)}
+.btn-sm{padding:6px 12px;font-size:12px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:7px;cursor:pointer;font-weight:600}
+.btn-sm:hover{background:#f9fafb}
+.btn-p{background:#4338ca;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-p:hover{background:#3730a3}
+.main{padding:40px 24px}
+.grid{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;max-width:900px;margin:0 auto}
+.card{background:#fff;border-radius:14px;padding:28px 32px;box-shadow:0 2px 8px rgba(0,0,0,0.07);border-top:4px solid transparent;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;text-decoration:none;color:inherit;flex:1;min-width:220px;max-width:260px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px}
+.card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.12)}
+.card-icon{font-size:2.6rem}
+.card-name{font-size:1.1rem;font-weight:800;color:#1e1b4b}
+.card-desc{font-size:12px;color:#9ca3af;font-weight:500}
+.card-badge{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:700;margin-top:4px}
+.coming{opacity:0.5;cursor:default;pointer-events:none}
+.section-label{width:100%;max-width:900px;margin:0 auto 16px;font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;padding:0 4px}
+
+/* Vault widget */
+.vault-bar{background:#fff;border:1px solid #e0e7ff;border-radius:14px;padding:18px 24px;max-width:900px;margin:0 auto 32px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.vault-bar-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.vault-bar-title{font-size:13px;font-weight:700;color:#1e1b4b;display:flex;align-items:center;gap:7px}
+.vault-status{font-size:12px;color:#6b7280}
+.vault-body{margin-top:14px;display:none}
+.vault-tokens{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.vault-token-chip{display:flex;align-items:center;gap:8px;background:#f8f7ff;border:1px solid #c7d2fe;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;color:#3730a3}
+.vault-token-chip button{background:none;border:none;cursor:pointer;font-size:11px;color:#6b7280;padding:0}
+.vault-token-chip button:hover{color:#4338ca}
+.tok-active{background:#e0fdf4;border-color:#6ee7b7;color:#065f46}
+.tok-badge{font-size:10px;padding:2px 7px;border-radius:999px;font-weight:700;background:#e0e7ff;color:#3730a3;margin-left:4px}
+.tok-badge.active{background:#d1fae5;color:#065f46}
+.pw-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pw-row input{flex:1;min-width:180px;padding:9px 13px;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none}
+.pw-row input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
+.err-msg{font-size:12px;color:#dc2626;margin-top:5px;min-height:16px}
+.hint{font-size:12px;color:#9ca3af;margin-top:4px}
+.active-tokens{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.at-chip{display:inline-flex;align-items:center;gap:5px;background:#e0fdf4;border:1px solid #6ee7b7;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#065f46}
+.at-chip button{background:none;border:none;cursor:pointer;font-size:11px;color:#059669;padding:0;line-height:1}
+.at-chip button:hover{color:#dc2626}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="hdr-in">
+    <div><h1>📋 CentralView Issue Triage Hub</h1><p>Select a project dashboard to get started</p></div>
+    <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn-w">🛠 PM Tools</a>
+  </div>
+</div>
+<div class="main">
+
+  <!-- Vault Widget -->
+  <div class="vault-bar">
+    <div class="vault-bar-top">
+      <div class="vault-bar-title">
+        <span id="vaultIcon">🔒</span> Token Vault
+        <span class="vault-status" id="vaultStatusText">Unlock to pre-fill tokens for any dashboard</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="active-tokens" id="activeTokensBar" style="display:none"></div>
+        <button class="btn-sm" id="vaultToggleBtn" onclick="toggleVaultWidget()">Unlock Vault</button>
+        <button class="btn-sm" id="vaultLockBtn" style="display:none;border-color:#fca5a5;color:#dc2626" onclick="lockVaultWidget()">🔒 Lock</button>
+      </div>
+    </div>
+    <div class="vault-body" id="vaultBody">
+      <!-- Locked state -->
+      <div id="vaultLockForm">
+        <div class="pw-row">
+          <input type="password" id="vaultPwInput" placeholder="Master password..." autocomplete="new-password" onkeydown="if(event.key==='Enter')unlockVault()"/>
+          <button class="btn-p" onclick="unlockVault()">Unlock</button>
+        </div>
+        <div class="err-msg" id="vaultPwErr"></div>
+        <div class="hint">Tokens saved in your vault on any dashboard are available here.</div>
+      </div>
+      <!-- Unlocked state -->
+      <div id="vaultUnlockedPanel" style="display:none">
+        <div id="vaultTokenList"></div>
+        <div style="border-top:1px solid #e5e7eb;margin-top:14px;padding-top:14px">
+          <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">➕ Add New Token</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input type="text" id="idxNewName" placeholder="Name" style="width:120px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>
+            <select id="idxNewType" style="padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;color:#374151">
+              <option value="">Type...</option>
+              <option value="gh">GitHub (GH)</option>
+              <option value="zh">ZenHub (ZH)</option>
+              <option value="asana">Asana</option>
+            </select>
+            <input type="password" id="idxNewTok" placeholder="Token value" autocomplete="new-password" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>
+            <button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="idxVaultSave()">＋ Save</button>
+          </div>
+          <div id="idxSaveMsg" style="font-size:12px;margin-top:5px;min-height:16px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="section-label">Active Dashboards</div>
+
+    <a href="cis.html" class="card" style="border-top-color:#4338ca">
+      <div class="card-icon">🛡️</div>
+      <div class="card-name">CIS</div>
+      <div class="card-desc">CS Issues Hub — tracking, patches, exceptions &amp; weekly report</div>
+      <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
+    </a>
+
+    <div class="section-label" style="margin-top:16px">Coming Soon</div>
+
+    <a href="powersearch.html" class="card coming" style="border-top-color:#0891b2">
+      <div class="card-icon">🔍</div>
+      <div class="card-name">PowerSearch</div>
+      <div class="card-desc">Issues dashboard — coming soon</div>
+      <span class="card-badge" style="background:#e0f2fe;color:#0369a1">Placeholder</span>
+    </a>
+
+    <a href="customerportal.html" class="card coming" style="border-top-color:#059669">
+      <div class="card-icon">🌐</div>
+      <div class="card-name">Customer Portal</div>
+      <div class="card-desc">Issues dashboard — coming soon</div>
+      <span class="card-badge" style="background:#d1fae5;color:#065f46">Placeholder</span>
+    </a>
+  </div>
+</div>
+
+<script>
+// ── Vault (AES-GCM) ───────────────────────────────────────────────────────────
+var Vault=(function(){
+  var KEY='cis_vault_v1',_pw=null,_data=[];
+  async function deriveKey(pw,salt){var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
+  async function encrypt(text,pw){var salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));var key=await deriveKey(pw,salt);var ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,new TextEncoder().encode(text));var buf=new Uint8Array(28+ct.byteLength);buf.set(salt,0);buf.set(iv,16);buf.set(new Uint8Array(ct),28);return btoa(String.fromCharCode(...buf));}
+  async function decrypt(b64,pw){var buf=Uint8Array.from(atob(b64),function(c){return c.charCodeAt(0);});var key=await deriveKey(pw,buf.slice(0,16));var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(16,28)},key,buf.slice(28));return new TextDecoder().decode(plain);}
+  function load(){try{var v=localStorage.getItem(KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+  function save(d){localStorage.setItem(KEY,JSON.stringify(d));_data=d;}
+  return{
+    isUnlocked:function(){return _pw!==null;},
+    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}}  _pw=pw;_data=data;},
+    lock:function(){_pw=null;_data=[];},
+    list:function(){return _data.map(function(e){return {name:e.name,type:e.type||''};});},
+    get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
+    add:async function(name,tok,type){if(_data.find(function(e){return e.name===name;}))throw new Error('Name already exists');var enc=await encrypt(tok,_pw);save(_data.concat([{name:name,enc:enc,type:type||''}]));},
+    setType:function(name,type){var d=_data.map(function(e){return e.name===name?{name:e.name,enc:e.enc,type:type}:e;});save(d);},
+    rename:function(oldName,newName){var d=_data.map(function(e){return e.name===oldName?{name:newName,enc:e.enc,type:e.type||''}:e;});save(d);},
+    del:function(name){save(_data.filter(function(e){return e.name!==name;}));}
+  };
+})();
+
+var SESSION_GH='cv_session_gh',SESSION_ZH='cv_session_zh';
+
+function getSessionTokens(){
+  return{gh:sessionStorage.getItem(SESSION_GH)||null,zh:sessionStorage.getItem(SESSION_ZH)||null};
+}
+
+function toggleVaultWidget(){
+  var body=document.getElementById('vaultBody');
+  var open=body.style.display==='block';
+  body.style.display=open?'none':'block';
+  document.getElementById('vaultToggleBtn').textContent=open?'Unlock Vault':'Hide';
+}
+
+async function unlockVault(){
+  var pw=document.getElementById('vaultPwInput').value;
+  var err=document.getElementById('vaultPwErr');
+  err.textContent='';
+  if(!pw){err.textContent='Enter your master password.';return;}
+  try{
+    await Vault.unlock(pw);
+    document.getElementById('vaultLockForm').style.display='none';
+    document.getElementById('vaultUnlockedPanel').style.display='block';
+    document.getElementById('vaultLockBtn').style.display='inline-flex';
+    document.getElementById('vaultToggleBtn').textContent='Hide';
+    document.getElementById('vaultIcon').textContent='🔓';
+    document.getElementById('vaultStatusText').textContent='Vault unlocked — assign tokens below';
+    renderTokenList();
+    renderActiveBar();
+  }catch(e){
+    document.getElementById('vaultPwErr').textContent=e.message;
+  }
+}
+
+function lockVaultWidget(){
+  Vault.lock();
+  sessionStorage.removeItem(SESSION_GH);
+  sessionStorage.removeItem(SESSION_ZH);
+  document.getElementById('vaultLockForm').style.display='block';
+  document.getElementById('vaultUnlockedPanel').style.display='none';
+  document.getElementById('vaultLockBtn').style.display='none';
+  document.getElementById('vaultBody').style.display='none';
+  document.getElementById('vaultToggleBtn').textContent='Unlock Vault';
+  document.getElementById('vaultIcon').textContent='🔒';
+  document.getElementById('vaultStatusText').textContent='Unlock to pre-fill tokens for any dashboard';
+  document.getElementById('vaultPwInput').value='';
+  document.getElementById('activeTokensBar').style.display='none';
+  renderActiveBar();
+}
+
 function renderTokenList(){
   var tokens=Vault.list();
   var el=document.getElementById('vaultTokenList');
@@ -24,7 +232,6 @@ function renderTokenList(){
       } else {
         h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;background:#4338ca;color:#fff;border-color:#4338ca" onclick="assignToken(\''+esc(t.name)+'\',\''+t.type+'\')">Use</button>';
       }
-      // ── NEW: delete button ──
       h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;border-color:#fca5a5;color:#dc2626" onclick="idxVaultDel(\''+esc(t.name)+'\')" title="Delete token">🗑</button>';
       h+='</div>';
     });
@@ -36,7 +243,6 @@ function renderTokenList(){
     untagged.forEach(function(t){
       h+='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:6px 10px;font-size:12px;color:#6b7280;font-weight:600;display:flex;align-items:center;gap:8px">';
       h+=esc(t.name)+' <span style="font-weight:400;color:#9ca3af">untagged</span>';
-      // ── NEW: delete button for untagged too ──
       h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;border-color:#fca5a5;color:#dc2626" onclick="idxVaultDel(\''+esc(t.name)+'\')" title="Delete token">🗑</button>';
       h+='</div>';
     });
@@ -44,3 +250,91 @@ function renderTokenList(){
   }
   el.innerHTML=h;
 }
+
+async function assignToken(name,type){
+  try{
+    var tok=await Vault.get(name);
+    if(type==='gh'){
+      sessionStorage.setItem(SESSION_GH,tok);
+      sessionStorage.setItem('cv_session_gh_name',name);
+    } else {
+      sessionStorage.setItem(SESSION_ZH,tok);
+      sessionStorage.setItem('cv_session_zh_name',name);
+    }
+    renderTokenList();
+    renderActiveBar();
+  }catch(e){alert('Failed: '+e.message);}
+}
+
+function unassignToken(type){
+  if(type==='gh'){sessionStorage.removeItem(SESSION_GH);sessionStorage.removeItem('cv_session_gh_name');}
+  else{sessionStorage.removeItem(SESSION_ZH);sessionStorage.removeItem('cv_session_zh_name');}
+  renderTokenList();
+  renderActiveBar();
+}
+
+async function idxVaultSave(){
+  var name=document.getElementById('idxNewName').value.trim();
+  var type=document.getElementById('idxNewType').value;
+  var tok=document.getElementById('idxNewTok').value.trim();
+  var msg=document.getElementById('idxSaveMsg');
+  msg.textContent='';
+  if(!name||!tok){msg.style.color='#dc2626';msg.textContent='Name and token are required.';return;}
+  try{
+    await Vault.add(name,tok,type);
+    msg.style.color='#059669';
+    msg.textContent='"'+name+'" saved!'+(type?' Tagged as '+type.toUpperCase()+'.':'');
+    document.getElementById('idxNewName').value='';
+    document.getElementById('idxNewType').value='';
+    document.getElementById('idxNewTok').value='';
+    setTimeout(function(){msg.textContent='';renderTokenList();},800);
+  }catch(e){msg.style.color='#dc2626';msg.textContent=e.message;}
+}
+
+function idxVaultDel(name){
+  if(!confirm('Delete "'+name+'"?'))return;
+  Vault.del(name);
+  ['gh','zh','asana'].forEach(function(type){
+    if(sessionStorage.getItem('cv_session_'+type+'_name')===name){
+      sessionStorage.removeItem('cv_session_'+type);
+      sessionStorage.removeItem('cv_session_'+type+'_name');
+    }
+  });
+  renderTokenList();
+  renderActiveBar();
+}
+
+function idxVaultRename(name){
+  var newName=prompt('Rename "'+name+'" to:',name);
+  if(!newName||newName===name)return;
+  newName=newName.trim();
+  if(!newName)return;
+  var tokens=Vault.list();
+  if(tokens.find(function(t){return t.name===newName;})){alert('"'+newName+'" already exists.');return;}
+  Vault.rename(name,newName);
+  ['gh','zh','asana'].forEach(function(type){
+    if(sessionStorage.getItem('cv_session_'+type+'_name')===name){
+      sessionStorage.setItem('cv_session_'+type+'_name',newName);
+    }
+  });
+  renderTokenList();
+  renderActiveBar();
+}
+
+function renderActiveBar(){
+  var bar=document.getElementById('activeTokensBar');
+  var ghName=sessionStorage.getItem('cv_session_gh_name');
+  var zhName=sessionStorage.getItem('cv_session_zh_name');
+  var h='';
+  if(ghName)h+='<div class="at-chip">🔑 GH: '+esc(ghName)+'<button onclick="unassignToken(\'gh\')" title="Remove">✕</button></div>';
+  if(zhName)h+='<div class="at-chip">🔑 ZH: '+esc(zhName)+'<button onclick="unassignToken(\'zh\')" title="Remove">✕</button></div>';
+  bar.innerHTML=h;
+  bar.style.display=(ghName||zhName)?'flex':'none';
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+renderActiveBar();
+</script>
+</body>
+</html>
