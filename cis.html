@@ -1374,11 +1374,13 @@ function clearHistory(){if(!confirm('Clear all report history?'))return;localSto
 // ── Mismatch Scanner ──────────────────────────────────────────────────────────
 var _scanResults=null,_scanning=false,_scanDismissed={};
 var SCAN_DISMISSED_KEY='cis_scan_dismissed_v1';
-function loadScanDismissed(){try{var v=localStorage.getItem(SCAN_DISMISSED_KEY);_scanDismissed=v?JSON.parse(v):{};}catch(e){_scanDismissed={};}}
-function saveScanDismissed(){try{localStorage.setItem(SCAN_DISMISSED_KEY,JSON.stringify(_scanDismissed));}catch(e){}}
+function loadScanDismissed(){try{var v=localStorage.getItem(SCAN_DISMISSED_KEY);_scanDismissed=v?JSON.parse(v):{};console.log('[ScanDismissed] loaded',Object.keys(_scanDismissed).length,'entries',_scanDismissed);}catch(e){_scanDismissed={};}}
+function saveScanDismissed(){try{localStorage.setItem(SCAN_DISMISSED_KEY,JSON.stringify(_scanDismissed));console.log('[ScanDismissed] saved',Object.keys(_scanDismissed).length,'entries',_scanDismissed);}catch(e){console.error('[ScanDismissed] save failed',e);}}
 async function runMismatchScan(){
   if(_scanning)return;
-  _scanning=true;_scanResults=null;renderReport();
+  _scanning=true;_scanResults=null;
+  loadScanDismissed();
+  renderReport();
   var tracking=S.issues.filter(function(i){
     if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
     var t=i.title.trim().toLowerCase();
@@ -1397,8 +1399,8 @@ async function runMismatchScan(){
       var issueNum=parseInt(mm[1]);
       // FIX 2: Always fetch from GitHub to get ground-truth state, don't rely on S.issues only
       // Skip if previously dismissed
-      var dkey=track.id+'_'+issueNum;
-      if(_scanDismissed[dkey])continue;
+      var dkey=String(track.id)+'_'+String(issueNum);
+      if(_scanDismissed[dkey]){console.log('[Scan] skipping dismissed:',dkey);continue;}
       var openIssue=S.issues.find(function(i){return i.id===issueNum&&i.repo===track.repo;});
       if(openIssue){
         // It's in our open issues list — definitely still open, flag it
@@ -1508,7 +1510,8 @@ function clearScanDismissed(){_scanDismissed={};saveScanDismissed();renderReport
 async function uncheckMismatch(idx){var r=_scanResults[idx];if(!r)return;await uncheckInParent(r.trackingIssue.id,r.trackingIssue.repo,r.childId);_scanResults.splice(idx,1);renderReport();}
 function dismissMismatch(idx){
   var r=_scanResults[idx];if(!r)return;
-  var key=r.trackingIssue.id+'_'+r.childId;
+  var key=String(r.trackingIssue.id)+'_'+String(r.childId);
+  console.log('[dismissMismatch] dismissing key:',key);
   _scanDismissed[key]=true;
   saveScanDismissed();
   _scanResults.splice(idx,1);
