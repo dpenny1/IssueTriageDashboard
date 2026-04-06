@@ -314,6 +314,13 @@ function setStatus(html){var el=document.getElementById('loadedAt');if(el)el.inn
 function renderProfileDd(){var sel=document.getElementById('profileSelect');if(!sel)return;sel.innerHTML='<option value="">-- Select a project --</option>';loadProfiles().forEach(function(p){sel.innerHTML+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});}
 function onProfileSel(){var sel=document.getElementById('profileSelect');var p=loadProfiles().find(function(x){return x.id===sel.value;});if(!p)return;S.activeProfile=p;document.getElementById('reposInput').value=p.type==='group'?(p.repos||[]).map(function(r){return r.repo;}).join(','):p.repo;}
 
+// ── Parent link helper ────────────────────────────────────────────────────────
+function parentLink(issue){
+  if(!issue.parent)return '';
+  var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;
+  return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';
+}
+
 function renderCfg(){
   var profiles=loadProfiles(),h='';
   if(profiles.length){
@@ -409,7 +416,6 @@ function repoForId(id){return Object.keys(S.repoIds).find(function(r){return S.r
 
 async function loadSubIssueParents(){
   var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});
-  console.log('[loadSubIssueParents] found '+parents.length+' parent issues');
   for(var i=0;i<parents.length;i++){
     var p=parents[i];
     try{
@@ -426,7 +432,6 @@ async function loadSubIssueParents(){
 
 async function refreshTrackingBodies(){
   var tracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
-  console.log('[refreshTrackingBodies] refreshing '+tracking.length+' CS Task Item issues');
   for(var i=0;i<tracking.length;i++){
     try{var fresh=await ghFetch('/repos/'+tracking[i].repo+'/issues/'+tracking[i].id);tracking[i].body=fresh.body||'';}
     catch(e){console.error('[refreshTrackingBodies] failed #'+tracking[i].id,e);}
@@ -450,8 +455,7 @@ async function loadIssues(){
     var taskItems=cd.filter(function(iss){return !iss.pull_request;}).slice(0,100);
     var cd2=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=50&since='+since60);
     if(!Array.isArray(cd2))cd2=[];
-    var count=0;
-    var seenIds={};
+    var count=0,seenIds={};
     taskItems.forEach(function(iss){seenIds[iss.number]=1;});
     for(var j=0;j<taskItems.length;j++){
       var iss=taskItems[j];
@@ -496,18 +500,13 @@ function findAutoCheckedParents(issueId){
 
 function isReferencedInTracking(issueId){
   var found=false;
-  var openTracking=S.issues.filter(function(ti){
-    return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});
-  });
-  var closedTracking=S.closedIssues.filter(function(ti){
-    return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});
-  });
+  var openTracking=S.issues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
+  var closedTracking=S.closedIssues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
   var trackingIssues=openTracking.concat(closedTracking);
   for(var i=0;i<trackingIssues.length;i++){
     var lines=(trackingIssues[i].body||'').split('\n');
     for(var j=0;j<lines.length;j++){
-      var mm=lines[j].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);
-      if(!mm)continue;
+      var mm=lines[j].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!mm)continue;
       var rr=mm[1].match(/#(\d+)/);
       if(rr&&parseInt(rr[1])===issueId){found=true;break;}
     }
@@ -560,26 +559,16 @@ function ignoreClosedExc(key){
 
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
 
-function isNIP(issue){
-  return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');
-}
+function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');}
 
-// FIX 1: If issue has a parent (set by sub-issue API or body), it is never an exception
-// UNLESS it's checked [x] in a tracking issue while still having CS In Testing label.
 function isException(issue){
   if(issue.state!=='open')return false;
   if(isExempt(issue))return false;
-  // CS Task Items are never exceptions
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
-  // Checked [x] in a tracking issue AND currently has cs in testing label → exception regardless of parent
   if(findAutoCheckedParents(issue.id).length>0&&issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';}))return true;
-  // Has a verified parent → not an exception (parent resolves all other concerns)
   if(issue.parent)return false;
-  // Still in New Issues pipeline
   if(isNIP(issue))return true;
-  // CS Item not referenced in any tracking issue
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id))return true;
-  // Has any CS label but no parent
   if(hasCS(issue))return true;
   return false;
 }
@@ -612,7 +601,6 @@ function applyFilters(list){var q=(document.getElementById('searchInput').value|
 
 function sortIssues(list,tab){
   if(tab==='taskitem')return list.slice().sort(function(a,b){var at=a.title.toLowerCase(),bt=b.title.toLowerCase();var aP=at.indexOf('cs production issues')===0,bP=bt.indexOf('cs production issues')===0;var aF=at.indexOf('cs features')===0,bF=bt.indexOf('cs features')===0;var aCS=at.indexOf('cs ')===0,bCS=bt.indexOf('cs ')===0;if(aP&&!bP)return -1;if(!aP&&bP)return 1;if(aF&&!bF)return -1;if(!aF&&bF)return 1;if(aCS&&!bCS)return -1;if(!aCS&&bCS)return 1;return at.localeCompare(bt);});
-  // Exceptions always sort by issue number ascending
   if(tab==='exceptions')return list.slice().sort(function(a,b){return a.id-b.id;});
   if(tab==='closed'){var dir=S.sortState.col==='closed'?S.sortState.dir:-1;return list.slice().sort(function(a,b){var av=new Date(a.closedAt||0),bv=new Date(b.closedAt||0);if(av<bv)return -dir;if(av>bv)return dir;return 0;});}
   var col=S.sortState.col,dir=S.sortState.dir;
@@ -726,35 +714,14 @@ async function updateLabel(oldKey){var newName=document.getElementById('leName_'
 async function deleteLabel(lk){var display=S.labelNames[lk]||lk;if(!confirm('Delete label "'+display+'"? This cannot be undone.'))return;try{await ghDel('/repos/'+S.repos[0]+'/labels/'+encodeURIComponent(display));delete S.labelColors[lk];delete S.labelNames[lk];S.issues.concat(S.closedIssues).forEach(function(i){i.labels=i.labels.filter(function(l){return l.toLowerCase()!==lk;});});renderLabelManager();renderMain();}catch(e){alert('Failed: '+e.message);}}
 
 // ── Parent search & linking ───────────────────────────────────────────────────
-// FIX 3: renderParentSearch is now a standalone function called from every table row
-// (not just exceptions). Renders inline under the issue title cell.
-function renderParentSearch(issueId, repo) {
-  var key = issueId + '_' + repo;
-  var issue = S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});
-  var parentInfo = issue && issue.parent ? '🔗 Parent: #'+issue.parent.issueNumber : '';
-  var h = '<div style="margin-top:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px">';
-  if(parentInfo) h += '<div style="font-size:11px;color:#059669;font-weight:600;margin-bottom:5px">'+parentInfo+'</div>';
-  h += '<div style="display:flex;gap:6px;align-items:center">';
-  h += '<input type="text" id="psearch_'+key+'" placeholder="Search or enter # to set parent..." style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none" oninput="searchParent('+issueId+',\''+esc(repo)+'\')" onkeydown="if(event.key===\'Escape\'){document.getElementById(\'presults_'+key+'\').style.display=\'none\';}"/>';
-  h += '</div>';
-  h += '<div id="presults_'+key+'" style="display:none;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);margin-top:4px;max-height:180px;overflow-y:auto"></div>';
-  h += '</div>';
-  return h;
-}
-
-var _openParentPanel = null;
-function toggleParentSearch(issueId, repo) {
-  var key = issueId + '_' + repo;
-  var panelId = 'parentpanel_' + key;
-  if (_openParentPanel && _openParentPanel !== panelId) {
-    var old = document.getElementById(_openParentPanel);
-    if (old) old.style.display = 'none';
-  }
-  var panel = document.getElementById(panelId);
-  if (!panel) return;
-  var isOpen = panel.style.display === 'block';
-  panel.style.display = isOpen ? 'none' : 'block';
-  _openParentPanel = isOpen ? null : panelId;
+var _openParentPanel=null;
+function toggleParentSearch(issueId,repo){
+  var key=issueId+'_'+repo,panelId='parentpanel_'+key;
+  if(_openParentPanel&&_openParentPanel!==panelId){var old=document.getElementById(_openParentPanel);if(old)old.style.display='none';}
+  var panel=document.getElementById(panelId);if(!panel)return;
+  var isOpen=panel.style.display==='block';
+  panel.style.display=isOpen?'none':'block';
+  _openParentPanel=isOpen?null:panelId;
 }
 
 function renderExcReason(issue){
@@ -777,9 +744,7 @@ function renderExcReason(issue){
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id)){
     parts.push('<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not in any tracking issue</span>');
   }
-  if(!parts.length){
-    parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Has CS label but no parent</span>');
-  }
+  if(!parts.length){parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Has CS label but no parent</span>');}
   return parts.join('<div style="margin-top:4px"></div>');
 }
 
@@ -793,13 +758,8 @@ async function searchParent(issueId,repo){
     var results;
     var num=parseInt(q);
     var isExactNum=!isNaN(num)&&String(num)===q.trim();
-    if(isExactNum){
-      try{var single=await ghFetch('/repos/'+repo+'/issues/'+num);results=single.pull_request?[]:[single];}catch(e){results=[];}
-    }
-    if(!results||!results.length){
-      var searchUrl='/search/issues?q='+encodeURIComponent(q)+'+repo:'+repo+'+is:issue+is:open&per_page=10&sort=updated';
-      try{var data=await ghFetch(searchUrl);results=Array.isArray(data.items)?data.items:[];}catch(e){results=[];}
-    }
+    if(isExactNum){try{var single=await ghFetch('/repos/'+repo+'/issues/'+num);results=single.pull_request?[]:[single];}catch(e){results=[];}}
+    if(!results||!results.length){var searchUrl='/search/issues?q='+encodeURIComponent(q)+'+repo:'+repo+'+is:issue+is:open&per_page=10&sort=updated';try{var data=await ghFetch(searchUrl);results=Array.isArray(data.items)?data.items:[];}catch(e){results=[];}}
     if(!results.length){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">No issues found.</div>';return;}
     var h='';
     results.slice(0,8).forEach(function(r){
@@ -814,26 +774,19 @@ async function setParent(issueId,repo,parentId,parentTitle){
   var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});
   var succeeded=false;
   try{
-    var r=await fetch('https://api.github.com/repos/'+repo+'/issues/'+parentId+'/sub_issues',{
-      method:'POST',credentials:'omit',
-      headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},
-      body:JSON.stringify({sub_issue_id:issueId})
-    });
-    if(r.ok){succeeded=true;}
+    var r=await fetch('https://api.github.com/repos/'+repo+'/issues/'+parentId+'/sub_issues',{method:'POST',credentials:'omit',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({sub_issue_id:issueId})});
+    if(r.ok)succeeded=true;
   }catch(e1){}
   if(!succeeded){
     try{
       var childData=await ghFetch('/repos/'+repo+'/issues/'+issueId);
       var existingBody=childData.body||'';
       var parentRef='\n\n**Parent:** #'+parentId+' '+parentTitle;
-      if(existingBody.indexOf('**Parent:** #'+parentId)===-1){
-        await ghPatch('/repos/'+repo+'/issues/'+issueId,{body:existingBody.trimEnd()+parentRef});
-      }
+      if(existingBody.indexOf('**Parent:** #'+parentId)===-1){await ghPatch('/repos/'+repo+'/issues/'+issueId,{body:existingBody.trimEnd()+parentRef});}
       succeeded=true;
     }catch(e2){alert('Could not set parent: '+e2.message);return;}
   }
   if(issue){issue.parent={issueNumber:parentId};saveCache();}
-  // Close the parent panel
   var key=issueId+'_'+repo;
   var panel=document.getElementById('parentpanel_'+key);if(panel)panel.style.display='none';
   _openParentPanel=null;
@@ -859,12 +812,11 @@ function renderTable(issues,tab,def){
   if(!issues.length)h+='<tr><td colspan="99" class="er">No issues found.</td></tr>';
   issues.forEach(function(issue){
     var ikey=issue.id+'_'+issue.repo,days=issue.state==='closed'?null:ageDays(issue.createdAt),isOT=isTesting&&issue.state==='open';
-    var pkey=issue.id+'_'+issue.repo;
     h+='<tr'+(isOT||isExc?' style="background:#fff5f5"':'')+'>'; 
     h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
     h+='<td style="min-width:200px">';
     h+='<a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>';
-    if(issue.parent)h+=' <span style="font-size:11px;color:#059669;font-weight:600">🔗#'+issue.parent.issueNumber+'</span>';
+    h+=parentLink(issue);
     h+='</td>';
     h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
     sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
@@ -940,12 +892,11 @@ function renderCSItemsGrouped(issues,def){
   if(!activeIssues.length)h+='<tr><td colspan="99" class="er">No issues in this pipeline.</td></tr>';
   activeIssues.forEach(function(issue){
     var ikey=issue.id+'_'+issue.repo,days=ageDays(issue.createdAt);
-    var pkey=issue.id+'_'+issue.repo;
     h+='<tr>';
     h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
     h+='<td style="min-width:200px">';
     h+='<a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>';
-    if(issue.parent)h+=' <span style="font-size:11px;color:#059669;font-weight:600">🔗#'+issue.parent.issueNumber+'</span>';
+    h+=parentLink(issue);
     h+='</td>';
     h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
     sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
@@ -973,16 +924,12 @@ function renderExceptionsView(){
   var openExc=applyFilters(sortIssues(getExceptions(),'exceptions'));
   var closedExc=getClosedExceptions();
   var h='';
-  // Sub-tab bar
   h+='<div style="display:flex;border-bottom:2px solid #e5e7eb;margin-bottom:16px;background:#fff;border-radius:10px 10px 0 0;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">';
   h+='<button onclick="switchExcTab(\'open\')" style="flex:1;padding:13px 0;font-size:13px;font-weight:700;border:none;border-bottom:'+(_excTab==='open'?'3px solid '+color:'3px solid transparent')+';background:'+(_excTab==='open'?'#fff5f5':'transparent')+';color:'+(_excTab==='open'?color:'#6b7280')+';cursor:pointer">Open Exceptions <span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700;background:'+(_excTab==='open'?'#fee2e2':'#f3f4f6')+';color:'+(_excTab==='open'?color:'#6b7280')+';margin-left:4px">'+openExc.length+'</span></button>';
   h+='<button onclick="switchExcTab(\'closed\')" style="flex:1;padding:13px 0;font-size:13px;font-weight:700;border:none;border-bottom:'+(_excTab==='closed'?'3px solid #7c3aed':'3px solid transparent')+';background:'+(_excTab==='closed'?'#faf5ff':'transparent')+';color:'+(_excTab==='closed'?'#7c3aed':'#6b7280')+';cursor:pointer">Closed Exceptions <span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700;background:'+(_excTab==='closed'?'#ede9fe':'#f3f4f6')+';color:'+(_excTab==='closed'?'#7c3aed':'#6b7280')+';margin-left:4px">'+closedExc.length+'</span></button>';
   h+='</div>';
-  if(_excTab==='open'){
-    h+=renderExcOpenTable(openExc,color);
-  } else {
-    h+=renderExcClosedTable(closedExc);
-  }
+  if(_excTab==='open'){h+=renderExcOpenTable(openExc,color);}
+  else{h+=renderExcClosedTable(closedExc);}
   return h;
 }
 
@@ -1003,7 +950,7 @@ function renderExcOpenTable(issues,color){
     h+='<tr style="background:#fff5f5">';
     h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
     h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>';
-    if(issue.parent)h+=' <span style="font-size:11px;color:#059669;font-weight:600">🔗#'+issue.parent.issueNumber+'</span>';
+    h+=parentLink(issue);
     h+='</td>';
     h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
     sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
@@ -1028,8 +975,7 @@ function renderExcClosedTable(issues){
   if(!issues.length)h+='<tr><td colspan="99" class="er">No closed exceptions.</td></tr>';
   issues.forEach(function(issue){
     var lbls=issue.labels.map(function(l){return l.toLowerCase();});
-    var hasCSItem=lbls.indexOf('cs item')!==-1;
-    var hasTesting=lbls.indexOf('cs in testing')!==-1;
+    var hasCSItem=lbls.indexOf('cs item')!==-1,hasTesting=lbls.indexOf('cs in testing')!==-1;
     var reasons=[];
     if(hasCSItem&&!issue.parent)reasons.push('No parent issue');
     if(hasCSItem&&!isReferencedInTracking(issue.id))reasons.push('Not in any tracking issue');
@@ -1038,7 +984,7 @@ function renderExcClosedTable(issues){
     h+='<tr style="background:#faf5ff">';
     h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
     h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>';
-    if(issue.parent)h+=' <span style="font-size:11px;color:#059669;font-weight:600">🔗#'+issue.parent.issueNumber+'</span>';
+    h+=parentLink(issue);
     h+='</td>';
     h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';
     sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
@@ -1053,41 +999,6 @@ function renderExcClosedTable(issues){
     h+='</tr>';
   });
   return h+'</tbody></table></div>';
-}
-
-function renderClosedExceptionsSection(issues){
-  var h='<div style="margin-top:20px">';
-  h+='<div class="gh" style="background:#7c3aed;border-radius:10px 10px 0 0"><span class="gt">⚠ Closed Issue Exceptions<span class="gc">'+issues.length+'</span></span></div>';
-  h+='<div class="tw2"><table><thead><tr>';
-  h+=mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th><th>Reason</th>';
-  h+=mkTh('closed','Closed')+'<th>Closed By</th><th></th></tr></thead><tbody>';
-  issues.forEach(function(issue){
-    var lbls=issue.labels.map(function(l){return l.toLowerCase();});
-    var hasCSItem=lbls.indexOf('cs item')!==-1;
-    var hasTesting=lbls.indexOf('cs in testing')!==-1;
-    var reasons=[];
-    if(hasCSItem&&!issue.parent)reasons.push('No parent issue');
-    if(hasCSItem&&!isReferencedInTracking(issue.id))reasons.push('Not in any tracking issue');
-    if(!hasTesting)reasons.push('Never had CS In Testing label');
-    var ikey=issue.id+'_'+issue.repo;
-    h+='<tr style="background:#faf5ff">';
-    h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
-    h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>';
-    if(issue.parent)h+=' <span style="font-size:11px;color:#059669;font-weight:600">🔗#'+issue.parent.issueNumber+'</span>';
-    h+='</td>';
-    h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';
-    sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
-    h+='</div></td>';
-    h+='<td style="min-width:180px">';
-    reasons.forEach(function(r){h+='<div><span class="badge" style="background:#ede9fe;color:#5b21b6;margin-bottom:2px">⚠ '+esc(r)+'</span></div>';});
-    h+='</td>';
-    h+='<td style="font-size:12px;color:#059669;font-weight:600">'+(issue.closedAt?new Date(issue.closedAt).toLocaleDateString():'—')+'</td>';
-    h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.closedBy||'—')+'</td>';
-    h+='<td><button class="btn-ig" onclick="ignoreClosedExc(\''+ikey+'\')">Dismiss</button></td>';
-    h+='</tr>';
-  });
-  h+='</tbody></table></div></div>';
-  return h;
 }
 
 async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});if(!list.length){sel.value='';return;}if(!confirm('Move '+list.length+' issues?')){sel.value='';return;}for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}
@@ -1111,86 +1022,36 @@ function renderMain(){
 // ── Release Modal ─────────────────────────────────────────────────────────────
 var _releases=[],_releaseIssues=[],_releaseSelected={},_releaseAssignees=[],_collaborators=[],_defaultAssignees=[];
 var RELEASE_ASSIGNEES_KEY='cis_release_assignees_v1';
-
 function loadDefaultAssignees(){try{var v=localStorage.getItem(RELEASE_ASSIGNEES_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveDefaultAssignees(){try{localStorage.setItem(RELEASE_ASSIGNEES_KEY,JSON.stringify(_defaultAssignees));}catch(e){}}
-
-function showReleaseModal(){
-  document.getElementById('releaseModal').style.display='block';
-  _defaultAssignees=loadDefaultAssignees();
-  _releaseAssignees=_defaultAssignees.slice();
-  _releases=[];_releaseIssues=[];_releaseSelected={};
-  drawReleaseModal('<div style="text-align:center;padding:30px;color:#9ca3af"><span class="spin spd"></span> Loading releases...</div>');
-  ghFetch('/repos/'+S.repos[0]+'/releases?per_page=20').then(function(r){
-    _releases=r;drawReleaseModal();
-  }).catch(function(e){
-    drawReleaseModal('<div class="err">Failed to load releases: '+esc(e.message)+'</div>');
-  });
-}
-
-function hideReleaseModal(){
-  document.getElementById('releaseModal').style.display='none';
-}
-
+function showReleaseModal(){document.getElementById('releaseModal').style.display='block';_defaultAssignees=loadDefaultAssignees();_releaseAssignees=_defaultAssignees.slice();_releases=[];_releaseIssues=[];_releaseSelected={};drawReleaseModal('<div style="text-align:center;padding:30px;color:#9ca3af"><span class="spin spd"></span> Loading releases...</div>');ghFetch('/repos/'+S.repos[0]+'/releases?per_page=20').then(function(r){_releases=r;drawReleaseModal();}).catch(function(e){drawReleaseModal('<div class="err">Failed to load releases: '+esc(e.message)+'</div>');});}
+function hideReleaseModal(){document.getElementById('releaseModal').style.display='none';}
 function drawReleaseModal(loadingHtml){
   var el=document.getElementById('releaseModalContent');
   if(loadingHtml){el.innerHTML=loadingHtml;return;}
-
   var h='';
-
   h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px">';
   h+='<select id="releasePicker" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;color:#374151"><option value="">— Select a release —</option>';
   _releases.forEach(function(r){h+='<option value="'+esc(r.id)+'">'+esc(r.name||r.tag_name)+'</option>';});
-  h+='</select>';
-  h+='<button class="btn-p" onclick="loadReleaseIssues()">Load Issues</button>';
-  h+='</div>';
-
-  h+='<div style="margin-bottom:20px">';
-  h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Assignees</div>';
+  h+='</select><button class="btn-p" onclick="loadReleaseIssues()">Load Issues</button></div>';
+  h+='<div style="margin-bottom:20px"><div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Assignees</div>';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">';
-  _releaseAssignees.forEach(function(a){
-    h+='<div style="display:inline-flex;align-items:center;gap:5px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3">';
-    h+=esc(a)+'<button onclick="removeAssignee(\''+esc(a)+'\')" style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:12px;line-height:1">✕</button></div>';
-  });
+  _releaseAssignees.forEach(function(a){h+='<div style="display:inline-flex;align-items:center;gap:5px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3">'+esc(a)+'<button onclick="removeAssignee(\''+esc(a)+'\')" style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:12px;line-height:1">✕</button></div>';});
   if(!_releaseAssignees.length)h+='<span style="font-size:12px;color:#9ca3af">No assignees selected</span>';
-  h+='</div>';
-  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative">';
+  h+='</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative">';
   h+='<input type="text" id="assigneeSearch" placeholder="Search collaborators..." style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;width:220px" oninput="searchCollaborators(this.value)"/>';
   h+='<div id="collaboratorResults" style="display:none;position:absolute;top:38px;left:0;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:220px;z-index:200"></div>';
   h+='<button class="btn-sm" style="border-color:#4338ca;color:#4338ca" onclick="saveAsDefault()">💾 Save as Default</button>';
   h+='</div></div>';
-
   if(_releaseIssues.length){
-    var csIssues=_releaseIssues.filter(function(i){return i.isCS;});
-    var nonCS=_releaseIssues.filter(function(i){return !i.isCS;});
+    var csIssues=_releaseIssues.filter(function(i){return i.isCS;}),nonCS=_releaseIssues.filter(function(i){return !i.isCS;});
     h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">';
     h+='<div style="font-size:13px;font-weight:700;color:#1e1b4b">'+csIssues.length+' CS Issues found <span style="font-weight:400;color:#9ca3af">('+nonCS.length+' non-CS skipped)</span></div>';
-    h+='<div style="display:flex;gap:8px;align-items:center">';
-    h+='<button class="btn-sm" onclick="selectAllRelease(true)">Select All</button>';
-    h+='<button class="btn-sm" onclick="selectAllRelease(false)">Deselect All</button>';
-    h+='<button class="btn-p" onclick="applyRelease()" id="applyReleaseBtn">✓ Apply to Selected</button>';
-    h+='</div></div>';
-
-    h+='<div id="releaseStatusBar" style="display:none;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:10px 14px;margin-bottom:12px">';
-    h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">';
-    h+='<span class="spin spd" id="releaseSpinner"></span>';
-    h+='<span id="releaseStatusText" style="font-size:13px;font-weight:600;color:#1e1b4b"></span>';
-    h+='</div>';
-    h+='<div style="background:#e5e7eb;border-radius:999px;height:6px;overflow:hidden">';
-    h+='<div id="releaseProgressBar" style="background:#4338ca;height:6px;border-radius:999px;width:0%;transition:width 0.3s"></div>';
-    h+='</div></div>';
-
-    h+='<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;max-height:360px;overflow-y:auto">';
-    h+='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb">';
-    h+='<th style="padding:9px 13px;width:36px"><input type="checkbox" id="releaseCheckAll" onchange="selectAllRelease(this.checked)" checked/></th>';
-    h+='<th style="padding:9px 13px;text-align:left">#</th>';
-    h+='<th style="padding:9px 13px;text-align:left">Title</th>';
-    h+='<th style="padding:9px 13px;text-align:left">Labels</th>';
-    h+='<th style="padding:9px 13px;text-align:left">Status</th>';
-    h+='</tr></thead><tbody>';
+    h+='<div style="display:flex;gap:8px;align-items:center"><button class="btn-sm" onclick="selectAllRelease(true)">Select All</button><button class="btn-sm" onclick="selectAllRelease(false)">Deselect All</button><button class="btn-p" onclick="applyRelease()" id="applyReleaseBtn">✓ Apply to Selected</button></div></div>';
+    h+='<div id="releaseStatusBar" style="display:none;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:10px 14px;margin-bottom:12px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span class="spin spd" id="releaseSpinner"></span><span id="releaseStatusText" style="font-size:13px;font-weight:600;color:#1e1b4b"></span></div><div style="background:#e5e7eb;border-radius:999px;height:6px;overflow:hidden"><div id="releaseProgressBar" style="background:#4338ca;height:6px;border-radius:999px;width:0%;transition:width 0.3s"></div></div></div>';
+    h+='<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;max-height:360px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;width:36px"><input type="checkbox" id="releaseCheckAll" onchange="selectAllRelease(this.checked)" checked/></th><th style="padding:9px 13px;text-align:left">#</th><th style="padding:9px 13px;text-align:left">Title</th><th style="padding:9px 13px;text-align:left">Labels</th><th style="padding:9px 13px;text-align:left">Status</th></tr></thead><tbody>';
     csIssues.forEach(function(issue){
-      var checked=_releaseSelected[issue.id]!==false;
-      var hasTesting=issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';});
+      var checked=_releaseSelected[issue.id]!==false,hasTesting=issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';});
       h+='<tr style="border-bottom:1px solid #f3f4f6'+(hasTesting?';background:#f0fdf4':'')+'">';
       h+='<td style="padding:8px 13px"><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleReleaseIssue('+issue.id+',this.checked)"/></td>';
       h+='<td style="padding:8px 13px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;font-weight:600">#'+issue.id+'</a></td>';
@@ -1203,132 +1064,39 @@ function drawReleaseModal(loadingHtml){
     });
     h+='</tbody></table></div>';
   }
-
   el.innerHTML=h;
 }
-
-async function loadReleaseIssues(){
-  var sel=document.getElementById('releasePicker');
-  var releaseId=sel?sel.value:'';
-  if(!releaseId)return;
-  var release=_releases.find(function(r){return String(r.id)===String(releaseId);});
-  if(!release)return;
-  drawReleaseModal('<div style="text-align:center;padding:30px;color:#9ca3af"><span class="spin spd"></span> Parsing release notes...</div>');
-  var body=release.body||'';
-  var matches=body.match(/#(\d+)/g)||[];
-  var ids=[...new Set(matches.map(function(m){return parseInt(m.replace('#',''));}))];
-  _releaseIssues=[];_releaseSelected={};
-  for(var i=0;i<ids.length;i++){
-    try{
-      var iss=await ghFetch('/repos/'+S.repos[0]+'/issues/'+ids[i]);
-      if(iss.pull_request)continue;
-      var lbls=iss.labels.map(function(l){return l.name;});
-      var isCS=lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});
-      _releaseIssues.push({id:iss.number,title:iss.title,url:iss.html_url,labels:lbls,isCS:isCS,assignees:iss.assignees.map(function(a){return a.login;})});
-      _releaseSelected[iss.number]=isCS;
-    }catch(e){}
-  }
-  drawReleaseModal();
-  setTimeout(function(){var s=document.getElementById('releasePicker');if(s)s.value=releaseId;},0);
-}
-
-async function searchCollaborators(q){
-  var el=document.getElementById('collaboratorResults');
-  if(!q){el.style.display='none';return;}
-  if(!_collaborators.length){
-    try{_collaborators=await ghFetch('/repos/'+S.repos[0]+'/collaborators?per_page=100');}catch(e){return;}
-  }
-  var filtered=_collaborators.filter(function(c){return c.login.toLowerCase().indexOf(q.toLowerCase())!==-1;}).slice(0,8);
-  if(!filtered.length){el.style.display='none';return;}
-  el.style.display='block';
-  el.innerHTML=filtered.map(function(c){
-    return '<div style="padding:8px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f3f4f6" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="addAssignee(\''+esc(c.login)+'\')">'+
-    '<img src="'+esc(c.avatar_url)+'" style="width:20px;height:20px;border-radius:50%"/> '+esc(c.login)+'</div>';
-  }).join('');
-}
-
-function addAssignee(login){
-  if(_releaseAssignees.indexOf(login)===-1)_releaseAssignees.push(login);
-  var el=document.getElementById('collaboratorResults');if(el)el.style.display='none';
-  var inp=document.getElementById('assigneeSearch');if(inp)inp.value='';
-  drawReleaseModal();
-  setTimeout(function(){var s=document.getElementById('releasePicker');if(s&&_releaseIssues.length)s.value=String(_releases[0]&&_releases[0].id);},0);
-}
-
-function removeAssignee(login){
-  _releaseAssignees=_releaseAssignees.filter(function(a){return a!==login;});
-  drawReleaseModal();
-}
-
-function saveAsDefault(){
-  _defaultAssignees=_releaseAssignees.slice();
-  saveDefaultAssignees();
-  alert('Default assignees saved!');
-}
-
+async function loadReleaseIssues(){var sel=document.getElementById('releasePicker');var releaseId=sel?sel.value:'';if(!releaseId)return;var release=_releases.find(function(r){return String(r.id)===String(releaseId);});if(!release)return;drawReleaseModal('<div style="text-align:center;padding:30px;color:#9ca3af"><span class="spin spd"></span> Parsing release notes...</div>');var body=release.body||'';var matches=body.match(/#(\d+)/g)||[];var ids=[...new Set(matches.map(function(m){return parseInt(m.replace('#',''));}))];_releaseIssues=[];_releaseSelected={};for(var i=0;i<ids.length;i++){try{var iss=await ghFetch('/repos/'+S.repos[0]+'/issues/'+ids[i]);if(iss.pull_request)continue;var lbls=iss.labels.map(function(l){return l.name;});var isCS=lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});_releaseIssues.push({id:iss.number,title:iss.title,url:iss.html_url,labels:lbls,isCS:isCS,assignees:iss.assignees.map(function(a){return a.login;})});_releaseSelected[iss.number]=isCS;}catch(e){}}drawReleaseModal();setTimeout(function(){var s=document.getElementById('releasePicker');if(s)s.value=releaseId;},0);}
+async function searchCollaborators(q){var el=document.getElementById('collaboratorResults');if(!q){el.style.display='none';return;}if(!_collaborators.length){try{_collaborators=await ghFetch('/repos/'+S.repos[0]+'/collaborators?per_page=100');}catch(e){return;}}var filtered=_collaborators.filter(function(c){return c.login.toLowerCase().indexOf(q.toLowerCase())!==-1;}).slice(0,8);if(!filtered.length){el.style.display='none';return;}el.style.display='block';el.innerHTML=filtered.map(function(c){return '<div style="padding:8px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f3f4f6" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="addAssignee(\''+esc(c.login)+'\')"><img src="'+esc(c.avatar_url)+'" style="width:20px;height:20px;border-radius:50%"/> '+esc(c.login)+'</div>';}).join('');}
+function addAssignee(login){if(_releaseAssignees.indexOf(login)===-1)_releaseAssignees.push(login);var el=document.getElementById('collaboratorResults');if(el)el.style.display='none';var inp=document.getElementById('assigneeSearch');if(inp)inp.value='';drawReleaseModal();setTimeout(function(){var s=document.getElementById('releasePicker');if(s&&_releaseIssues.length)s.value=String(_releases[0]&&_releases[0].id);},0);}
+function removeAssignee(login){_releaseAssignees=_releaseAssignees.filter(function(a){return a!==login;});drawReleaseModal();}
+function saveAsDefault(){_defaultAssignees=_releaseAssignees.slice();saveDefaultAssignees();alert('Default assignees saved!');}
 function toggleReleaseIssue(id,checked){_releaseSelected[id]=checked;}
-
-function selectAllRelease(checked){
-  _releaseIssues.filter(function(i){return i.isCS;}).forEach(function(i){_releaseSelected[i.id]=checked;});
-  drawReleaseModal();
-  setTimeout(function(){var s=document.getElementById('releasePicker');if(s&&_releaseIssues.length)s.value=String(_releases[0]&&_releases[0].id);},0);
-}
-
+function selectAllRelease(checked){_releaseIssues.filter(function(i){return i.isCS;}).forEach(function(i){_releaseSelected[i.id]=checked;});drawReleaseModal();setTimeout(function(){var s=document.getElementById('releasePicker');if(s&&_releaseIssues.length)s.value=String(_releases[0]&&_releases[0].id);},0);}
 async function applyRelease(){
   var selected=_releaseIssues.filter(function(i){return i.isCS&&_releaseSelected[i.id]!==false;});
   if(!selected.length){alert('No issues selected.');return;}
   if(!_releaseAssignees.length&&!confirm('No assignees selected. Continue with just adding the CS In Testing label?'))return;
-
   var btn=document.getElementById('applyReleaseBtn');if(btn){btn.disabled=true;btn.textContent='Applying...';}
   var bar=document.getElementById('releaseStatusBar');if(bar)bar.style.display='block';
-  var prog=document.getElementById('releaseProgressBar');
-  var txt=document.getElementById('releaseStatusText');
-  var spinner=document.getElementById('releaseSpinner');
-
+  var prog=document.getElementById('releaseProgressBar'),txt=document.getElementById('releaseStatusText'),spinner=document.getElementById('releaseSpinner');
   var done=0,failed=0,total=selected.length;
-
-  function updateProgress(){
-    var pct=Math.round(((done+failed)/total)*100);
-    if(prog)prog.style.width=pct+'%';
-    if(txt)txt.textContent='Processing '+( done+failed)+' of '+total+'...';
-  }
-
+  function updateProgress(){var pct=Math.round(((done+failed)/total)*100);if(prog)prog.style.width=pct+'%';if(txt)txt.textContent='Processing '+(done+failed)+' of '+total+'...';}
   updateProgress();
-
   for(var i=0;i<selected.length;i++){
-    var issue=selected[i];
-    var rowEl=document.getElementById('releaseRowStatus_'+issue.id);
+    var issue=selected[i];var rowEl=document.getElementById('releaseRowStatus_'+issue.id);
     if(rowEl)rowEl.innerHTML='<span style="font-size:12px;color:#6b7280"><span class="spin spd"></span> Processing...</span>';
     try{
-      var newLabels=issue.labels.slice();
-      var hasLabel=newLabels.some(function(l){return l.toLowerCase()==='cs in testing';});
-      if(!hasLabel){
-        var labelName=S.labelNames['cs in testing']||'CS In Testing';
-        newLabels.push(labelName);
-        await ghPatch('/repos/'+S.repos[0]+'/issues/'+issue.id,{labels:newLabels});
-        issue.labels=newLabels;
-      }
-      if(_releaseAssignees.length){
-        await ghPost('/repos/'+S.repos[0]+'/issues/'+issue.id+'/assignees',{assignees:_releaseAssignees});
-        issue.assignees=_releaseAssignees.slice();
-      }
-      done++;
-      if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#d1fae5;color:#065f46">✓ Done</span>';
-    }catch(e){
-      failed++;
-      if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#fee2e2;color:#991b1b">✕ Failed</span>';
-      console.error('Failed #'+issue.id,e);
-    }
+      var newLabels=issue.labels.slice(),hasLabel=newLabels.some(function(l){return l.toLowerCase()==='cs in testing';});
+      if(!hasLabel){var labelName=S.labelNames['cs in testing']||'CS In Testing';newLabels.push(labelName);await ghPatch('/repos/'+S.repos[0]+'/issues/'+issue.id,{labels:newLabels});issue.labels=newLabels;}
+      if(_releaseAssignees.length){await ghPost('/repos/'+S.repos[0]+'/issues/'+issue.id+'/assignees',{assignees:_releaseAssignees});issue.assignees=_releaseAssignees.slice();}
+      done++;if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#d1fae5;color:#065f46">✓ Done</span>';
+    }catch(e){failed++;if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#fee2e2;color:#991b1b">✕ Failed</span>';console.error('Failed #'+issue.id,e);}
     updateProgress();
   }
-
-  if(prog)prog.style.width='100%';
-  if(prog)prog.style.background=failed?'#f59e0b':'#059669';
+  if(prog){prog.style.width='100%';prog.style.background=failed?'#f59e0b':'#059669';}
   if(spinner)spinner.style.display='none';
-  if(txt){
-    txt.style.color=failed?'#d97706':'#059669';
-    txt.textContent=done+' issue'+(done!==1?'s':'')+' updated successfully'+(failed?' · '+failed+' failed':'')+'!';
-  }
+  if(txt){txt.style.color=failed?'#d97706':'#059669';txt.textContent=done+' issue'+(done!==1?'s':'')+' updated successfully'+(failed?' · '+failed+' failed':'')+'!';}
   if(btn){btn.disabled=false;btn.textContent='✓ Apply to Selected';}
   doRefresh();
 }
@@ -1338,33 +1106,20 @@ function parseSnapshotIssue(issue){
   var t=0,c=0,o=0,n=0;
   (issue.body||'').split('\n').forEach(function(line){
     var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i),unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);
-    if(!chk&&!unk)return;
-    var text=(chk||unk)[1].trim();
+    if(!chk&&!unk)return;var text=(chk||unk)[1].trim();
     if(!/#\d+/.test(text)){n++;return;}
     t++;if(chk)c++;else o++;
   });
   return{id:issue.id,title:issue.title,url:issue.url,total:t,closed:c,open:o,noIssue:n};
 }
-
 function getCurrentSnapshot(){
-  var tracking=S.issues.filter(function(i){
-    if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
-    var t=i.title.trim().toLowerCase();
-    if(t.indexOf('cs ')!==0)return false;
-    if(t.indexOf('research items')!==-1)return false;
-    if(t.indexOf('cs ba ')===0)return false;
-    return true;
-  });
+  var tracking=S.issues.filter(function(i){if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;var t=i.title.trim().toLowerCase();if(t.indexOf('cs ')!==0)return false;if(t.indexOf('research items')!==-1)return false;if(t.indexOf('cs ba ')===0)return false;return true;});
   if(!tracking.length)return null;
   var rows=[],total=0,closed=0,open=0,noIssue=0,nums=[];
-  tracking.forEach(function(issue){
-    nums.push(issue.id);var r=parseSnapshotIssue(issue);rows.push(r);
-    total+=r.total;closed+=r.closed;open+=r.open;noIssue+=r.noIssue;
-  });
+  tracking.forEach(function(issue){nums.push(issue.id);var r=parseSnapshotIssue(issue);rows.push(r);total+=r.total;closed+=r.closed;open+=r.open;noIssue+=r.noIssue;});
   rows.sort(function(a,b){return b.id-a.id;});
   return{date:todayStr(),tracking:nums.join('/'),total:total+noIssue,closed:closed,open:open,noIssue:noIssue,rows:rows};
 }
-
 function saveSnap(){var snap=getCurrentSnapshot();if(!snap){alert('No CS Task Item issues found.');return;}var history=loadHistory();if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}else history.push(snap);saveHistory(history);renderReport();}
 function delRptRow(idx){if(!confirm('Remove this row?'))return;var h=loadHistory();h.splice(idx,1);saveHistory(h);renderReport();}
 function importCSV(){var inp=document.createElement('input');inp.type='file';inp.accept='.csv';inp.onchange=function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){var lines=ev.target.result.split('\n').map(function(l){return l.trim();}).filter(Boolean);if(!lines.length){alert('Empty file.');return;}var start=lines[0].toLowerCase().indexOf('date')!==-1?1:0,imported=[],skipped=0;for(var i=start;i<lines.length;i++){var cols=lines[i].split(',');if(cols.length<5){skipped++;continue;}var row={date:(cols[0]||'').trim(),tracking:(cols[1]||'').trim(),total:parseInt(cols[2])||0,closed:parseInt(cols[3])||0,open:parseInt(cols[4])||0,noIssue:parseInt(cols[5])||0};if(!row.date){skipped++;continue;}imported.push(row);}if(!imported.length){alert('No valid rows found.');return;}var history=loadHistory(),existing={},added=0,dupes=0;history.forEach(function(r){existing[r.date]=1;});imported.forEach(function(r){if(existing[r.date])dupes++;else{history.push(r);added++;}});history.sort(function(a,b){return new Date(a.date)-new Date(b.date);});saveHistory(history);alert('Imported '+added+' row(s).'+(dupes?' Skipped '+dupes+' duplicate(s).':''));renderReport();};reader.readAsText(file);};inp.click();}
@@ -1374,21 +1129,14 @@ function clearHistory(){if(!confirm('Clear all report history?'))return;localSto
 // ── Mismatch Scanner ──────────────────────────────────────────────────────────
 var _scanResults=null,_scanning=false,_scanDismissed={};
 var SCAN_DISMISSED_KEY='cis_scan_dismissed_v1';
-function loadScanDismissed(){try{var v=localStorage.getItem(SCAN_DISMISSED_KEY);_scanDismissed=v?JSON.parse(v):{};console.log('[ScanDismissed] loaded',Object.keys(_scanDismissed).length,'entries',_scanDismissed);}catch(e){_scanDismissed={};}}
-function saveScanDismissed(){try{localStorage.setItem(SCAN_DISMISSED_KEY,JSON.stringify(_scanDismissed));console.log('[ScanDismissed] saved',Object.keys(_scanDismissed).length,'entries',_scanDismissed);}catch(e){console.error('[ScanDismissed] save failed',e);}}
+function loadScanDismissed(){try{var v=localStorage.getItem(SCAN_DISMISSED_KEY);_scanDismissed=v?JSON.parse(v):{};}catch(e){_scanDismissed={};}}
+function saveScanDismissed(){try{localStorage.setItem(SCAN_DISMISSED_KEY,JSON.stringify(_scanDismissed));}catch(e){}}
+
 async function runMismatchScan(){
   if(_scanning)return;
   _scanning=true;_scanResults=null;
-  loadScanDismissed();
-  renderReport();
-  var tracking=S.issues.filter(function(i){
-    if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
-    var t=i.title.trim().toLowerCase();
-    if(t.indexOf('cs ')!==0)return false;
-    if(t.indexOf('research items')!==-1)return false;
-    if(t.indexOf('cs ba ')===0)return false;
-    return true;
-  });
+  loadScanDismissed();renderReport();
+  var tracking=S.issues.filter(function(i){if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;var t=i.title.trim().toLowerCase();if(t.indexOf('cs ')!==0)return false;if(t.indexOf('research items')!==-1)return false;if(t.indexOf('cs ba ')===0)return false;return true;});
   var mismatches=[];
   for(var ti=0;ti<tracking.length;ti++){
     var track=tracking[ti];
@@ -1397,61 +1145,24 @@ async function runMismatchScan(){
       var chk=lines[li].match(/^\s*-\s*\[x\]\s*(.+)/i);if(!chk)continue;
       var ref=chk[1].trim();var mm=ref.match(/#(\d+)/);if(!mm)continue;
       var issueNum=parseInt(mm[1]);
-      // FIX 2: Always fetch from GitHub to get ground-truth state, don't rely on S.issues only
-      // Skip if previously dismissed
       var dkey=String(track.id)+'_'+String(issueNum);
-      if(_scanDismissed[dkey]){console.log('[Scan] skipping dismissed:',dkey);continue;}
+      if(_scanDismissed[dkey])continue;
       var openIssue=S.issues.find(function(i){return i.id===issueNum&&i.repo===track.repo;});
       if(openIssue){
-        // It's in our open issues list — definitely still open, flag it
         mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:openIssue.title,childUrl:openIssue.url,lineText:ref,closedButChecked:false});
       } else {
-        // Not in open issues — could be closed or just not loaded; fetch directly
         try{
           var data=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum);
           if(data&&data.state==='open'){
-            // Open but not in our local list (shouldn't normally happen, but catch it)
             mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:false});
           } else if(data&&data.state==='closed'){
-            // Closed — check if it was auto-closed by a PR
             var closedByPR=false,closedByUser='',closedAt=data.closed_at||'';
             if(data.closed_by&&data.closed_by.login)closedByUser=data.closed_by.login;
-            try{
-              var tl=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum+'/timeline?per_page=100');
-              if(Array.isArray(tl)){
-                tl.forEach(function(ev){
-                  if(ev.event==='closed'&&ev.commit_id)closedByPR=true;
-                  if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;
-                });
-              }
-            }catch(e){}
-            // FIX 2: Report ALL closed issues that are checked, not just PR-closed ones.
-            // If closedByPR → note it. If manually closed → also flag (it wasn't verified through the process).
-            mismatches.push({
-              trackingIssue:track,
-              childId:issueNum,
-              childRepo:track.repo,
-              childTitle:data.title,
-              childUrl:data.html_url,
-              lineText:ref,
-              closedButChecked:true,
-              closedByPR:closedByPR,
-              closedByUser:closedByUser,
-              closedAt:closedAt
-            });
+            try{var tl=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum+'/timeline?per_page=100');if(Array.isArray(tl)){tl.forEach(function(ev){if(ev.event==='closed'&&ev.commit_id)closedByPR=true;if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;});}}catch(e){}
+            mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:true,closedByPR:closedByPR,closedByUser:closedByUser,closedAt:closedAt});
           }
         }catch(e){
-          // Issue fetch failed — flag it as unknown for manual review
-          mismatches.push({
-            trackingIssue:track,
-            childId:issueNum,
-            childRepo:track.repo,
-            childTitle:'(could not load)',
-            childUrl:'https://github.com/'+track.repo+'/issues/'+issueNum,
-            lineText:ref,
-            closedButChecked:false,
-            fetchError:true
-          });
+          mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:'(could not load)',childUrl:'https://github.com/'+track.repo+'/issues/'+issueNum,lineText:ref,closedButChecked:false,fetchError:true});
         }
       }
     }
@@ -1468,8 +1179,7 @@ function renderMismatchPanel(){
   h+='<div style="display:flex;gap:8px;align-items:center">';
   h+=_scanning?'<div style="font-size:13px;color:#6b7280;display:flex;align-items:center;gap:6px"><span class="spin spd"></span>Scanning...</div>':'<button class="btn-p" onclick="runMismatchScanBackground()" style="font-size:13px;padding:8px 18px">▶ Run Scan</button>';
   if(dismissedCount)h+='<button class="btn-sm" onclick="clearScanDismissed()" title="Re-show all dismissed items on next scan">↩ Clear '+dismissedCount+' dismissed</button>';
-  h+='</div>';
-  h+='</div>';
+  h+='</div></div>';
   if(_scanResults===null&&!_scanning){h+='<div style="font-size:13px;color:#9ca3af">Click Run Scan to check all tracking issues for boxes that may need review.</div>';}
   else if(_scanning){h+='<div style="font-size:13px;color:#9ca3af">Checking each checked item against GitHub...</div>';}
   else if(_scanResults.length===0){h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found.</div>';}
@@ -1492,7 +1202,20 @@ function renderMismatchPanel(){
         var label=r.closedByPR?'Closed by PR'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():''):'Manually closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'');
         h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">'+label+' — verify process was followed</span></div>';
       }
+      // Monospace line text
       h+='<div style="font-size:11px;color:#9ca3af;margin-top:3px;font-family:monospace">'+esc(r.lineText)+'</div>';
+      // ── EDIT 2: Show checkbox status within the tracking issue ──
+      var trackBody=r.trackingIssue.body||'';
+      var checkStatus='❓ unknown';
+      trackBody.split('\n').forEach(function(line){
+        var checkedMatch=line.match(/^\s*-\s*\[x\]\s*(.+)/i);
+        var uncheckedMatch=line.match(/^\s*-\s*\[ \]\s*(.+)/i);
+        if(checkedMatch){var ref2=checkedMatch[1].match(/#(\d+)/);if(ref2&&parseInt(ref2[1])===r.childId)checkStatus='☑ Checked [x]';}
+        else if(uncheckedMatch){var ref3=uncheckedMatch[1].match(/#(\d+)/);if(ref3&&parseInt(ref3[1])===r.childId)checkStatus='☐ Unchecked [ ]';}
+      });
+      var statusColor=checkStatus==='☑ Checked [x]'?'#dc2626':checkStatus==='☐ Unchecked [ ]'?'#059669':'#6b7280';
+      h+='<div style="font-size:11px;margin-top:4px"><span style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:2px 8px;font-weight:700;color:'+statusColor+'">Status in #'+r.trackingIssue.id+': '+checkStatus+'</span></div>';
+      // ── end EDIT 2 ──
       h+='</div><div style="display:flex;gap:6px;align-items:center;flex-shrink:0">';
       h+='<a href="'+esc(r.childUrl)+'" target="_blank" class="btn-sm" style="font-size:11px;text-decoration:none">👁 View</a>';
       if(!r.fetchError)h+='<button class="btn-sm" style="font-size:11px;border-color:#f59e0b;color:#92400e;background:#fffbeb" onclick="uncheckMismatch('+idx+')">☐ Uncheck</button>';
@@ -1506,17 +1229,8 @@ function renderMismatchPanel(){
 }
 
 function clearScanDismissed(){_scanDismissed={};saveScanDismissed();renderReport();}
-
 async function uncheckMismatch(idx){var r=_scanResults[idx];if(!r)return;await uncheckInParent(r.trackingIssue.id,r.trackingIssue.repo,r.childId);_scanResults.splice(idx,1);renderReport();}
-function dismissMismatch(idx){
-  var r=_scanResults[idx];if(!r)return;
-  var key=String(r.trackingIssue.id)+'_'+String(r.childId);
-  console.log('[dismissMismatch] dismissing key:',key);
-  _scanDismissed[key]=true;
-  saveScanDismissed();
-  _scanResults.splice(idx,1);
-  renderReport();
-}
+function dismissMismatch(idx){var r=_scanResults[idx];if(!r)return;var key=String(r.trackingIssue.id)+'_'+String(r.childId);_scanDismissed[key]=true;saveScanDismissed();_scanResults.splice(idx,1);renderReport();}
 
 function renderReport(){
   var snap=getCurrentSnapshot(),history=loadHistory(),excCount=getExceptions().length,canSave=snap&&excCount===0;
@@ -1554,7 +1268,7 @@ function renderReport(){
     ['Date','Tracking Issues','Total','Net Change','Closed','Open','No Issue Raised',''].forEach(function(x){h+='<th>'+x+'</th>';});
     h+='</tr></thead><tbody>';
     history.slice().reverse().forEach(function(row,i){
-      var actualIdx=history.length-1-i;var pv=actualIdx>0?history[actualIdx-1]:null,nt=pv!==null?row.total-pv.total:null;
+      var actualIdx=history.length-1-i,pv=actualIdx>0?history[actualIdx-1]:null,nt=pv!==null?row.total-pv.total:null;
       var ns=nt===null?'&mdash;':(nt>0?'<span class="pos">+'+nt+'</span>':(nt<0?'<span class="neg">'+nt+'</span>':'0'));
       h+='<tr><td>'+esc(row.date)+'</td><td style="font-size:12px;color:#6b7280">'+esc(row.tracking)+'</td><td class="num">'+row.total+'</td><td class="num">'+ns+'</td><td class="num" style="color:#059669">'+row.closed+'</td><td class="num" style="color:#dc2626">'+row.open+'</td><td class="num">'+(row.noIssue||0)+'</td><td><button class="btn-d" style="font-size:11px;padding:3px 8px" onclick="delRptRow('+actualIdx+')">✕</button></td></tr>';
     });
