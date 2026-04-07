@@ -80,15 +80,25 @@ tr:hover td{background:#f9fafb}
 .aci{display:flex;flex-direction:column;gap:3px}
 .acit{font-size:11px;background:#fff3cd;border:1px solid #ffc107;border-radius:5px;padding:3px 7px;color:#7a4f00;max-width:280px;word-break:break-word}
 .lbl-edit-panel{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-top:6px}
-.vault-panel{background:#f8f7ff;border:1px solid #c7d2fe;border-radius:10px;padding:14px;margin-top:8px}
 .vault-chip{display:inline-flex;align-items:center;gap:4px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3;cursor:pointer;border:none}
 .vault-chip:hover{background:#c7d2fe}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;overflow-y:auto}
 .modal-box{background:#fff;border-radius:14px;max-width:580px;margin:40px auto;padding:24px 28px;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
 #setup,#cfgScr,#dash{display:none}
+#loadingOverlay{position:fixed;inset:0;background:rgba(30,27,75,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;backdrop-filter:blur(3px)}
+#loadingOverlay .lo-spin{width:52px;height:52px;border:5px solid rgba(255,255,255,0.2);border-top-color:#a5b4fc;border-radius:50%;animation:sp 0.8s linear infinite}
+#loadingOverlay .lo-title{color:#fff;font-size:1.1rem;font-weight:700}
+#loadingOverlay .lo-msg{color:#c7d2fe;font-size:13px;min-height:20px;text-align:center}
 </style>
 </head>
 <body>
+
+<div id="loadingOverlay">
+  <div class="lo-spin"></div>
+  <div class="lo-title">📋 CentralView</div>
+  <div class="lo-msg" id="loMsg">Initializing...</div>
+</div>
+
 <div id="setup">
   <div class="hdr"><div class="hdr-in">
     <div><h1>📋 CentralView</h1><p>Select a project to get started</p></div>
@@ -169,8 +179,7 @@ tr:hover td{background:#f9fafb}
 </div>
 
 <script>
-var APP_VERSION='2026-04-07 v19';
-
+var APP_VERSION='2026-04-07 v20';
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],closedExcIgnored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',CLOSED_EXC_IGNORED_KEY='cis_closed_exc_ignored_v1',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
@@ -188,17 +197,27 @@ var TAB_DEFS=[
   {id:'report',label:'Weekly Report',color:'#1e1b4b'}
 ];
 
+// ── Loading overlay ───────────────────────────────────────────────────────────
+function showLoadingOverlay(msg){
+  var o=document.getElementById('loadingOverlay');
+  if(o)o.style.display='flex';
+  var m=document.getElementById('loMsg');
+  if(m)m.textContent=msg||'Loading...';
+}
+function setLoMsg(msg){var m=document.getElementById('loMsg');if(m)m.textContent=msg||'';}
+function hideLoadingOverlay(){var o=document.getElementById('loadingOverlay');if(o)o.style.display='none';}
+
 // ── Token Vault ───────────────────────────────────────────────────────────────
 var Vault=(function(){
   var KEY='cis_vault_v1',_pw=null,_data=[];
+  function load(){try{var v=localStorage.getItem(KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+  function save(d){localStorage.setItem(KEY,JSON.stringify(d));_data=d;}
   async function deriveKey(pw,salt){var km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
   async function encrypt(text,pw){var salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));var key=await deriveKey(pw,salt);var ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,new TextEncoder().encode(text));var buf=new Uint8Array(28+ct.byteLength);buf.set(salt,0);buf.set(iv,16);buf.set(new Uint8Array(ct),28);return btoa(String.fromCharCode(...buf));}
   async function decrypt(b64,pw){var buf=Uint8Array.from(atob(b64),function(c){return c.charCodeAt(0);});var key=await deriveKey(pw,buf.slice(0,16));var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(16,28)},key,buf.slice(28));return new TextDecoder().decode(plain);}
-  function load(){try{var v=localStorage.getItem(KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
-  function save(d){localStorage.setItem(KEY,JSON.stringify(d));_data=d;}
   return{
     isUnlocked:function(){return _pw!==null;},
-    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}} _pw=pw;_data=data;},
+    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}}  _pw=pw;_data=data;},
     lock:function(){_pw=null;_data=[];},
     list:function(){return _data.map(function(e){return {name:e.name,type:e.type||''};});},
     get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
@@ -210,27 +229,21 @@ var Vault=(function(){
 
 var _activeVaultTarget=null;
 function toggleVault(target){
-  if(_activeVaultTarget===target){_activeVaultTarget=null;document.getElementById('vaultPanel'+target.toUpperCase()).style.display='none';return;}
-  _activeVaultTarget=target;
-  document.getElementById('vaultPanel'+target.toUpperCase()).style.display='block';
-  renderVaultPanel(target);
+  if(_activeVaultTarget===target){_activeVaultTarget=null;document.getElementById('vaultPanel'+target.toUpperCase()).style.display='none';}
+  else{_activeVaultTarget=target;document.getElementById('vaultPanel'+target.toUpperCase()).style.display='block';renderVaultPanel(target);}
 }
 function renderVaultPanel(target){
-  var el=document.getElementById('vaultInner'+target.toUpperCase());
-  if(!el)return;
+  var el=document.getElementById('vaultInner'+target.toUpperCase());if(!el)return;
   var h='';
   if(!Vault.isUnlocked()){
     h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">🔒 Unlock Vault</div>';
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
-    h+='<input type="password" id="vaultPw" placeholder="Master password..." autocomplete="new-password" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')vaultUnlock(\''+target+'\')"/>';
-    h+='<button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="vaultUnlock(\''+target+'\')">Unlock</button>';
-    h+='</div><div id="vaultErr" style="font-size:12px;color:#dc2626;margin-top:6px;min-height:16px"></div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="password" id="vaultPw" placeholder="Master password..." autocomplete="new-password" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')vaultUnlock(\''+target+'\')"/>';
+    h+='<button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="vaultUnlock(\''+target+'\')">Unlock</button></div>';
+    h+='<div id="vaultErr" style="font-size:12px;color:#dc2626;margin-top:6px;min-height:16px"></div>';
     h+='<div class="hint" style="margin-top:4px">New vault? Enter any password to create one.</div>';
   } else {
     var tokens=Vault.list();
-    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
-    h+='<span style="font-size:13px;font-weight:600;color:#374151">🔓 Select a token</span>';
-    h+='<button class="btn-sm" onclick="vaultLockAll()">🔒 Lock</button></div>';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-size:13px;font-weight:600;color:#374151">🔓 Select a token</span><button class="btn-sm" onclick="vaultLockAll()">🔒 Lock</button></div>';
     if(tokens.length){
       h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
       tokens.forEach(function(t){
@@ -238,11 +251,8 @@ function renderVaultPanel(target){
         h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(t.name)+'\')">'+esc(t.name)+badge+' ▶</button>';
       });
       h+='</div>';
-    } else {
-      h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">No tokens saved yet.</div>';
-    }
-    h+='<div style="border-top:1px solid #e0e7ff;padding-top:10px">';
-    h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Save New Token</div>';
+    } else {h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">No tokens saved yet.</div>';}
+    h+='<div style="border-top:1px solid #e0e7ff;padding-top:10px"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Save New Token</div>';
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
     h+='<input type="text" id="vaultNewName_'+target+'" placeholder="Name" style="width:120px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>';
     h+='<select id="vaultNewType_'+target+'" style="padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;color:#374151"><option value="">Type...</option><option value="gh">GitHub (GH)</option><option value="zh">ZenHub (ZH)</option><option value="asana">Asana</option></select>';
@@ -250,8 +260,7 @@ function renderVaultPanel(target){
     h+='<button class="btn-sm" onclick="vaultSave(\''+target+'\')">＋ Save</button></div>';
     h+='<div id="vaultSaveMsg_'+target+'" style="font-size:12px;margin-top:5px;min-height:16px"></div>';
     if(tokens.length){
-      h+='<div style="font-size:12px;font-weight:600;color:#374151;margin:10px 0 6px">Manage &amp; Tag</div>';
-      h+='<div style="display:flex;flex-direction:column;gap:5px">';
+      h+='<div style="font-size:12px;font-weight:600;color:#374151;margin:10px 0 6px">Manage &amp; Tag</div><div style="display:flex;flex-direction:column;gap:5px">';
       tokens.forEach(function(t){
         var typeColor=t.type==='gh'?'#3730a3':t.type==='zh'?'#065f46':'#6b7280';
         var typeBg=t.type==='gh'?'#e0e7ff':t.type==='zh'?'#d1fae5':'#f3f4f6';
@@ -263,8 +272,7 @@ function renderVaultPanel(target){
         h+='<option value="gh"'+(t.type==='gh'?' selected':'')+'>GitHub (GH)</option>';
         h+='<option value="zh"'+(t.type==='zh'?' selected':'')+'>ZenHub (ZH)</option>';
         h+='</select>';
-        h+='<button class="btn-sm" style="border-color:#fca5a5;color:#dc2626;padding:3px 8px;font-size:11px" onclick="vaultDel(\''+target+'\',\''+esc(t.name)+'\')">✕ Delete</button>';
-        h+='</div>';
+        h+='<button class="btn-sm" style="border-color:#fca5a5;color:#dc2626;padding:3px 8px;font-size:11px" onclick="vaultDel(\''+target+'\',\''+esc(t.name)+'\')">✕ Delete</button></div>';
       });
       h+='</div>';
     }
@@ -272,10 +280,10 @@ function renderVaultPanel(target){
   }
   el.innerHTML=h;
 }
-async function vaultUnlock(target){var pw=document.getElementById('vaultPw').value;var errEl=document.getElementById('vaultErr');if(errEl)errEl.textContent='';if(!pw){if(errEl)errEl.textContent='Enter a password.';return;}try{await Vault.unlock(pw);renderVaultPanel(target);}catch(e){if(errEl)errEl.textContent=e.message;}}
+async function vaultUnlock(target){var pw=document.getElementById('vaultPw').value;var errEl=document.getElementById('vaultErr');if(errEl)errEl.textContent='';if(!pw){if(errEl)errEl.textContent='Enter a password.';}else{try{await Vault.unlock(pw);renderVaultPanel(target);}catch(e){if(errEl)errEl.textContent=e.message;}}}
 function vaultLockAll(){Vault.lock();_activeVaultTarget=null;}
 async function vaultUse(target,name){try{var tok=await Vault.get(name);if(target==='gh'&&document.getElementById('ghToken'))document.getElementById('ghToken').value=tok;else if(document.getElementById('zhTokenInput'))document.getElementById('zhTokenInput').value=tok;}catch(e){alert('Failed to decrypt: '+e.message);}}
-async function vaultSave(target){var name=document.getElementById('vaultNewName_'+target).value.trim();var tok=document.getElementById('vaultNewTok_'+target).value.trim();var type=document.getElementById('vaultNewType_'+target).value;var msgEl=document.getElementById('vaultSaveMsg_'+target);if(!name||!tok){msgEl.style.color='#dc2626';msgEl.textContent='Name and token required.';return;}try{await Vault.add(name,tok,type);msgEl.style.color='#059669';msgEl.textContent='"'+name+'" saved!';setTimeout(function(){renderVaultPanel(target);},600);}catch(e){msgEl.style.color='#dc2626';msgEl.textContent=e.message;}}
+async function vaultSave(target){var name=document.getElementById('vaultNewName_'+target).value.trim();var tok=document.getElementById('vaultNewTok_'+target).value.trim();var type=document.getElementById('vaultNewType_'+target).value;var msgEl=document.getElementById('vaultSaveMsg_'+target);if(!name||!tok){msgEl.style.color='#dc2626';msgEl.textContent='Name and token required.';}else{try{await Vault.add(name,tok,type);msgEl.style.color='#059669';msgEl.textContent='"'+name+'" saved!';setTimeout(function(){renderVaultPanel(target);},600);}catch(e){msgEl.style.color='#dc2626';msgEl.textContent=e.message;}}}
 function vaultSetType(name,type){Vault.setType(name,type);}
 function vaultDel(target,name){if(!confirm('Delete "'+name+'"?'))return;Vault.del(name);renderVaultPanel(target);}
 
@@ -314,7 +322,6 @@ function setStatus(html){var el=document.getElementById('loadedAt');if(el)el.inn
 function renderProfileDd(){var sel=document.getElementById('profileSelect');if(!sel)return;sel.innerHTML='<option value="">-- Select a project --</option>';loadProfiles().forEach(function(p){sel.innerHTML+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});}
 function onProfileSel(){var sel=document.getElementById('profileSelect');var p=loadProfiles().find(function(x){return x.id===sel.value;});if(!p)return;S.activeProfile=p;document.getElementById('reposInput').value=p.type==='group'?(p.repos||[]).map(function(r){return r.repo;}).join(','):p.repo;}
 
-// ── Parent link helper ────────────────────────────────────────────────────────
 function parentLink(issue){
   if(!issue.parent)return '';
   var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;
@@ -335,7 +342,7 @@ function renderCfg(){
       h+='</div><button class="btn-sm" onclick="editProfile(\''+p.id+'\')">Edit</button> <button class="btn-d" onclick="delProfile(\''+p.id+'\')">Delete</button></div></div>';
     });
     h+='</div>';
-  } else h+='<div class="es" style="margin-bottom:20px">No projects yet.</div>';
+  } else {h+='<div class="es" style="margin-bottom:20px">No projects yet.</div>';}
   h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">';
   h+='<div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn-sm" id="ctS" onclick="showCfgTab(\'s\')" style="background:#4338ca;color:#fff;border-color:#4338ca">Individual</button><button class="btn-sm" id="ctG" onclick="showCfgTab(\'g\')">Group</button></div>';
   h+='<div id="cfgS"><div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Display name</label><input type="text" id="pName" placeholder="e.g. CIS" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
@@ -351,11 +358,11 @@ function renderCfg(){
   document.getElementById('cfgList').innerHTML=h;window._gr=[];
 }
 function showCfgTab(t){document.getElementById('cfgS').style.display=t==='s'?'block':'none';document.getElementById('cfgG').style.display=t==='g'?'block':'none';document.getElementById('ctS').style.cssText=t==='s'?'background:#4338ca;color:#fff;border-color:#4338ca':'';document.getElementById('ctG').style.cssText=t==='g'?'background:#4338ca;color:#fff;border-color:#4338ca':'';}
-function addGRepo(){var r=document.getElementById('gRI').value.trim(),w=document.getElementById('gWI').value.trim();if(!r){showErr('gErr','Repo required.');return;}if(!window._gr)window._gr=[];window._gr.push({repo:r,zhWorkspace:w});document.getElementById('gRI').value='';document.getElementById('gWI').value='';renderGRepos();}
-function renderGRepos(){var el=document.getElementById('gRepoList');if(!el)return;if(!window._gr||!window._gr.length){el.innerHTML='<div style="font-size:12px;color:#9ca3af">No repos added yet.</div>';return;}el.innerHTML=window._gr.map(function(r,i){return '<div style="display:flex;align-items:center;gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:7px 10px;font-size:12px"><span style="flex:1;font-weight:600">'+esc(r.repo)+'</span><span style="color:#9ca3af">'+esc(r.zhWorkspace||'no workspace')+'</span><button class="btn-d" style="padding:2px 8px;font-size:11px" onclick="remGRepo('+i+')">✕</button></div>';}).join('');}
+function addGRepo(){var r=document.getElementById('gRI').value.trim(),w=document.getElementById('gWI').value.trim();if(!r){showErr('gErr','Repo required.');}else{if(!window._gr)window._gr=[];window._gr.push({repo:r,zhWorkspace:w});document.getElementById('gRI').value='';document.getElementById('gWI').value='';renderGRepos();}}
+function renderGRepos(){var el=document.getElementById('gRepoList');if(!el)return;if(!window._gr||!window._gr.length){el.innerHTML='<div style="font-size:12px;color:#9ca3af">No repos added yet.</div>';}else{el.innerHTML=window._gr.map(function(r,i){return '<div style="display:flex;align-items:center;gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:7px 10px;font-size:12px"><span style="flex:1;font-weight:600">'+esc(r.repo)+'</span><span style="color:#9ca3af">'+esc(r.zhWorkspace||'no workspace')+'</span><button class="btn-d" style="padding:2px 8px;font-size:11px" onclick="remGRepo('+i+')">✕</button></div>';}).join('');}}
 function remGRepo(i){window._gr.splice(i,1);renderGRepos();}
-function saveGroup(){var n=document.getElementById('gName').value.trim();if(!n){showErr('gErr','Name required.');return;}if(!window._gr||!window._gr.length){showErr('gErr','Add at least one repo.');return;}var p=loadProfiles();p.push({id:'p_'+Date.now(),name:n,type:'group',repos:window._gr.slice()});saveProfiles(p);window._gr=[];renderCfg();}
-function saveNewProfile(){var n=document.getElementById('pName').value.trim(),r=document.getElementById('pRepo').value.trim(),w=document.getElementById('pWorkspace').value.trim();if(!n||!r){showErr('pErr','Name and repo required.');return;}var p=loadProfiles();p.push({id:'p_'+Date.now(),name:n,repo:r,zhWorkspace:w});saveProfiles(p);renderCfg();}
+function saveGroup(){var n=document.getElementById('gName').value.trim();if(!n){showErr('gErr','Name required.');}else if(!window._gr||!window._gr.length){showErr('gErr','Add at least one repo.');}else{var p=loadProfiles();p.push({id:'p_'+Date.now(),name:n,type:'group',repos:window._gr.slice()});saveProfiles(p);window._gr=[];renderCfg();}}
+function saveNewProfile(){var n=document.getElementById('pName').value.trim(),r=document.getElementById('pRepo').value.trim(),w=document.getElementById('pWorkspace').value.trim();if(!n||!r){showErr('pErr','Name and repo required.');}else{var p=loadProfiles();p.push({id:'p_'+Date.now(),name:n,repo:r,zhWorkspace:w});saveProfiles(p);renderCfg();}}
 function delProfile(id){if(!confirm('Delete?'))return;saveProfiles(loadProfiles().filter(function(p){return p.id!==id;}));renderCfg();}
 function editProfile(id){var p=loadProfiles(),pr=p.find(function(x){return x.id===id;});if(!pr)return;var n=prompt('Name:',pr.name);if(n===null)return;var r=prompt('Repo:',pr.repo);if(r===null)return;var w=prompt('ZenHub workspace ID:',pr.zhWorkspace||'');if(w===null)return;pr.name=n.trim();pr.repo=r.trim();pr.zhWorkspace=w.trim();saveProfiles(p);renderCfg();}
 
@@ -371,47 +378,89 @@ async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{head
 async function connect(){
   var rp=document.getElementById('reposInput').value.trim();
   hideErr('setupErr');
-  if(!S.ghToken||!rp){showErr('setupErr','Please select a project.');return;}
-  S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
-  S.ignored=loadIgnored();S.closedExcIgnored=loadClosedExcIgnored();loadScanDismissed();loadZHCreds();S.repoWorkspaceMap={};
-  if(S.activeProfile){
-    if(S.activeProfile.type==='group'){(S.activeProfile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(!S.zhWorkspace&&S.activeProfile.repos&&S.activeProfile.repos[0])S.zhWorkspace=S.activeProfile.repos[0].zhWorkspace||'';}
-    else if(S.activeProfile.zhWorkspace){S.zhWorkspace=S.activeProfile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=S.activeProfile.zhWorkspace;}
-    saveZHCreds();
+  if(!S.ghToken||!rp){
+    showErr('setupErr','Please select a project.');
+  } else {
+    S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
+    S.ignored=loadIgnored();S.closedExcIgnored=loadClosedExcIgnored();loadScanDismissed();loadZHCreds();S.repoWorkspaceMap={};
+    if(S.activeProfile){
+      if(S.activeProfile.type==='group'){(S.activeProfile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(!S.zhWorkspace&&S.activeProfile.repos&&S.activeProfile.repos[0])S.zhWorkspace=S.activeProfile.repos[0].zhWorkspace||'';}
+      else if(S.activeProfile.zhWorkspace){S.zhWorkspace=S.activeProfile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=S.activeProfile.zhWorkspace;}
+      saveZHCreds();
+    }
+    var btn=document.getElementById('connectBtn');btn.disabled=true;btn.innerHTML='<span class="spin spd"></span>Loading...';
+    var cache=loadCache();
+    if(cache&&cache.issues&&cache.parentsLoaded){
+      S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
+      var age=Math.round((Date.now()-cache.savedAt)/60000);
+      populateFilters();showDash();buildTabs();renderMain();
+      setStatus('<span style="color:#fbbf24;font-size:14px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
+      btn.disabled=false;btn.textContent='▶ Load Dashboard';
+      bgRefresh();
+    } else {
+      showLoadingOverlay('Loading issues...');
+      try{
+        await Promise.all([loadLabelColors(),loadIssues()]);
+        setLoMsg('Loading parent links...');
+        await loadSubIssueParents();
+        setLoMsg('Loading tracking bodies...');
+        await refreshTrackingBodies();
+        saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();
+        hideLoadingOverlay();
+        setTimeout(function(){runMismatchScanBackground();},0);
+      } catch(e){
+        hideLoadingOverlay();
+        showErr('setupErr',e.message);
+      }
+      btn.disabled=false;btn.textContent='▶ Load Dashboard';
+    }
   }
-  var btn=document.getElementById('connectBtn');btn.disabled=true;btn.innerHTML='<span class="spin spd"></span>Loading...';
-  var cache=loadCache();
-  if(cache&&cache.issues&&cache.parentsLoaded){
-    S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
-    var age=Math.round((Date.now()-cache.savedAt)/60000);
-    populateFilters();showDash();buildTabs();renderMain();
-    setStatus('<span style="color:#fbbf24;font-size:14px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
-    btn.disabled=false;btn.textContent='▶ Load Dashboard';
-    bgRefresh();return;
-  }
-  try{await Promise.all([loadLabelColors(),loadIssues()]);await loadSubIssueParents();await refreshTrackingBodies();saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();setTimeout(function(){runMismatchScanBackground();},0);}
-  catch(e){showErr('setupErr',e.message);}
-  btn.disabled=false;btn.textContent='▶ Load Dashboard';
 }
 
 function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
+
 async function bgRefresh(){
-  _scanResults=null;_lastScanTime=null; // force fresh scan after refresh
-  try{await Promise.all([loadLabelColors(),loadIssues()]);await loadSubIssueParents();await refreshTrackingBodies();saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();}catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}
+  _scanResults=null;_lastScanTime=null;
+  showLoadingOverlay('Refreshing issues...');
+  try{
+    await Promise.all([loadLabelColors(),loadIssues()]);
+    setLoMsg('Loading parent links...');
+    await loadSubIssueParents();
+    setLoMsg('Loading tracking bodies...');
+    await refreshTrackingBodies();
+    saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();
+  } catch(e){
+    setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');
+  }
+  hideLoadingOverlay();
   setTimeout(function(){runMismatchScanBackground();},0);
 }
 
-function runMismatchScanBackground(){runMismatchScan().then(function(){renderStats();if(S.activeTab==='report')renderReport();}).catch(function(e){console.error('Mismatch scan failed:',e);});}
+function runMismatchScanBackground(){
+  runMismatchScan().then(function(){renderStats();if(S.activeTab==='report')renderReport();}).catch(function(e){console.error('Mismatch scan failed:',e);});
+}
 
 async function doRefresh(){
   var btn=document.getElementById('refreshBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{localStorage.removeItem(CACHE_KEY);}catch(e){}
   S.zhIssueMap={};S.zhPipelines={};S.repoIds={};S.zhConnected=false;
-  try{await Promise.all([loadLabelColors(),loadIssues()]);await loadSubIssueParents();await refreshTrackingBodies();saveCache();populateFilters();buildTabs();renderMain();if(S.zhToken&&S.zhWorkspace)zhLoad();else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}
-  catch(e){showErr('dashErr',e.message);}
+  _scanResults=null;_lastScanTime=null;
+  showLoadingOverlay('Refreshing...');
+  try{
+    await Promise.all([loadLabelColors(),loadIssues()]);
+    setLoMsg('Loading parent links...');
+    await loadSubIssueParents();
+    setLoMsg('Loading tracking bodies...');
+    await refreshTrackingBodies();
+    saveCache();populateFilters();buildTabs();renderMain();
+    if(S.zhToken&&S.zhWorkspace)zhLoad();
+    else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
+  } catch(e){showErr('dashErr',e.message);}
+  hideLoadingOverlay();
   btn.disabled=false;btn.innerHTML='↻ Refresh';
   setTimeout(function(){runMismatchScanBackground();},0);
 }
+
 function startAutoRefresh(){if(S.autoRefreshTimer)clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=setInterval(function(){doRefresh();},15*60*1000);}
 function stopAutoRefresh(){if(S.autoRefreshTimer){clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=null;}}
 
@@ -424,10 +473,8 @@ async function loadSubIssueParents(){
   var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});
   for(var i=0;i<parents.length;i++){
     var p=parents[i];
-    try{
-      var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');
-      if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child)child.parent={issueNumber:p.id};});}
-    }catch(e){console.log('[loadSubIssueParents] failed for #'+p.id+': '+e.message);}
+    try{var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child)child.parent={issueNumber:p.id};});}}
+    catch(e){console.log('[loadSubIssueParents] failed for #'+p.id+': '+e.message);}
   }
 }
 
@@ -459,8 +506,7 @@ async function loadIssues(){
     var count=0,seenIds={};
     taskItems.forEach(function(iss){seenIds[iss.number]=1;});
     for(var j=0;j<taskItems.length;j++){
-      var iss=taskItems[j];
-      var lbls=iss.labels.map(function(l){return l.name;});
+      var iss=taskItems[j];var lbls=iss.labels.map(function(l){return l.name;});
       closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:null});
     }
     for(var j=0;j<cd2.length;j++){
@@ -478,13 +524,6 @@ async function loadIssues(){
 }
 
 // ── Issue logic ───────────────────────────────────────────────────────────────
-function getAutoClosedItems(issue){
-  if(!issue.labels.some(function(l){return l.toLowerCase()==='cs task item';})||issue.state!=='open')return[];
-  var hits=[];
-  (issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(chk&&/#\d+/.test(chk[1].trim()))hits.push(chk[1].trim());});
-  return hits;
-}
-
 function findAutoCheckedParents(issueId){
   var parents=[];
   S.issues.forEach(function(ti){
@@ -501,11 +540,9 @@ function findAutoCheckedParents(issueId){
 
 function isReferencedInTracking(issueId){
   var found=false;
-  var openTracking=S.issues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
-  var closedTracking=S.closedIssues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
-  var trackingIssues=openTracking.concat(closedTracking);
-  for(var i=0;i<trackingIssues.length;i++){
-    var lines=(trackingIssues[i].body||'').split('\n');
+  var all=S.issues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).concat(S.closedIssues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}); }));
+  for(var i=0;i<all.length;i++){
+    var lines=(all[i].body||'').split('\n');
     for(var j=0;j<lines.length;j++){
       var mm=lines[j].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!mm)continue;
       var rr=mm[1].match(/#(\d+)/);
@@ -518,20 +555,21 @@ function isReferencedInTracking(issueId){
 
 async function uncheckInParent(trackingIssueId,trackingRepo,childIssueId){
   var ti=S.issues.find(function(i){return i.id===trackingIssueId&&i.repo===trackingRepo;});
-  if(!ti){alert('Tracking issue not found in local state.');return;}
-  var lines=(ti.body||'').split('\n');
-  var changed=false;
-  var newLines=lines.map(function(line){
-    var chk=line.match(/^(\s*-\s*)\[x\](\s*.+)/i);if(!chk)return line;
-    var ref=chk[2];var mm=ref.match(/#(\d+)/);
-    if(mm&&parseInt(mm[1])===childIssueId){changed=true;return chk[1]+'[ ]'+chk[2];}
-    return line;
-  });
-  if(!changed){alert('Could not find the checked line to uncheck.');return;}
-  try{
-    await ghPatch('/repos/'+trackingRepo+'/issues/'+trackingIssueId,{body:newLines.join('\n')});
-    ti.body=newLines.join('\n');renderMain();
-  }catch(e){alert('Failed to uncheck: '+e.message);}
+  if(!ti){alert('Tracking issue not found in local state.');}
+  else{
+    var lines=(ti.body||'').split('\n'),changed=false;
+    var newLines=lines.map(function(line){
+      var chk=line.match(/^(\s*-\s*)\[x\](\s*.+)/i);if(!chk)return line;
+      var ref=chk[2];var mm=ref.match(/#(\d+)/);
+      if(mm&&parseInt(mm[1])===childIssueId){changed=true;return chk[1]+'[ ]'+chk[2];}
+      return line;
+    });
+    if(!changed){alert('Could not find the checked line to uncheck.');}
+    else{
+      try{await ghPatch('/repos/'+trackingRepo+'/issues/'+trackingIssueId,{body:newLines.join('\n')});ti.body=newLines.join('\n');renderMain();}
+      catch(e){alert('Failed to uncheck: '+e.message);}
+    }
+  }
 }
 
 function isClosedException(issue){
@@ -539,8 +577,7 @@ function isClosedException(issue){
   if(S.closedExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;
   var lbls=issue.labels.map(function(l){return l.toLowerCase();});
   if(lbls.indexOf('cs task item')!==-1)return false;
-  var hasCSItem=lbls.indexOf('cs item')!==-1;
-  var hasTesting=lbls.indexOf('cs in testing')!==-1;
+  var hasCSItem=lbls.indexOf('cs item')!==-1,hasTesting=lbls.indexOf('cs in testing')!==-1;
   var hasCSLabel=lbls.some(function(l){return CS_LABELS.indexOf(l)!==-1;});
   if(!hasCSLabel)return false;
   if(hasCSItem&&!isReferencedInTracking(issue.id))return true;
@@ -548,16 +585,8 @@ function isClosedException(issue){
   if(hasCSLabel&&!hasTesting)return true;
   return false;
 }
-
-function getClosedExceptions(){
-  return S.closedIssues.filter(function(i){return isClosedException(i);}).slice().sort(function(a,b){return a.id-b.id;});
-}
-
-function ignoreClosedExc(key){
-  if(S.closedExcIgnored.indexOf(key)===-1)S.closedExcIgnored.push(key);
-  saveClosedExcIgnored();renderMain();
-}
-
+function getClosedExceptions(){return S.closedIssues.filter(function(i){return isClosedException(i);}).slice().sort(function(a,b){return a.id-b.id;});}
+function ignoreClosedExc(key){if(S.closedExcIgnored.indexOf(key)===-1)S.closedExcIgnored.push(key);saveClosedExcIgnored();renderMain();}
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
 function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');}
 
@@ -582,11 +611,7 @@ function getTabIssues(tab){
   if(t==='exceptions')return getExceptions();
   if(t==='ignored')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;});
   if(t==='closed')return S.closedIssues.slice().sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
-  if(t==='testing'){
-    var oT=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
-    var cT=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
-    return oT.concat(cT);
-  }
+  if(t==='testing'){var oT=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});var cT=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});return oT.concat(cT);}
   if(t==='taskitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs in testing'||ll==='cs task item';});});
   if(t==='newitems')return base.filter(function(i){return !hasCS(i);});
@@ -637,23 +662,26 @@ function renderStats(){
       h+='<div class="sn" style="color:'+c+';font-size:2rem;position:relative;display:inline-block">📋';
       if(_scanResults!==null&&_scanResults.length>0)h+='<span style="position:absolute;top:-6px;right:-14px;background:#dc2626;color:#fff;font-size:11px;font-weight:800;padding:1px 6px;border-radius:999px;min-width:18px;text-align:center">'+_scanResults.length+'</span>';
       h+='</div>';
-    } else {
-      h+='<div class="sn" style="color:'+c+'">'+s.n+'</div>';
-    }
+    } else {h+='<div class="sn" style="color:'+c+'">'+s.n+'</div>';}
     h+='<div class="sl">'+esc(l)+'</div></div>';
   });
   document.getElementById('statGrid').innerHTML=h;
 }
 
-function buildTabs(){var pN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length;var uN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length;var fN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='failed testing';});}).length;var h='';TAB_DEFS.forEach(function(t){if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0)||(t.id==='failedtesting'&&fN===0))return;var cnt=getTabIssues(t.id).length,active=S.activeTab===t.id,c=tabColor(t);h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+c:'')+'">'+esc(t.label)+'<span class="tc">'+cnt+'</span></button>';});document.getElementById('tabsWrap').innerHTML=h;}
-
-function switchTab(name){
-  S.activeTab=name;
-  document.getElementById('searchBar').style.display=name==='report'?'none':'flex';
-  if(name==='closed')S.sortState={col:'closed',dir:-1};
-  buildTabs();renderMain();
+function buildTabs(){
+  var pN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length;
+  var uN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length;
+  var fN=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i)&&i.labels.some(function(l){return l.toLowerCase()==='failed testing';});}).length;
+  var h='';
+  TAB_DEFS.forEach(function(t){
+    if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0)||(t.id==='failedtesting'&&fN===0))return;
+    var cnt=getTabIssues(t.id).length,active=S.activeTab===t.id,c=tabColor(t);
+    h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+c:'')+'">'+esc(t.label)+'<span class="tc">'+cnt+'</span></button>';
+  });
+  document.getElementById('tabsWrap').innerHTML=h;
 }
 
+function switchTab(name){S.activeTab=name;document.getElementById('searchBar').style.display=name==='report'?'none':'flex';if(name==='closed')S.sortState={col:'closed',dir:-1};buildTabs();renderMain();}
 function ignoreIssue(k){if(S.ignored.indexOf(k)===-1)S.ignored.push(k);saveIgnored();buildTabs();renderMain();}
 function unignoreIssue(k){S.ignored=S.ignored.filter(function(x){return x!==k;});saveIgnored();buildTabs();renderMain();}
 
@@ -663,14 +691,12 @@ function toggleLabelEdit(issueId,repo){var key=issueId+'_'+repo;var panelId='lbl
 function renderLabelEditPanel(issueId,repo){
   var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;})||S.closedIssues.find(function(i){return i.id===issueId&&i.repo===repo;});
   var panel=document.getElementById('lblpanel_'+issueId+'_'+repo);if(!issue||!panel)return;
-  var allLabels=Object.keys(S.labelColors).sort(lsort);
-  var current=issue.labels.map(function(l){return l.toLowerCase();});
+  var allLabels=Object.keys(S.labelColors).sort(lsort),current=issue.labels.map(function(l){return l.toLowerCase();});
   var h='<div class="lbl-edit-panel"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Edit Labels — #'+issueId+'</div>';
   h+='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">';
   if(issue.labels.length){issue.labels.forEach(function(l){var c=S.labelColors[l.toLowerCase()]||'e5e7eb';var display=S.labelNames[l.toLowerCase()]||l;h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#'+c+';color:'+tfb(c)+';padding:3px 8px;border-radius:999px;font-size:11px;font-weight:600">'+esc(display)+'<button onclick="removeLbl('+issueId+',\''+esc(repo)+'\',\''+esc(l)+'\')" style="background:none;border:none;cursor:pointer;color:inherit;font-size:11px;padding:0;opacity:0.7">✕</button></span>';});}
   else h+='<span style="font-size:12px;color:#9ca3af">No labels</span>';
-  h+='</div><div style="display:flex;gap:6px;align-items:center">';
-  h+='<select id="lblAddSel_'+issueId+'_'+esc(repo)+'" style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"><option value="">— Add a label —</option>';
+  h+='</div><div style="display:flex;gap:6px;align-items:center"><select id="lblAddSel_'+issueId+'_'+esc(repo)+'" style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"><option value="">— Add a label —</option>';
   allLabels.forEach(function(l){if(current.indexOf(l)===-1){var display=S.labelNames[l]||l;h+='<option value="'+esc(l)+'">'+esc(display)+'</option>';}});
   h+='</select><button class="btn-sm" onclick="addLbl('+issueId+',\''+esc(repo)+'\')">＋ Add</button></div></div>';
   panel.innerHTML=h;
@@ -682,17 +708,14 @@ async function removeLbl(issueId,repo,label){var issue=S.issues.find(function(i)
 function showLabelManager(){document.getElementById('labelModal').style.display='block';renderLabelManager();}
 function hideLabelManager(){document.getElementById('labelModal').style.display='none';}
 function renderLabelManager(){
-  var el=document.getElementById('labelModalContent');
-  var labels=Object.keys(S.labelColors).sort(lsort);
-  var h='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:16px">';
-  h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">Create New Label</div>';
-  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
-  h+='<input type="text" id="newLblName" placeholder="Label name" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/>';
+  var el=document.getElementById('labelModalContent'),labels=Object.keys(S.labelColors).sort(lsort);
+  var h='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-bottom:16px"><div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">Create New Label</div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="text" id="newLblName" placeholder="Label name" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/>';
   h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;color:#6b7280">Color:</span><input type="color" id="newLblColor" value="#4338ca" style="width:36px;height:32px;border:1px solid #ddd;border-radius:6px;cursor:pointer;padding:2px"/></div>';
-  h+='<button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="createLabel()">＋ Create</button>';
-  h+='</div><div id="lblCreateMsg" style="font-size:12px;margin-top:6px;min-height:16px"></div></div>';
+  h+='<button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="createLabel()">＋ Create</button></div>';
+  h+='<div id="lblCreateMsg" style="font-size:12px;margin-top:6px;min-height:16px"></div></div>';
   h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:10px">Existing Labels ('+labels.length+')</div>';
-  if(!labels.length)h+='<div style="font-size:13px;color:#9ca3af">No labels loaded.</div>';
+  if(!labels.length){h+='<div style="font-size:13px;color:#9ca3af">No labels loaded.</div>';}
   else{
     h+='<div style="display:flex;flex-direction:column;gap:6px">';
     labels.forEach(function(lk){var c=S.labelColors[lk]||'e5e7eb';var display=S.labelNames[lk]||lk;
@@ -702,14 +725,13 @@ function renderLabelManager(){
       h+='<input type="text" value="'+esc(display)+'" id="leName_'+esc(lk)+'" style="width:150px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;outline:none"/>';
       h+='<input type="color" value="#'+c+'" id="leColor_'+esc(lk)+'" style="width:32px;height:28px;border:1px solid #ddd;border-radius:5px;cursor:pointer;padding:1px"/>';
       h+='<button class="btn-sm" onclick="updateLabel(\''+esc(lk)+'\')">Save</button>';
-      h+='<button class="btn-d" style="padding:5px 10px;font-size:12px" onclick="deleteLabel(\''+esc(lk)+'\')">Delete</button>';
-      h+='</div>';
+      h+='<button class="btn-d" style="padding:5px 10px;font-size:12px" onclick="deleteLabel(\''+esc(lk)+'\')">Delete</button></div>';
     });
     h+='</div>';
   }
   el.innerHTML=h;
 }
-async function createLabel(){var name=document.getElementById('newLblName').value.trim(),color=document.getElementById('newLblColor').value.replace('#',''),msg=document.getElementById('lblCreateMsg');if(!name){msg.style.color='#dc2626';msg.textContent='Name required.';return;}try{await ghPost('/repos/'+S.repos[0]+'/labels',{name:name,color:color});S.labelColors[name.toLowerCase()]=color;S.labelNames[name.toLowerCase()]=name;msg.style.color='#059669';msg.textContent='"'+name+'" created!';document.getElementById('newLblName').value='';setTimeout(function(){renderLabelManager();},600);}catch(e){msg.style.color='#dc2626';msg.textContent=e.message;}}
+async function createLabel(){var name=document.getElementById('newLblName').value.trim(),color=document.getElementById('newLblColor').value.replace('#',''),msg=document.getElementById('lblCreateMsg');if(!name){msg.style.color='#dc2626';msg.textContent='Name required.';}else{try{await ghPost('/repos/'+S.repos[0]+'/labels',{name:name,color:color});S.labelColors[name.toLowerCase()]=color;S.labelNames[name.toLowerCase()]=name;msg.style.color='#059669';msg.textContent='"'+name+'" created!';document.getElementById('newLblName').value='';setTimeout(function(){renderLabelManager();},600);}catch(e){msg.style.color='#dc2626';msg.textContent=e.message;}}}
 async function updateLabel(oldKey){var newName=document.getElementById('leName_'+oldKey).value.trim(),newColor=document.getElementById('leColor_'+oldKey).value.replace('#','');if(!newName)return;var oldDisplay=S.labelNames[oldKey]||oldKey;try{await fetch('https://api.github.com/repos/'+S.repos[0]+'/labels/'+encodeURIComponent(oldDisplay),{method:'PATCH',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify({new_name:newName,color:newColor})});delete S.labelColors[oldKey];delete S.labelNames[oldKey];S.labelColors[newName.toLowerCase()]=newColor;S.labelNames[newName.toLowerCase()]=newName;S.issues.concat(S.closedIssues).forEach(function(i){i.labels=i.labels.map(function(l){return l.toLowerCase()===oldKey?newName:l;});});renderLabelManager();renderMain();}catch(e){alert('Failed: '+e.message);}}
 async function deleteLabel(lk){var display=S.labelNames[lk]||lk;if(!confirm('Delete label "'+display+'"? This cannot be undone.'))return;try{await ghDel('/repos/'+S.repos[0]+'/labels/'+encodeURIComponent(display));delete S.labelColors[lk];delete S.labelNames[lk];S.issues.concat(S.closedIssues).forEach(function(i){i.labels=i.labels.filter(function(l){return l.toLowerCase()!==lk;});});renderLabelManager();renderMain();}catch(e){alert('Failed: '+e.message);}}
 
@@ -719,78 +741,56 @@ function toggleParentSearch(issueId,repo){
   var key=issueId+'_'+repo,panelId='parentpanel_'+key;
   if(_openParentPanel&&_openParentPanel!==panelId){var old=document.getElementById(_openParentPanel);if(old)old.style.display='none';}
   var panel=document.getElementById(panelId);if(!panel)return;
-  var isOpen=panel.style.display==='block';
-  panel.style.display=isOpen?'none':'block';
+  var isOpen=panel.style.display==='block';panel.style.display=isOpen?'none':'block';
   _openParentPanel=isOpen?null:panelId;
 }
 
 function renderExcReason(issue){
-  var parts=[];
-  var autoParents=findAutoCheckedParents(issue.id);
+  var parts=[],autoParents=findAutoCheckedParents(issue.id);
   if(autoParents.length&&issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';})){
     autoParents.forEach(function(ap){
-      var h='<div class="aci">';
-      h+='<div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:4px">⚠ Checked in tracking issue <a href="'+esc(ap.trackingIssue.url)+'" target="_blank" style="color:#7a4f00;text-decoration:underline">#'+ap.trackingIssue.id+'</a> but still has CS In Testing</div>';
+      var h='<div class="aci"><div style="font-size:11px;font-weight:700;color:#7a4f00;margin-bottom:4px">⚠ Checked in tracking issue <a href="'+esc(ap.trackingIssue.url)+'" target="_blank" style="color:#7a4f00;text-decoration:underline">#'+ap.trackingIssue.id+'</a> but still has CS In Testing</div>';
       h+='<div class="acit" style="margin-bottom:6px">'+esc(ap.lineText)+'</div>';
-      h+='<div style="display:flex;gap:6px;align-items:center">';
-      h+='<a href="'+esc(ap.trackingIssue.url)+'" target="_blank" class="btn-sm" style="font-size:11px;padding:3px 9px;text-decoration:none;display:inline-block">👁 Review #'+ap.trackingIssue.id+'</a>';
-      h+='<button class="btn-sm" style="font-size:11px;padding:3px 9px;border-color:#f59e0b;color:#92400e;background:#fffbeb" onclick="uncheckInParent('+ap.trackingIssue.id+',\''+esc(ap.trackingIssue.repo)+'\','+issue.id+')">☐ Uncheck in #'+ap.trackingIssue.id+'</button>';
-      h+='</div></div>';
+      h+='<div style="display:flex;gap:6px;align-items:center"><a href="'+esc(ap.trackingIssue.url)+'" target="_blank" class="btn-sm" style="font-size:11px;padding:3px 9px;text-decoration:none;display:inline-block">👁 Review #'+ap.trackingIssue.id+'</a>';
+      h+='<button class="btn-sm" style="font-size:11px;padding:3px 9px;border-color:#f59e0b;color:#92400e;background:#fffbeb" onclick="uncheckInParent('+ap.trackingIssue.id+',\''+esc(ap.trackingIssue.repo)+'\','+issue.id+')">☐ Uncheck in #'+ap.trackingIssue.id+'</button></div></div>';
       parts.push(h);
     });
     return parts.join('<div style="margin-top:4px"></div>');
   }
   if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
-  if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id)){
-    parts.push('<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not in any tracking issue</span>');
-  }
-  if(!parts.length){parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Has CS label but no parent</span>');}
+  if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id))parts.push('<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not in any tracking issue</span>');
+  if(!parts.length)parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Has CS label but no parent</span>');
   return parts.join('<div style="margin-top:4px"></div>');
 }
 
 async function searchParent(issueId,repo){
-  var key=issueId+'_'+repo;
-  var q=(document.getElementById('psearch_'+key)||{}).value||'';
+  var key=issueId+'_'+repo,q=(document.getElementById('psearch_'+key)||{}).value||'';
   var el=document.getElementById('presults_'+key);if(!el)return;
-  if(!q){el.style.display='none';return;}
-  el.style.display='block';el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">Searching...</div>';
-  try{
-    var results;
-    var num=parseInt(q);
-    var isExactNum=!isNaN(num)&&String(num)===q.trim();
-    if(isExactNum){try{var single=await ghFetch('/repos/'+repo+'/issues/'+num);results=single.pull_request?[]:[single];}catch(e){results=[];}}
-    if(!results||!results.length){var searchUrl='/search/issues?q='+encodeURIComponent(q)+'+repo:'+repo+'+is:issue+is:open&per_page=10&sort=updated';try{var data=await ghFetch(searchUrl);results=Array.isArray(data.items)?data.items:[];}catch(e){results=[];}}
-    if(!results.length){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">No issues found.</div>';return;}
-    var h='';
-    results.slice(0,8).forEach(function(r){
-      h+='<div style="padding:8px 12px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="setParent('+issueId+',\''+esc(repo)+'\','+r.number+',\''+esc(r.title.replace(/'/g,"\\'"))+'\')">'+
-      '<span style="color:#6b7280;font-weight:600">#'+r.number+'</span> <span style="color:#1e1b4b;font-weight:500">'+esc(r.title)+'</span></div>';
-    });
-    el.innerHTML=h;
-  }catch(e){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#dc2626">Error: '+esc(e.message)+'</div>';}
+  if(!q){el.style.display='none';}
+  else{
+    el.style.display='block';el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">Searching...</div>';
+    try{
+      var results,num=parseInt(q),isExactNum=!isNaN(num)&&String(num)===q.trim();
+      if(isExactNum){try{var single=await ghFetch('/repos/'+repo+'/issues/'+num);results=single.pull_request?[]:[single];}catch(e){results=[];}}
+      if(!results||!results.length){try{var data=await ghFetch('/search/issues?q='+encodeURIComponent(q)+'+repo:'+repo+'+is:issue+is:open&per_page=10&sort=updated');results=Array.isArray(data.items)?data.items:[];}catch(e){results=[];}}
+      if(!results.length){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#9ca3af">No issues found.</div>';}
+      else{var h='';results.slice(0,8).forEach(function(r){h+='<div style="padding:8px 12px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="setParent('+issueId+',\''+esc(repo)+'\','+r.number+',\''+esc(r.title.replace(/'/g,"\\'"))+'\')"><span style="color:#6b7280;font-weight:600">#'+r.number+'</span> <span style="color:#1e1b4b;font-weight:500">'+esc(r.title)+'</span></div>';});el.innerHTML=h;}
+    }catch(e){el.innerHTML='<div style="padding:8px 12px;font-size:12px;color:#dc2626">Error: '+esc(e.message)+'</div>';}
+  }
 }
 
 async function setParent(issueId,repo,parentId,parentTitle){
-  var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});
-  var succeeded=false;
-  try{
-    var r=await fetch('https://api.github.com/repos/'+repo+'/issues/'+parentId+'/sub_issues',{method:'POST',credentials:'omit',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({sub_issue_id:issueId})});
-    if(r.ok)succeeded=true;
-  }catch(e1){}
+  var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;}),succeeded=false;
+  try{var r=await fetch('https://api.github.com/repos/'+repo+'/issues/'+parentId+'/sub_issues',{method:'POST',credentials:'omit',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'},body:JSON.stringify({sub_issue_id:issueId})});if(r.ok)succeeded=true;}catch(e1){}
   if(!succeeded){
-    try{
-      var childData=await ghFetch('/repos/'+repo+'/issues/'+issueId);
-      var existingBody=childData.body||'';
-      var parentRef='\n\n**Parent:** #'+parentId+' '+parentTitle;
-      if(existingBody.indexOf('**Parent:** #'+parentId)===-1){await ghPatch('/repos/'+repo+'/issues/'+issueId,{body:existingBody.trimEnd()+parentRef});}
-      succeeded=true;
-    }catch(e2){alert('Could not set parent: '+e2.message);return;}
+    try{var childData=await ghFetch('/repos/'+repo+'/issues/'+issueId);var existingBody=childData.body||'';var parentRef='\n\n**Parent:** #'+parentId+' '+parentTitle;if(existingBody.indexOf('**Parent:** #'+parentId)===-1){await ghPatch('/repos/'+repo+'/issues/'+issueId,{body:existingBody.trimEnd()+parentRef});}succeeded=true;}
+    catch(e2){alert('Could not set parent: '+e2.message);}
   }
-  if(issue){issue.parent={issueNumber:parentId};saveCache();}
-  var key=issueId+'_'+repo;
-  var panel=document.getElementById('parentpanel_'+key);if(panel)panel.style.display='none';
-  _openParentPanel=null;
-  renderMain();
+  if(succeeded){
+    if(issue){issue.parent={issueNumber:parentId};saveCache();}
+    var panel=document.getElementById('parentpanel_'+issueId+'_'+repo);if(panel)panel.style.display='none';
+    _openParentPanel=null;renderMain();
+  }
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
@@ -827,7 +827,8 @@ function renderTable(issues,tab,def){
     if(isClosed&&issue.closedAt)h+='<td style="font-size:12px;color:#059669;font-weight:600">'+new Date(issue.closedAt).toLocaleDateString()+'</td><td style="font-size:12px;color:#6b7280">'+esc(issue.closedBy||'—')+'</td>';
     else if(days!==null)h+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td>';
     else h+='<td>—</td>';
-    if(!isClosed){if(!isIgnored)h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';else h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';}else h+='<td></td>';
+    if(!isClosed){if(!isIgnored)h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';else h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';}
+    else h+='<td></td>';
     h+='</tr>';
   });
   return h+'</tbody></table></div>';
@@ -843,23 +844,15 @@ function renderOnDeckBanner(issues){
   if(!onDeck.length)return '';
   var assigned=onDeck.filter(function(i){return i.assignees&&i.assignees.length>0;});
   var h='<div style="background:#fff;border:1px solid #c7d2fe;border-radius:10px;padding:14px 18px;margin-bottom:16px;border-left:4px solid #4338ca">';
-  h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">';
-  h+='<div style="font-size:14px;font-weight:700;color:#1e1b4b">📋 On Deck Priorities</div>';
+  h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#1e1b4b">📋 On Deck Priorities</div>';
   h+='<span style="font-size:12px;padding:2px 9px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-weight:700">'+onDeck.length+' total</span>';
   if(assigned.length)h+='<span style="font-size:12px;padding:2px 9px;border-radius:999px;background:#d1fae5;color:#065f46;font-weight:700">'+assigned.length+' assigned</span>';
   h+='</div>';
   if(assigned.length){
-    h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Assigned:</div>';
-    h+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
-    assigned.forEach(function(i){
-      h+='<a href="'+esc(i.url)+'" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#1e1b4b;text-decoration:none">';
-      h+='<span style="color:#6b7280">#'+i.id+'</span> '+esc(i.title.length>40?i.title.substring(0,40)+'…':i.title);
-      h+=' <span style="color:#059669;font-size:11px">→ '+esc(i.assignees.join(', '))+'</span></a>';
-    });
+    h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Assigned:</div><div style="display:flex;flex-wrap:wrap;gap:6px">';
+    assigned.forEach(function(i){h+='<a href="'+esc(i.url)+'" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#1e1b4b;text-decoration:none"><span style="color:#6b7280">#'+i.id+'</span> '+esc(i.title.length>40?i.title.substring(0,40)+'…':i.title)+' <span style="color:#059669;font-size:11px">→ '+esc(i.assignees.join(', '))+'</span></a>';});
     h+='</div>';
-  } else {
-    h+='<div style="font-size:13px;color:#9ca3af">No assigned issues in On Deck Priorities.</div>';
-  }
+  } else {h+='<div style="font-size:13px;color:#9ca3af">No assigned issues in On Deck Priorities.</div>';}
   h+='</div>';
   return h;
 }
@@ -872,15 +865,12 @@ function renderCSItemsGrouped(issues,def){
   issues.forEach(function(i){var pn=i.pipeline?i.pipeline.pipelineName:'No Pipeline';if(!groups[pn])groups[pn]=[];groups[pn].push(i);});
   var sortedKeys=Object.keys(groups).sort(function(a,b){var ao=pipelineOrder(a),bo=pipelineOrder(b);if(ao!==bo)return ao-bo;return a.toLowerCase().localeCompare(b.toLowerCase());});
   if(!_csItemsPipeline||!groups[_csItemsPipeline])_csItemsPipeline=sortedKeys[0]||null;
-  var activeGroup=_csItemsPipeline;
-  var activeIssues=(groups[activeGroup]||[]).slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+  var activeGroup=_csItemsPipeline,activeIssues=(groups[activeGroup]||[]).slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
   var h='<div class="gh" style="background:'+color+'"><span class="gt">'+esc(label)+'<span class="gc">'+issues.length+'</span></span>';
   if(S.zhToken&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\'csitems\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
-  h+='</div>';
-  h+='<div style="display:flex;gap:0;border-bottom:2px solid #e5e7eb;background:#fff;flex-wrap:wrap">';
-  sortedKeys.forEach(function(pn){var isActive=pn===activeGroup;var cnt=groups[pn].length;h+='<button onclick="setCsItemsPipeline(\''+esc(pn)+'\')" style="padding:10px 16px;font-size:12px;font-weight:700;border:none;border-bottom:'+(isActive?'2px solid #4338ca':'2px solid transparent')+';background:'+(isActive?'#f9fafb':'transparent')+';color:'+(isActive?'#4338ca':'#6b7280')+';cursor:pointer;white-space:nowrap;margin-bottom:-2px">'+esc(pn)+' <span style="font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;background:'+(isActive?'#e0e7ff':'#f3f4f6')+';color:'+(isActive?'#4338ca':'#6b7280')+'">'+cnt+'</span></button>';});
-  h+='</div>';
-  h+='<div class="tw2" style="border-top:none;border-radius:0 0 10px 10px"><table><thead><tr>';
+  h+='</div><div style="display:flex;gap:0;border-bottom:2px solid #e5e7eb;background:#fff;flex-wrap:wrap">';
+  sortedKeys.forEach(function(pn){var isActive=pn===activeGroup,cnt=groups[pn].length;h+='<button onclick="setCsItemsPipeline(\''+esc(pn)+'\')" style="padding:10px 16px;font-size:12px;font-weight:700;border:none;border-bottom:'+(isActive?'2px solid #4338ca':'2px solid transparent')+';background:'+(isActive?'#f9fafb':'transparent')+';color:'+(isActive?'#4338ca':'#6b7280')+';cursor:pointer;white-space:nowrap;margin-bottom:-2px">'+esc(pn)+' <span style="font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;background:'+(isActive?'#e0e7ff':'#f3f4f6')+';color:'+(isActive?'#4338ca':'#6b7280')+'">'+cnt+'</span></button>';});
+  h+='</div><div class="tw2" style="border-top:none;border-radius:0 0 10px 10px"><table><thead><tr>';
   h+=mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th>';
   if(S.repos.length>1)h+=mkTh('repo','Repo');
   h+='<th>Assignee</th>';
@@ -889,8 +879,7 @@ function renderCSItemsGrouped(issues,def){
   if(!activeIssues.length)h+='<tr><td colspan="99" class="er">No issues in this pipeline.</td></tr>';
   activeIssues.forEach(function(issue){
     var ikey=issue.id+'_'+issue.repo,days=ageDays(issue.createdAt);
-    h+='<tr>';
-    h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
+    h+='<tr><td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
     h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>'+parentLink(issue)+'</td>';
     h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
     sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
@@ -899,9 +888,7 @@ function renderCSItemsGrouped(issues,def){
     if(S.repos.length>1)h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.repo.split('/')[1])+'</td>';
     h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
     if(S.zhToken){var rp=S.zhPipelines[issue.repo]||[],cur=issue.pipeline?issue.pipeline.pipelineId:'',curN=issue.pipeline?issue.pipeline.pipelineName:'—';var srp=rp.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});if(srp.length){h+='<td><select class="ps" onchange="movePipeline('+issue.id+',\''+esc(issue.repo)+'\',this.value)"><option value="">'+esc(curN)+'</option>';srp.forEach(function(p){h+='<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>';});h+='</select></td>';}else h+='<td style="font-size:12px;color:#6b7280">'+esc(curN)+'</td>';}
-    h+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td>';
-    h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
-    h+='</tr>';
+    h+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td><td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td></tr>';
   });
   h+='</tbody></table></div>';
   return h;
@@ -909,22 +896,12 @@ function renderCSItemsGrouped(issues,def){
 
 function setCsItemsPipeline(pn){_csItemsPipeline=pn;renderMain();}
 
-var _excTab='open';
-function switchExcTab(t){_excTab=t;renderMain();}
-
 function renderExceptionsView(){
   var def=TAB_DEFS.find(function(d){return d.id==='exceptions';});
   var color=tabColor(def);
   var openExc=applyFilters(sortIssues(getExceptions(),'exceptions'));
   var closedExc=getClosedExceptions();
-  var h='';
-  h+='<div style="display:flex;border-bottom:2px solid #e5e7eb;margin-bottom:16px;background:#fff;border-radius:10px 10px 0 0;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">';
-  h+='<button onclick="switchExcTab(\'open\')" style="flex:1;padding:13px 0;font-size:13px;font-weight:700;border:none;border-bottom:'+(_excTab==='open'?'3px solid '+color:'3px solid transparent')+';background:'+(_excTab==='open'?'#fff5f5':'transparent')+';color:'+(_excTab==='open'?color:'#6b7280')+';cursor:pointer">Open Exceptions <span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700;background:'+(_excTab==='open'?'#fee2e2':'#f3f4f6')+';color:'+(_excTab==='open'?color:'#6b7280')+';margin-left:4px">'+openExc.length+'</span></button>';
-  h+='<button onclick="switchExcTab(\'closed\')" style="flex:1;padding:13px 0;font-size:13px;font-weight:700;border:none;border-bottom:'+(_excTab==='closed'?'3px solid #7c3aed':'3px solid transparent')+';background:'+(_excTab==='closed'?'#faf5ff':'transparent')+';color:'+(_excTab==='closed'?'#7c3aed':'#6b7280')+';cursor:pointer">Closed Exceptions <span style="font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700;background:'+(_excTab==='closed'?'#ede9fe':'#f3f4f6')+';color:'+(_excTab==='closed'?'#7c3aed':'#6b7280')+';margin-left:4px">'+closedExc.length+'</span></button>';
-  h+='</div>';
-  if(_excTab==='open'){h+=renderExcOpenTable(openExc,color);}
-  else{h+=renderExcClosedTable(closedExc);}
-  return h;
+  return renderExcOpenTable(openExc,color)+'<div style="margin-top:24px"></div>'+renderExcClosedTable(closedExc);
 }
 
 function renderExcOpenTable(issues,color){
@@ -941,8 +918,7 @@ function renderExcOpenTable(issues,color){
   if(!issues.length)h+='<tr><td colspan="99" class="er">No open exceptions.</td></tr>';
   issues.forEach(function(issue){
     var ikey=issue.id+'_'+issue.repo,days=ageDays(issue.createdAt);
-    h+='<tr style="background:#fff5f5">';
-    h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
+    h+='<tr style="background:#fff5f5"><td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
     h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>'+parentLink(issue)+'</td>';
     h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
     sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
@@ -952,58 +928,47 @@ function renderExcOpenTable(issues,color){
     h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
     h+='<td style="min-width:220px">'+renderExcReason(issue)+'</td>';
     if(S.zhToken){var rp=S.zhPipelines[issue.repo]||[],cur=issue.pipeline?issue.pipeline.pipelineId:'',curN=issue.pipeline?issue.pipeline.pipelineName:'—';var srp=rp.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});if(srp.length){h+='<td><select class="ps" onchange="movePipeline('+issue.id+',\''+esc(issue.repo)+'\',this.value)"><option value="">'+esc(curN)+'</option>';srp.forEach(function(p){h+='<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>';});h+='</select></td>';}else h+='<td style="font-size:12px;color:#6b7280">'+esc(curN)+'</td>';}
-    h+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td>';
-    h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
-    h+='</tr>';
+    h+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td><td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td></tr>';
   });
   return h+'</tbody></table></div>';
 }
 
 function renderExcClosedTable(issues){
   var h='<div class="gh" style="background:#7c3aed"><span class="gt">Closed Exceptions<span class="gc">'+issues.length+'</span></span></div>';
-  h+='<div class="tw2"><table><thead><tr>';
-  h+=mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th><th>Reason</th>';
-  h+='<th>Assignee</th>'+mkTh('closed','Closed')+'<th>Closed By</th><th></th></tr></thead><tbody>';
+  h+='<div class="tw2"><table><thead><tr>'+mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th><th>Reason</th><th>Assignee</th>'+mkTh('closed','Closed')+'<th>Closed By</th><th></th></tr></thead><tbody>';
   if(!issues.length)h+='<tr><td colspan="99" class="er">No closed exceptions.</td></tr>';
   issues.forEach(function(issue){
-    var lbls=issue.labels.map(function(l){return l.toLowerCase();});
-    var hasCSItem=lbls.indexOf('cs item')!==-1,hasTesting=lbls.indexOf('cs in testing')!==-1;
+    var lbls=issue.labels.map(function(l){return l.toLowerCase();}),hasCSItem=lbls.indexOf('cs item')!==-1,hasTesting=lbls.indexOf('cs in testing')!==-1;
     var reasons=[];
     if(hasCSItem&&!issue.parent)reasons.push('No parent issue');
     if(hasCSItem&&!isReferencedInTracking(issue.id))reasons.push('Not in any tracking issue');
     if(!hasTesting)reasons.push('Never had CS In Testing label');
     var ikey=issue.id+'_'+issue.repo;
-    h+='<tr style="background:#faf5ff">';
-    h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
+    h+='<tr style="background:#faf5ff"><td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
     h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>'+parentLink(issue)+'</td>';
-    h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';
-    sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});
-    h+='</div></td>';
-    h+='<td style="min-width:180px">';
-    reasons.forEach(function(r){h+='<div><span class="badge" style="background:#ede9fe;color:#5b21b6;margin-bottom:2px">⚠ '+esc(r)+'</span></div>';});
-    h+='</td>';
+    h+='<td><div style="display:flex;flex-wrap:wrap;gap:3px">';sortLbls(issue.labels).forEach(function(l){h+=lblBadge(l);});h+='</div></td>';
+    h+='<td style="min-width:180px">';reasons.forEach(function(r){h+='<div><span class="badge" style="background:#ede9fe;color:#5b21b6;margin-bottom:2px">⚠ '+esc(r)+'</span></div>';});h+='</td>';
     h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
     h+='<td style="font-size:12px;color:#059669;font-weight:600">'+(issue.closedAt?new Date(issue.closedAt).toLocaleDateString():'—')+'</td>';
     h+='<td style="font-size:12px;color:#6b7280">'+esc(issue.closedBy||'—')+'</td>';
-    h+='<td><button class="btn-ig" onclick="ignoreClosedExc(\''+ikey+'\')">Dismiss</button></td>';
-    h+='</tr>';
+    h+='<td><button class="btn-ig" onclick="ignoreClosedExc(\''+ikey+'\')">Dismiss</button></td></tr>';
   });
   return h+'</tbody></table></div>';
 }
 
-async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});if(!list.length){sel.value='';return;}if(!confirm('Move '+list.length+' issues?')){sel.value='';return;}for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}
+async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});if(!list.length){sel.value='';}else if(!confirm('Move '+list.length+' issues?')){sel.value='';}else{for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}}
 
 function renderMain(){
   renderStats();buildTabs();hideErr('dashErr');
-  if(S.activeTab==='report'){renderReport();return;}
-  var def=TAB_DEFS.find(function(d){return d.id===S.activeTab;});
-  var filterPipeline=document.getElementById('filterPipeline').value||'';
-  if(S.activeTab==='csitems'&&S.zhToken&&!filterPipeline){
+  if(S.activeTab==='report'){renderReport();}
+  else if(S.activeTab==='csitems'&&S.zhToken&&!document.getElementById('filterPipeline').value){
     var csIssues=applyFilters(getTabIssues('csitems'));
+    var def=TAB_DEFS.find(function(d){return d.id==='csitems';});
     document.getElementById('mainContent').innerHTML=renderOnDeckBanner(csIssues)+renderCSItemsGrouped(csIssues,def);
   } else if(S.activeTab==='exceptions'){
     document.getElementById('mainContent').innerHTML=renderExceptionsView();
   } else {
+    var def=TAB_DEFS.find(function(d){return d.id===S.activeTab;});
     var issues=applyFilters(sortIssues(getTabIssues(S.activeTab),S.activeTab));
     document.getElementById('mainContent').innerHTML=renderTable(issues,S.activeTab,def);
   }
@@ -1018,77 +983,74 @@ function showReleaseModal(){document.getElementById('releaseModal').style.displa
 function hideReleaseModal(){document.getElementById('releaseModal').style.display='none';}
 function drawReleaseModal(loadingHtml){
   var el=document.getElementById('releaseModalContent');
-  if(loadingHtml){el.innerHTML=loadingHtml;return;}
-  var h='';
-  h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px">';
-  h+='<select id="releasePicker" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;color:#374151"><option value="">— Select a release —</option>';
-  _releases.forEach(function(r){h+='<option value="'+esc(r.id)+'">'+esc(r.name||r.tag_name)+'</option>';});
-  h+='</select><button class="btn-p" onclick="loadReleaseIssues()">Load Issues</button></div>';
-  h+='<div style="margin-bottom:20px"><div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Assignees</div>';
-  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">';
-  _releaseAssignees.forEach(function(a){h+='<div style="display:inline-flex;align-items:center;gap:5px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3">'+esc(a)+'<button onclick="removeAssignee(\''+esc(a)+'\')" style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:12px;line-height:1">✕</button></div>';});
-  if(!_releaseAssignees.length)h+='<span style="font-size:12px;color:#9ca3af">No assignees selected</span>';
-  h+='</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative">';
-  h+='<input type="text" id="assigneeSearch" placeholder="Search collaborators..." style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;width:220px" oninput="searchCollaborators(this.value)"/>';
-  h+='<div id="collaboratorResults" style="display:none;position:absolute;top:38px;left:0;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:220px;z-index:200"></div>';
-  h+='<button class="btn-sm" style="border-color:#4338ca;color:#4338ca" onclick="saveAsDefault()">💾 Save as Default</button>';
-  h+='</div></div>';
-  if(_releaseIssues.length){
-    var csIssues=_releaseIssues.filter(function(i){return i.isCS;}),nonCS=_releaseIssues.filter(function(i){return !i.isCS;});
-    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">';
-    h+='<div style="font-size:13px;font-weight:700;color:#1e1b4b">'+csIssues.length+' CS Issues found <span style="font-weight:400;color:#9ca3af">('+nonCS.length+' non-CS skipped)</span></div>';
-    h+='<div style="display:flex;gap:8px;align-items:center"><button class="btn-sm" onclick="selectAllRelease(true)">Select All</button><button class="btn-sm" onclick="selectAllRelease(false)">Deselect All</button><button class="btn-p" onclick="applyRelease()" id="applyReleaseBtn">✓ Apply to Selected</button></div></div>';
-    h+='<div id="releaseStatusBar" style="display:none;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:10px 14px;margin-bottom:12px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span class="spin spd" id="releaseSpinner"></span><span id="releaseStatusText" style="font-size:13px;font-weight:600;color:#1e1b4b"></span></div><div style="background:#e5e7eb;border-radius:999px;height:6px;overflow:hidden"><div id="releaseProgressBar" style="background:#4338ca;height:6px;border-radius:999px;width:0%;transition:width 0.3s"></div></div></div>';
-    h+='<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;max-height:360px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;width:36px"><input type="checkbox" id="releaseCheckAll" onchange="selectAllRelease(this.checked)" checked/></th><th style="padding:9px 13px;text-align:left">#</th><th style="padding:9px 13px;text-align:left">Title</th><th style="padding:9px 13px;text-align:left">Labels</th><th style="padding:9px 13px;text-align:left">Status</th></tr></thead><tbody>';
-    csIssues.forEach(function(issue){
-      var checked=_releaseSelected[issue.id]!==false,hasTesting=issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';});
-      h+='<tr style="border-bottom:1px solid #f3f4f6'+(hasTesting?';background:#f0fdf4':'')+'">';
-      h+='<td style="padding:8px 13px"><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleReleaseIssue('+issue.id+',this.checked)"/></td>';
-      h+='<td style="padding:8px 13px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;font-weight:600">#'+issue.id+'</a></td>';
-      h+='<td style="padding:8px 13px;font-weight:600;color:#1e1b4b;min-width:160px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#1e1b4b;text-decoration:none">'+esc(issue.title)+'</a></td>';
-      h+='<td style="padding:8px 13px"><div style="display:flex;flex-wrap:wrap;gap:3px">';
-      issue.labels.forEach(function(l){h+=lblBadge(l);});
-      h+='</div></td>';
-      h+='<td style="padding:8px 13px" id="releaseRowStatus_'+issue.id+'">'+(hasTesting?'<span class="badge" style="background:#d1fae5;color:#065f46">✓ CS In Testing</span>':'<span style="font-size:12px;color:#9ca3af">Pending</span>')+'</td>';
-      h+='</tr>';
-    });
-    h+='</tbody></table></div>';
+  if(loadingHtml){el.innerHTML=loadingHtml;}
+  else{
+    var h='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px"><select id="releasePicker" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;color:#374151"><option value="">— Select a release —</option>';
+    _releases.forEach(function(r){h+='<option value="'+esc(r.id)+'">'+esc(r.name||r.tag_name)+'</option>';});
+    h+='</select><button class="btn-p" onclick="loadReleaseIssues()">Load Issues</button></div>';
+    h+='<div style="margin-bottom:20px"><div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Assignees</div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">';
+    _releaseAssignees.forEach(function(a){h+='<div style="display:inline-flex;align-items:center;gap:5px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3">'+esc(a)+'<button onclick="removeAssignee(\''+esc(a)+'\')" style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:12px;line-height:1">✕</button></div>';});
+    if(!_releaseAssignees.length)h+='<span style="font-size:12px;color:#9ca3af">No assignees selected</span>';
+    h+='</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative">';
+    h+='<input type="text" id="assigneeSearch" placeholder="Search collaborators..." style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;width:220px" oninput="searchCollaborators(this.value)"/>';
+    h+='<div id="collaboratorResults" style="display:none;position:absolute;top:38px;left:0;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:220px;z-index:200"></div>';
+    h+='<button class="btn-sm" style="border-color:#4338ca;color:#4338ca" onclick="saveAsDefault()">💾 Save as Default</button></div></div>';
+    if(_releaseIssues.length){
+      var csIssues=_releaseIssues.filter(function(i){return i.isCS;}),nonCS=_releaseIssues.filter(function(i){return !i.isCS;});
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px"><div style="font-size:13px;font-weight:700;color:#1e1b4b">'+csIssues.length+' CS Issues found <span style="font-weight:400;color:#9ca3af">('+nonCS.length+' non-CS skipped)</span></div>';
+      h+='<div style="display:flex;gap:8px;align-items:center"><button class="btn-sm" onclick="selectAllRelease(true)">Select All</button><button class="btn-sm" onclick="selectAllRelease(false)">Deselect All</button><button class="btn-p" onclick="applyRelease()" id="applyReleaseBtn">✓ Apply to Selected</button></div></div>';
+      h+='<div id="releaseStatusBar" style="display:none;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:10px 14px;margin-bottom:12px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span class="spin spd" id="releaseSpinner"></span><span id="releaseStatusText" style="font-size:13px;font-weight:600;color:#1e1b4b"></span></div><div style="background:#e5e7eb;border-radius:999px;height:6px;overflow:hidden"><div id="releaseProgressBar" style="background:#4338ca;height:6px;border-radius:999px;width:0%;transition:width 0.3s"></div></div></div>';
+      h+='<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;max-height:360px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;width:36px"><input type="checkbox" id="releaseCheckAll" onchange="selectAllRelease(this.checked)" checked/></th><th style="padding:9px 13px;text-align:left">#</th><th style="padding:9px 13px;text-align:left">Title</th><th style="padding:9px 13px;text-align:left">Labels</th><th style="padding:9px 13px;text-align:left">Status</th></tr></thead><tbody>';
+      csIssues.forEach(function(issue){
+        var checked=_releaseSelected[issue.id]!==false,hasTesting=issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';});
+        h+='<tr style="border-bottom:1px solid #f3f4f6'+(hasTesting?';background:#f0fdf4':'')+'">';
+        h+='<td style="padding:8px 13px"><input type="checkbox" '+(checked?'checked':'')+' onchange="toggleReleaseIssue('+issue.id+',this.checked)"/></td>';
+        h+='<td style="padding:8px 13px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;font-weight:600">#'+issue.id+'</a></td>';
+        h+='<td style="padding:8px 13px;font-weight:600;color:#1e1b4b;min-width:160px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#1e1b4b;text-decoration:none">'+esc(issue.title)+'</a></td>';
+        h+='<td style="padding:8px 13px"><div style="display:flex;flex-wrap:wrap;gap:3px">';issue.labels.forEach(function(l){h+=lblBadge(l);});h+='</div></td>';
+        h+='<td style="padding:8px 13px" id="releaseRowStatus_'+issue.id+'">'+(hasTesting?'<span class="badge" style="background:#d1fae5;color:#065f46">✓ CS In Testing</span>':'<span style="font-size:12px;color:#9ca3af">Pending</span>')+'</td></tr>';
+      });
+      h+='</tbody></table></div>';
+    }
+    el.innerHTML=h;
   }
-  el.innerHTML=h;
 }
 async function loadReleaseIssues(){var sel=document.getElementById('releasePicker');var releaseId=sel?sel.value:'';if(!releaseId)return;var release=_releases.find(function(r){return String(r.id)===String(releaseId);});if(!release)return;drawReleaseModal('<div style="text-align:center;padding:30px;color:#9ca3af"><span class="spin spd"></span> Parsing release notes...</div>');var body=release.body||'';var matches=body.match(/#(\d+)/g)||[];var ids=[...new Set(matches.map(function(m){return parseInt(m.replace('#',''));}))];_releaseIssues=[];_releaseSelected={};for(var i=0;i<ids.length;i++){try{var iss=await ghFetch('/repos/'+S.repos[0]+'/issues/'+ids[i]);if(iss.pull_request)continue;var lbls=iss.labels.map(function(l){return l.name;});var isCS=lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});_releaseIssues.push({id:iss.number,title:iss.title,url:iss.html_url,labels:lbls,isCS:isCS,assignees:iss.assignees.map(function(a){return a.login;})});_releaseSelected[iss.number]=isCS;}catch(e){}}drawReleaseModal();setTimeout(function(){var s=document.getElementById('releasePicker');if(s)s.value=releaseId;},0);}
-async function searchCollaborators(q){var el=document.getElementById('collaboratorResults');if(!q){el.style.display='none';return;}if(!_collaborators.length){try{_collaborators=await ghFetch('/repos/'+S.repos[0]+'/collaborators?per_page=100');}catch(e){return;}}var filtered=_collaborators.filter(function(c){return c.login.toLowerCase().indexOf(q.toLowerCase())!==-1;}).slice(0,8);if(!filtered.length){el.style.display='none';return;}el.style.display='block';el.innerHTML=filtered.map(function(c){return '<div style="padding:8px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f3f4f6" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="addAssignee(\''+esc(c.login)+'\')"><img src="'+esc(c.avatar_url)+'" style="width:20px;height:20px;border-radius:50%"/> '+esc(c.login)+'</div>';}).join('');}
-function addAssignee(login){if(_releaseAssignees.indexOf(login)===-1)_releaseAssignees.push(login);var el=document.getElementById('collaboratorResults');if(el)el.style.display='none';var inp=document.getElementById('assigneeSearch');if(inp)inp.value='';drawReleaseModal();setTimeout(function(){var s=document.getElementById('releasePicker');if(s&&_releaseIssues.length)s.value=String(_releases[0]&&_releases[0].id);},0);}
+async function searchCollaborators(q){var el=document.getElementById('collaboratorResults');if(!q){el.style.display='none';}else{if(!_collaborators.length){try{_collaborators=await ghFetch('/repos/'+S.repos[0]+'/collaborators?per_page=100');}catch(e){}}var filtered=_collaborators.filter(function(c){return c.login.toLowerCase().indexOf(q.toLowerCase())!==-1;}).slice(0,8);if(!filtered.length){el.style.display='none';}else{el.style.display='block';el.innerHTML=filtered.map(function(c){return '<div style="padding:8px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f3f4f6" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="addAssignee(\''+esc(c.login)+'\')"><img src="'+esc(c.avatar_url)+'" style="width:20px;height:20px;border-radius:50%"/> '+esc(c.login)+'</div>';}).join('');}}}
+function addAssignee(login){if(_releaseAssignees.indexOf(login)===-1)_releaseAssignees.push(login);var el=document.getElementById('collaboratorResults');if(el)el.style.display='none';var inp=document.getElementById('assigneeSearch');if(inp)inp.value='';drawReleaseModal();}
 function removeAssignee(login){_releaseAssignees=_releaseAssignees.filter(function(a){return a!==login;});drawReleaseModal();}
 function saveAsDefault(){_defaultAssignees=_releaseAssignees.slice();saveDefaultAssignees();alert('Default assignees saved!');}
 function toggleReleaseIssue(id,checked){_releaseSelected[id]=checked;}
-function selectAllRelease(checked){_releaseIssues.filter(function(i){return i.isCS;}).forEach(function(i){_releaseSelected[i.id]=checked;});drawReleaseModal();setTimeout(function(){var s=document.getElementById('releasePicker');if(s&&_releaseIssues.length)s.value=String(_releases[0]&&_releases[0].id);},0);}
+function selectAllRelease(checked){_releaseIssues.filter(function(i){return i.isCS;}).forEach(function(i){_releaseSelected[i.id]=checked;});drawReleaseModal();}
 async function applyRelease(){
   var selected=_releaseIssues.filter(function(i){return i.isCS&&_releaseSelected[i.id]!==false;});
-  if(!selected.length){alert('No issues selected.');return;}
-  if(!_releaseAssignees.length&&!confirm('No assignees selected. Continue with just adding the CS In Testing label?'))return;
-  var btn=document.getElementById('applyReleaseBtn');if(btn){btn.disabled=true;btn.textContent='Applying...';}
-  var bar=document.getElementById('releaseStatusBar');if(bar)bar.style.display='block';
-  var prog=document.getElementById('releaseProgressBar'),txt=document.getElementById('releaseStatusText'),spinner=document.getElementById('releaseSpinner');
-  var done=0,failed=0,total=selected.length;
-  function updateProgress(){var pct=Math.round(((done+failed)/total)*100);if(prog)prog.style.width=pct+'%';if(txt)txt.textContent='Processing '+(done+failed)+' of '+total+'...';}
-  updateProgress();
-  for(var i=0;i<selected.length;i++){
-    var issue=selected[i];var rowEl=document.getElementById('releaseRowStatus_'+issue.id);
-    if(rowEl)rowEl.innerHTML='<span style="font-size:12px;color:#6b7280"><span class="spin spd"></span> Processing...</span>';
-    try{
-      var newLabels=issue.labels.slice(),hasLabel=newLabels.some(function(l){return l.toLowerCase()==='cs in testing';});
-      if(!hasLabel){var labelName=S.labelNames['cs in testing']||'CS In Testing';newLabels.push(labelName);await ghPatch('/repos/'+S.repos[0]+'/issues/'+issue.id,{labels:newLabels});issue.labels=newLabels;}
-      if(_releaseAssignees.length){await ghPost('/repos/'+S.repos[0]+'/issues/'+issue.id+'/assignees',{assignees:_releaseAssignees});issue.assignees=_releaseAssignees.slice();}
-      done++;if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#d1fae5;color:#065f46">✓ Done</span>';
-    }catch(e){failed++;if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#fee2e2;color:#991b1b">✕ Failed</span>';console.error('Failed #'+issue.id,e);}
+  if(!selected.length){alert('No issues selected.');}
+  else if(!_releaseAssignees.length&&!confirm('No assignees selected. Continue with just adding the CS In Testing label?')){}
+  else{
+    var btn=document.getElementById('applyReleaseBtn');if(btn){btn.disabled=true;btn.textContent='Applying...';}
+    var bar=document.getElementById('releaseStatusBar');if(bar)bar.style.display='block';
+    var prog=document.getElementById('releaseProgressBar'),txt=document.getElementById('releaseStatusText'),spinner=document.getElementById('releaseSpinner');
+    var done=0,failed=0,total=selected.length;
+    function updateProgress(){var pct=Math.round(((done+failed)/total)*100);if(prog)prog.style.width=pct+'%';if(txt)txt.textContent='Processing '+(done+failed)+' of '+total+'...';}
     updateProgress();
+    for(var i=0;i<selected.length;i++){
+      var issue=selected[i];var rowEl=document.getElementById('releaseRowStatus_'+issue.id);
+      if(rowEl)rowEl.innerHTML='<span style="font-size:12px;color:#6b7280"><span class="spin spd"></span> Processing...</span>';
+      try{
+        var newLabels=issue.labels.slice(),hasLabel=newLabels.some(function(l){return l.toLowerCase()==='cs in testing';});
+        if(!hasLabel){var labelName=S.labelNames['cs in testing']||'CS In Testing';newLabels.push(labelName);await ghPatch('/repos/'+S.repos[0]+'/issues/'+issue.id,{labels:newLabels});issue.labels=newLabels;}
+        if(_releaseAssignees.length){await ghPost('/repos/'+S.repos[0]+'/issues/'+issue.id+'/assignees',{assignees:_releaseAssignees});issue.assignees=_releaseAssignees.slice();}
+        done++;if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#d1fae5;color:#065f46">✓ Done</span>';
+      }catch(e){failed++;if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#fee2e2;color:#991b1b">✕ Failed</span>';console.error('Failed #'+issue.id,e);}
+      updateProgress();
+    }
+    if(prog){prog.style.width='100%';prog.style.background=failed?'#f59e0b':'#059669';}
+    if(spinner)spinner.style.display='none';
+    if(txt){txt.style.color=failed?'#d97706':'#059669';txt.textContent=done+' issue'+(done!==1?'s':'')+' updated successfully'+(failed?' · '+failed+' failed':'')+'!';}
+    if(btn){btn.disabled=false;btn.textContent='✓ Apply to Selected';}
+    doRefresh();
   }
-  if(prog){prog.style.width='100%';prog.style.background=failed?'#f59e0b':'#059669';}
-  if(spinner)spinner.style.display='none';
-  if(txt){txt.style.color=failed?'#d97706':'#059669';txt.textContent=done+' issue'+(done!==1?'s':'')+' updated successfully'+(failed?' · '+failed+' failed':'')+'!';}
-  if(btn){btn.disabled=false;btn.textContent='✓ Apply to Selected';}
-  doRefresh();
 }
 
 // ── Report ────────────────────────────────────────────────────────────────────
@@ -1097,8 +1059,7 @@ function parseSnapshotIssue(issue){
   (issue.body||'').split('\n').forEach(function(line){
     var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i),unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);
     if(!chk&&!unk)return;var text=(chk||unk)[1].trim();
-    if(!/#\d+/.test(text)){n++;return;}
-    t++;if(chk)c++;else o++;
+    if(!/#\d+/.test(text)){n++;}else{t++;if(chk)c++;else o++;}
   });
   return{id:issue.id,title:issue.title,url:issue.url,total:t,closed:c,open:o,noIssue:n};
 }
@@ -1110,9 +1071,9 @@ function getCurrentSnapshot(){
   rows.sort(function(a,b){return b.id-a.id;});
   return{date:todayStr(),tracking:nums.join('/'),total:total+noIssue,closed:closed,open:open,noIssue:noIssue,rows:rows};
 }
-function saveSnap(){var snap=getCurrentSnapshot();if(!snap){alert('No CS Task Item issues found.');return;}var history=loadHistory();if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}else history.push(snap);saveHistory(history);renderReport();}
+function saveSnap(){var snap=getCurrentSnapshot();if(!snap){alert('No CS Task Item issues found.');}else{var history=loadHistory();if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}else history.push(snap);saveHistory(history);renderReport();}}
 function delRptRow(idx){if(!confirm('Remove this row?'))return;var h=loadHistory();h.splice(idx,1);saveHistory(h);renderReport();}
-function importCSV(){var inp=document.createElement('input');inp.type='file';inp.accept='.csv';inp.onchange=function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){var lines=ev.target.result.split('\n').map(function(l){return l.trim();}).filter(Boolean);if(!lines.length){alert('Empty file.');return;}var start=lines[0].toLowerCase().indexOf('date')!==-1?1:0,imported=[],skipped=0;for(var i=start;i<lines.length;i++){var cols=lines[i].split(',');if(cols.length<5){skipped++;continue;}var row={date:(cols[0]||'').trim(),tracking:(cols[1]||'').trim(),total:parseInt(cols[2])||0,closed:parseInt(cols[3])||0,open:parseInt(cols[4])||0,noIssue:parseInt(cols[5])||0};if(!row.date){skipped++;continue;}imported.push(row);}if(!imported.length){alert('No valid rows found.');return;}var history=loadHistory(),existing={},added=0,dupes=0;history.forEach(function(r){existing[r.date]=1;});imported.forEach(function(r){if(existing[r.date])dupes++;else{history.push(r);added++;}});history.sort(function(a,b){return new Date(a.date)-new Date(b.date);});saveHistory(history);alert('Imported '+added+' row(s).'+(dupes?' Skipped '+dupes+' duplicate(s).':''));renderReport();};reader.readAsText(file);};inp.click();}
+function importCSV(){var inp=document.createElement('input');inp.type='file';inp.accept='.csv';inp.onchange=function(e){var file=e.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(ev){var lines=ev.target.result.split('\n').map(function(l){return l.trim();}).filter(Boolean);if(!lines.length){alert('Empty file.');}else{var start=lines[0].toLowerCase().indexOf('date')!==-1?1:0,imported=[],skipped=0;for(var i=start;i<lines.length;i++){var cols=lines[i].split(',');if(cols.length<5){skipped++;continue;}var row={date:(cols[0]||'').trim(),tracking:(cols[1]||'').trim(),total:parseInt(cols[2])||0,closed:parseInt(cols[3])||0,open:parseInt(cols[4])||0,noIssue:parseInt(cols[5])||0};if(!row.date){skipped++;continue;}imported.push(row);}if(!imported.length){alert('No valid rows found.');}else{var history=loadHistory(),existing={},added=0,dupes=0;history.forEach(function(r){existing[r.date]=1;});imported.forEach(function(r){if(existing[r.date])dupes++;else{history.push(r);added++;}});history.sort(function(a,b){return new Date(a.date)-new Date(b.date);});saveHistory(history);alert('Imported '+added+' row(s).'+(dupes?' Skipped '+dupes+' duplicate(s).':''));renderReport();}}};reader.readAsText(file);};inp.click();}
 function exportCSV(){var history=loadHistory(),rows=['Date,Tracking Issues,Total,Closed,Open,No Issue Raised'];history.forEach(function(row){rows.push([row.date,row.tracking,row.total,row.closed,row.open,row.noIssue||0].join(','));});var blob=new Blob([rows.join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cs_report.csv';a.click();}
 function clearHistory(){if(!confirm('Clear all report history?'))return;localStorage.removeItem(STORAGE_KEY);renderReport();}
 
@@ -1145,15 +1106,13 @@ async function runMismatchScan(){
         var issueNum=parseInt(mm[1]);
         var dkey=String(track.id)+'_'+String(issueNum);
         if(_scanDismissed[dkey]){
-          // Only skip if the box is still checked — if unchecked since dismissal, clear it and re-surface
           var stillChecked=false;
           (track.body||'').split('\n').forEach(function(line){
             var cm=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(!cm)return;
             var rf=cm[1].match(/#(\d+)/);if(rf&&parseInt(rf[1])===issueNum)stillChecked=true;
           });
           if(stillChecked)continue;
-          delete _scanDismissed[dkey];
-          saveScanDismissed();
+          delete _scanDismissed[dkey];saveScanDismissed();
         }
         var openIssue=S.issues.find(function(i){return i.id===issueNum&&i.repo===track.repo;});
         if(openIssue){
@@ -1169,78 +1128,48 @@ async function runMismatchScan(){
               try{var tl=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum+'/timeline?per_page=100');if(Array.isArray(tl)){tl.forEach(function(ev){if(ev.event==='closed'&&ev.commit_id)closedByPR=true;if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;});}}catch(e){}
               mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:true,closedByPR:closedByPR,closedByUser:closedByUser,closedAt:closedAt});
             }
-          }catch(e){
-            mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:'(could not load)',childUrl:'https://github.com/'+track.repo+'/issues/'+issueNum,lineText:ref,closedButChecked:false,fetchError:true});
-          }
+          }catch(e){mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:'(could not load)',childUrl:'https://github.com/'+track.repo+'/issues/'+issueNum,lineText:ref,closedButChecked:false,fetchError:true});}
         }
       }
     }
-  } finally {
-    _scanning=false;
-  }
-  _scanResults=mismatches;
-  _lastScanTime=new Date();
+  } finally {_scanning=false;}
+  _scanResults=mismatches;_lastScanTime=new Date();
   renderReport();
 }
 
 function renderMismatchPanel(){
-  var dismissedKeys=Object.keys(_scanDismissed);
-  var dismissedCount=dismissedKeys.length;
-
+  var dismissedKeys=Object.keys(_scanDismissed),dismissedCount=dismissedKeys.length;
   var h='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #f59e0b">';
-
-  // Header row
   h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
   h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Mismatch Scanner</div>';
   h+='<div style="font-size:12px;color:#9ca3af;margin-top:2px">Runs automatically on each refresh — finds checked boxes that may need review</div>';
-  if(_lastScanTime){
-    h+='<div style="font-size:12px;color:#6b7280;margin-top:4px">Last scan: <span style="font-weight:600;color:#374151">'+_lastScanTime.toLocaleDateString()+' at '+_lastScanTime.toLocaleTimeString()+'</span></div>';
-  } else if(_scanning){
-    h+='<div style="font-size:12px;color:#6b7280;margin-top:4px;display:flex;align-items:center;gap:5px"><span class="spin spd"></span> Scanning now...</div>';
-  } else {
-    h+='<div style="font-size:12px;color:#9ca3af;margin-top:4px">Not yet run this session</div>';
-  }
+  if(_lastScanTime){h+='<div style="font-size:12px;color:#6b7280;margin-top:4px">Last scan: <span style="font-weight:600;color:#374151">'+_lastScanTime.toLocaleDateString()+' at '+_lastScanTime.toLocaleTimeString()+'</span></div>';}
+  else if(_scanning){h+='<div style="font-size:12px;color:#6b7280;margin-top:4px;display:flex;align-items:center;gap:5px"><span class="spd" style="display:inline-block;width:11px;height:11px;border:2px solid #e5e7eb;border-top-color:#6366f1;border-radius:50%;animation:sp 0.7s linear infinite"></span> Scanning now...</div>';}
+  else{h+='<div style="font-size:12px;color:#9ca3af;margin-top:4px">Not yet run this session</div>';}
   h+='</div>';
-
-  // Dismissed button
-  if(dismissedCount){
-    h+='<button class="btn-sm" onclick="toggleDismissedPanel()" style="border-color:'+(_showDismissedPanel?'#4338ca':'#d1d5db')+';color:'+(_showDismissedPanel?'#4338ca':'#374151')+';background:'+(_showDismissedPanel?'#e0e7ff':'#fff')+'">📋 Dismissed ('+dismissedCount+')</button>';
-  }
+  if(dismissedCount){h+='<button class="btn-sm" onclick="toggleDismissedPanel()" style="border-color:'+(_showDismissedPanel?'#4338ca':'#d1d5db')+';color:'+(_showDismissedPanel?'#4338ca':'#374151')+';background:'+(_showDismissedPanel?'#e0e7ff':'#fff')+'">📋 Dismissed ('+dismissedCount+')</button>';}
   h+='</div>';
-
-  // Dismissed review panel
   if(_showDismissedPanel&&dismissedCount){
     h+='<div style="background:#f8f7ff;border:1px solid #c7d2fe;border-radius:10px;padding:14px;margin-bottom:16px">';
     h+='<div style="font-size:13px;font-weight:700;color:#1e1b4b;margin-bottom:10px">Dismissed Items — click Reinstate to re-flag as exception</div>';
     h+='<div style="display:flex;flex-direction:column;gap:6px">';
     dismissedKeys.forEach(function(key){
-      var parts=key.split('_');
-      var trackingId=parseInt(parts[0]),childId=parseInt(parts[1]);
+      var parts=key.split('_'),trackingId=parseInt(parts[0]),childId=parseInt(parts[1]);
       var trackingIssue=S.issues.find(function(i){return i.id===trackingId;})||S.closedIssues.find(function(i){return i.id===trackingId;});
       var childIssue=S.issues.find(function(i){return i.id===childId;})||S.closedIssues.find(function(i){return i.id===childId;});
-      var trackingTitle=trackingIssue?trackingIssue.title:'#'+trackingId;
-      var childTitle=childIssue?childIssue.title:'#'+childId;
-      var childUrl=childIssue?childIssue.url:'';
-      var trackUrl=trackingIssue?trackingIssue.url:'';
+      var trackingTitle=trackingIssue?trackingIssue.title:'#'+trackingId,childTitle=childIssue?childIssue.title:'#'+childId;
+      var childUrl=childIssue?childIssue.url:'',trackUrl=trackingIssue?trackingIssue.url:'';
       h+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;background:#fff;border:1px solid #e0e7ff;border-radius:8px;padding:10px 12px;flex-wrap:wrap">';
-      h+='<div style="flex:1;min-width:180px">';
-      h+='<div style="font-size:12px;color:#6b7280;margin-bottom:2px">Tracking: '+(trackUrl?'<a href="'+esc(trackUrl)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+trackingId+' '+esc(trackingTitle)+'</a>':'<span style="font-weight:600">#'+trackingId+' '+esc(trackingTitle)+'</span>')+'</div>';
-      h+='<div style="font-size:13px;font-weight:600;color:#1e1b4b">'+(childUrl?'<a href="'+esc(childUrl)+'" target="_blank" style="color:#7c3aed">#'+childId+'</a>':'<span style="color:#7c3aed">#'+childId+'</span>')+' '+esc(childTitle)+'</div>';
-      h+='</div>';
-      h+='<button class="btn-sm" style="font-size:11px;border-color:#c4b5fd;color:#7c3aed;background:#faf5ff;flex-shrink:0" onclick="reinstateDismissed(\''+esc(key)+'\')">↩ Reinstate</button>';
-      h+='</div>';
+      h+='<div style="flex:1;min-width:180px"><div style="font-size:12px;color:#6b7280;margin-bottom:2px">Tracking: '+(trackUrl?'<a href="'+esc(trackUrl)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+trackingId+' '+esc(trackingTitle)+'</a>':'<span style="font-weight:600">#'+trackingId+' '+esc(trackingTitle)+'</span>')+'</div>';
+      h+='<div style="font-size:13px;font-weight:600;color:#1e1b4b">'+(childUrl?'<a href="'+esc(childUrl)+'" target="_blank" style="color:#7c3aed">#'+childId+'</a>':'<span style="color:#7c3aed">#'+childId+'</span>')+' '+esc(childTitle)+'</div></div>';
+      h+='<button class="btn-sm" style="font-size:11px;border-color:#c4b5fd;color:#7c3aed;background:#faf5ff;flex-shrink:0" onclick="reinstateDismissed(\''+esc(key)+'\')">↩ Reinstate</button></div>';
     });
     h+='</div></div>';
   }
-
-  // Scan results
-  if(_scanResults===null&&!_scanning){
-    h+='<div style="font-size:13px;color:#9ca3af">Scan results will appear here after the next refresh.</div>';
-  } else if(_scanning){
-    h+='<div style="font-size:13px;color:#9ca3af;display:flex;align-items:center;gap:6px"><span class="spin spd"></span> Checking each checked item against GitHub...</div>';
-  } else if(_scanResults.length===0){
-    h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found.</div>';
-  } else {
+  if(_scanResults===null&&!_scanning){h+='<div style="font-size:13px;color:#9ca3af">Scan results will appear here after the next refresh.</div>';}
+  else if(_scanning){h+='<div style="font-size:13px;color:#9ca3af;display:flex;align-items:center;gap:6px"><span class="spd" style="display:inline-block;width:11px;height:11px;border:2px solid #e5e7eb;border-top-color:#6366f1;border-radius:50%;animation:sp 0.7s linear infinite"></span> Checking each checked item against GitHub...</div>';}
+  else if(_scanResults.length===0){h+='<div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#059669;font-weight:600"><span style="font-size:1.2rem">✅</span> No mismatches found.</div>';}
+  else{
     h+='<div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:10px">⚠ '+_scanResults.length+' item'+(_scanResults.length!==1?'s':'')+' to review:</div>';
     h+='<div style="display:flex;flex-direction:column;gap:8px">';
     _scanResults.forEach(function(r,idx){
@@ -1248,32 +1177,19 @@ function renderMismatchPanel(){
       var bgColor=isStillOpen?'#fff5f5':r.fetchError?'#fffbeb':'#f5f3ff';
       var borderColor=isStillOpen?'#fca5a5':r.fetchError?'#fcd34d':'#c4b5fd';
       h+='<div style="background:'+bgColor+';border:1px solid '+borderColor+';border-radius:9px;padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">';
-      h+='<div style="flex:1;min-width:200px">';
-      h+='<div style="font-size:12px;color:#6b7280;margin-bottom:3px">Tracking: <a href="'+esc(r.trackingIssue.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+r.trackingIssue.id+' '+esc(r.trackingIssue.title)+'</a></div>';
+      h+='<div style="flex:1;min-width:200px"><div style="font-size:12px;color:#6b7280;margin-bottom:3px">Tracking: <a href="'+esc(r.trackingIssue.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+r.trackingIssue.id+' '+esc(r.trackingIssue.title)+'</a></div>';
       h+='<div style="font-size:13px;font-weight:600"><a href="'+esc(r.childUrl)+'" target="_blank" style="color:'+(isStillOpen?'#dc2626':r.fetchError?'#92400e':'#7c3aed')+'">#'+r.childId+'</a> '+esc(r.childTitle)+'</div>';
-      if(isStillOpen){
-        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Issue is still open but checked off</span></div>';
-      } else if(r.fetchError){
-        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Could not load issue — review manually</span></div>';
-      } else {
-        var label=r.closedByPR?'Closed by PR'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():''):'Manually closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'');
-        h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">'+label+' — verify process was followed</span></div>';
-      }
+      if(isStillOpen){h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Issue is still open but checked off</span></div>';}
+      else if(r.fetchError){h+='<div style="font-size:11px;margin-top:4px"><span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:999px;font-weight:600">⚠ Could not load issue — review manually</span></div>';}
+      else{var label=r.closedByPR?'Closed by PR'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():''):'Manually closed'+(r.closedAt?' on '+new Date(r.closedAt).toLocaleDateString():'');h+='<div style="font-size:11px;margin-top:4px"><span style="background:#ede9fe;color:#5b21b6;padding:2px 8px;border-radius:999px;font-weight:600">'+label+' — verify process was followed</span></div>';}
       h+='<div style="font-size:11px;color:#9ca3af;margin-top:3px;font-family:monospace">'+esc(r.lineText)+'</div>';
-      var trackBody=r.trackingIssue.body||'';
-      var checkStatus='❓ unknown';
-      trackBody.split('\n').forEach(function(line){
-        var cm=line.match(/^\s*-\s*\[x\]\s*(.+)/i),um=line.match(/^\s*-\s*\[ \]\s*(.+)/i);
-        if(cm){var rf=cm[1].match(/#(\d+)/);if(rf&&parseInt(rf[1])===r.childId)checkStatus='☑ Checked [x]';}
-        else if(um){var rf2=um[1].match(/#(\d+)/);if(rf2&&parseInt(rf2[1])===r.childId)checkStatus='☐ Unchecked [ ]';}
-      });
+      var trackBody=r.trackingIssue.body||'',checkStatus='❓ unknown';
+      trackBody.split('\n').forEach(function(line){var cm=line.match(/^\s*-\s*\[x\]\s*(.+)/i),um=line.match(/^\s*-\s*\[ \]\s*(.+)/i);if(cm){var rf=cm[1].match(/#(\d+)/);if(rf&&parseInt(rf[1])===r.childId)checkStatus='☑ Checked [x]';}else if(um){var rf2=um[1].match(/#(\d+)/);if(rf2&&parseInt(rf2[1])===r.childId)checkStatus='☐ Unchecked [ ]';}});
       var statusColor=checkStatus==='☑ Checked [x]'?'#dc2626':checkStatus==='☐ Unchecked [ ]'?'#059669':'#6b7280';
-      h+='<div style="font-size:11px;margin-top:4px"><span style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:2px 8px;font-weight:700;color:'+statusColor+'">Status in #'+r.trackingIssue.id+': '+checkStatus+'</span></div>';
-      h+='</div><div style="display:flex;gap:6px;align-items:center;flex-shrink:0">';
-      h+='<a href="'+esc(r.childUrl)+'" target="_blank" class="btn-sm" style="font-size:11px;text-decoration:none">👁 View</a>';
+      h+='<div style="font-size:11px;margin-top:4px"><span style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:2px 8px;font-weight:700;color:'+statusColor+'">Status in #'+r.trackingIssue.id+': '+checkStatus+'</span></div></div>';
+      h+='<div style="display:flex;gap:6px;align-items:center;flex-shrink:0"><a href="'+esc(r.childUrl)+'" target="_blank" class="btn-sm" style="font-size:11px;text-decoration:none">👁 View</a>';
       if(!r.fetchError)h+='<button class="btn-sm" style="font-size:11px;border-color:#f59e0b;color:#92400e;background:#fffbeb" onclick="uncheckMismatch('+idx+')">☐ Uncheck</button>';
-      h+='<button class="btn-sm" style="font-size:11px;border-color:#d1fae5;color:#065f46;background:#f0fdf4" onclick="dismissMismatch('+idx+')">✓ OK</button>';
-      h+='</div></div>';
+      h+='<button class="btn-sm" style="font-size:11px;border-color:#d1fae5;color:#065f46;background:#f0fdf4" onclick="dismissMismatch('+idx+')">✓ OK</button></div></div>';
     });
     h+='</div>';
   }
@@ -1282,38 +1198,19 @@ function renderMismatchPanel(){
 }
 
 function toggleDismissedPanel(){_showDismissedPanel=!_showDismissedPanel;renderReport();}
-
 function reinstateDismissed(key){
-  delete _scanDismissed[key];
-  saveScanDismissed();
-  var parts=key.split('_');
-  var trackingId=parseInt(parts[0]),childId=parseInt(parts[1]);
+  delete _scanDismissed[key];saveScanDismissed();
+  var parts=key.split('_'),trackingId=parseInt(parts[0]),childId=parseInt(parts[1]);
   var trackingIssue=S.issues.find(function(i){return i.id===trackingId;})||S.closedIssues.find(function(i){return i.id===trackingId;});
   if(trackingIssue&&_scanResults!==null){
-    var body=trackingIssue.body||'';
-    var lineText='';
-    body.split('\n').forEach(function(line){
-      var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(!chk)return;
-      var mm=chk[1].match(/#(\d+)/);if(mm&&parseInt(mm[1])===childId)lineText=chk[1].trim();
-    });
+    var body=trackingIssue.body||'',lineText='';
+    body.split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(!chk)return;var mm=chk[1].match(/#(\d+)/);if(mm&&parseInt(mm[1])===childId)lineText=chk[1].trim();});
     var childIssue=S.issues.find(function(i){return i.id===childId;})||S.closedIssues.find(function(i){return i.id===childId;});
-    if(lineText){
-      _scanResults.push({
-        trackingIssue:trackingIssue,
-        childId:childId,
-        childRepo:trackingIssue.repo,
-        childTitle:childIssue?childIssue.title:'#'+childId,
-        childUrl:childIssue?childIssue.url:'https://github.com/'+trackingIssue.repo+'/issues/'+childId,
-        lineText:lineText,
-        closedButChecked:childIssue?childIssue.state==='closed':false,
-        fetchError:!childIssue
-      });
-    }
+    if(lineText){_scanResults.push({trackingIssue:trackingIssue,childId:childId,childRepo:trackingIssue.repo,childTitle:childIssue?childIssue.title:'#'+childId,childUrl:childIssue?childIssue.url:'https://github.com/'+trackingIssue.repo+'/issues/'+childId,lineText:lineText,closedButChecked:childIssue?childIssue.state==='closed':false,fetchError:!childIssue});}
   }
   if(!Object.keys(_scanDismissed).length)_showDismissedPanel=false;
   renderReport();
 }
-
 async function uncheckMismatch(idx){var r=_scanResults[idx];if(!r)return;await uncheckInParent(r.trackingIssue.id,r.trackingIssue.repo,r.childId);_scanResults.splice(idx,1);renderReport();}
 function dismissMismatch(idx){var r=_scanResults[idx];if(!r)return;var key=String(r.trackingIssue.id)+'_'+String(r.childId);_scanDismissed[key]=true;saveScanDismissed();_scanResults.splice(idx,1);renderReport();}
 
@@ -1321,24 +1218,15 @@ function renderReport(){
   var snap=getCurrentSnapshot(),history=loadHistory(),excCount=getExceptions().length,canSave=snap&&excCount===0;
   var h=renderMismatchPanel();
   h+='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px">';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">';
-  h+='<div><div style="font-size:15px;font-weight:700;color:#1e1b4b">Today\'s Snapshot</div><div style="font-size:12px;color:#9ca3af;margin-top:2px">'+todayStr()+'</div></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px"><div><div style="font-size:15px;font-weight:700;color:#1e1b4b">Today\'s Snapshot</div><div style="font-size:12px;color:#9ca3af;margin-top:2px">'+todayStr()+'</div></div>';
   h+='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">';
   if(excCount>0)h+='<div style="font-size:12px;color:#dc2626;font-weight:600;display:flex;align-items:center;gap:5px">⚠ '+excCount+' unresolved exception'+(excCount>1?'s':'')+' <button class="btn-sm" style="font-size:11px;padding:3px 9px;border-color:#fca5a5;color:#dc2626" onclick="switchTab(\'exceptions\')">View</button></div>';
-  h+='<button class="btn-p" onclick="saveSnap()" style="font-size:13px;padding:8px 18px"'+(canSave?'':' disabled')+'>⬇ Save to Report</button>';
-  h+='</div></div>';
-  if(!snap)h+='<div style="color:#9ca3af;font-size:13px">No open CS Task Item issues found.</div>';
+  h+='<button class="btn-p" onclick="saveSnap()" style="font-size:13px;padding:8px 18px"'+(canSave?'':' disabled')+'>⬇ Save to Report</button></div></div>';
+  if(!snap){h+='<div style="color:#9ca3af;font-size:13px">No open CS Task Item issues found.</div>';}
   else{
-    h+='<div class="rw"><table class="rt"><thead><tr><th style="text-align:left">#</th><th style="text-align:left">Task Name</th>';
-    ['Total','Closed','Open','No Issue Raised'].forEach(function(x){h+='<th>'+x+'</th>';});
-    h+='</tr></thead><tbody>';
-    snap.rows.forEach(function(row){
-      h+='<tr><td class="tl" style="font-size:12px;color:#6b7280"><a href="'+esc(row.url)+'" target="_blank">#'+row.id+'</a></td>';
-      h+='<td class="tl" style="font-weight:600;min-width:220px"><a href="'+esc(row.url)+'" target="_blank" style="color:#1e1b4b;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">'+esc(row.title)+'</a></td>';
-      h+='<td class="num">'+(row.total+row.noIssue)+'</td><td class="num" style="color:#059669">'+row.closed+'</td><td class="num" style="color:#dc2626">'+row.open+'</td><td class="num">'+row.noIssue+'</td></tr>';
-    });
-    h+='<tr style="background:#f0f4ff;font-weight:700;border-top:2px solid #e5e7eb"><td colspan="2" class="tl" style="font-size:13px;color:#374151">Totals</td>';
-    h+='<td class="num">'+snap.total+'</td><td class="num" style="color:#059669">'+snap.closed+'</td><td class="num" style="color:#dc2626">'+snap.open+'</td><td class="num">'+snap.noIssue+'</td></tr>';
+    h+='<div class="rw"><table class="rt"><thead><tr><th style="text-align:left">#</th><th style="text-align:left">Task Name</th><th>Total</th><th>Closed</th><th>Open</th><th>No Issue Raised</th></tr></thead><tbody>';
+    snap.rows.forEach(function(row){h+='<tr><td class="tl" style="font-size:12px;color:#6b7280"><a href="'+esc(row.url)+'" target="_blank">#'+row.id+'</a></td><td class="tl" style="font-weight:600;min-width:220px"><a href="'+esc(row.url)+'" target="_blank" style="color:#1e1b4b;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">'+esc(row.title)+'</a></td><td class="num">'+(row.total+row.noIssue)+'</td><td class="num" style="color:#059669">'+row.closed+'</td><td class="num" style="color:#dc2626">'+row.open+'</td><td class="num">'+row.noIssue+'</td></tr>';});
+    h+='<tr style="background:#f0f4ff;font-weight:700;border-top:2px solid #e5e7eb"><td colspan="2" class="tl" style="font-size:13px;color:#374151">Totals</td><td class="num">'+snap.total+'</td><td class="num" style="color:#059669">'+snap.closed+'</td><td class="num" style="color:#dc2626">'+snap.open+'</td><td class="num">'+snap.noIssue+'</td></tr>';
     h+='</tbody></table></div>';
   }
   h+='</div>';
@@ -1347,11 +1235,9 @@ function renderReport(){
   if(!history.length)h+='<button class="btn-sm" onclick="loadHistoricalData()" style="border-color:#4338ca;color:#4338ca">📂 Load Historical Data</button>';
   if(history.length)h+='<button class="btn-sm" onclick="exportCSV()">⬇ Export CSV</button><button class="btn-d" onclick="clearHistory()">Clear</button>';
   h+='</div>';
-  if(!history.length)h+='<div class="es">No saved snapshots yet.</div>';
+  if(!history.length){h+='<div class="es">No saved snapshots yet.</div>';}
   else{
-    h+='<div class="rw"><table class="rt"><thead><tr>';
-    ['Date','Tracking Issues','Total','Net Change','Closed','Open','No Issue Raised',''].forEach(function(x){h+='<th>'+x+'</th>';});
-    h+='</tr></thead><tbody>';
+    h+='<div class="rw"><table class="rt"><thead><tr><th>Date</th><th>Tracking Issues</th><th>Total</th><th>Net Change</th><th>Closed</th><th>Open</th><th>No Issue Raised</th><th></th></tr></thead><tbody>';
     history.slice().reverse().forEach(function(row,i){
       var actualIdx=history.length-1-i,pv=actualIdx>0?history[actualIdx-1]:null,nt=pv!==null?row.total-pv.total:null;
       var ns=nt===null?'&mdash;':(nt>0?'<span class="pos">+'+nt+'</span>':(nt<0?'<span class="neg">'+nt+'</span>':'0'));
@@ -1373,39 +1259,46 @@ function loadHistoricalData(){
   var gh=sessionStorage.getItem('cv_session_gh');
   var zh=sessionStorage.getItem('cv_session_zh');
   if(!gh){
+    hideLoadingOverlay();
     document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;gap:16px;font-family:ui-sans-serif,system-ui,sans-serif"><div style="background:#fff;border-radius:14px;padding:40px 48px;box-shadow:0 2px 12px rgba(0,0,0,0.08);text-align:center;max-width:400px"><div style="font-size:2.5rem;margin-bottom:12px">🔒</div><div style="font-size:1.1rem;font-weight:700;color:#1e1b4b;margin-bottom:8px">Tokens required</div><div style="font-size:14px;color:#6b7280;margin-bottom:24px">Please unlock your vault on the hub page and select your GitHub token before opening this dashboard.</div><a href="index.html" style="display:inline-block;background:#4338ca;color:#fff;border-radius:9px;padding:11px 28px;font-size:14px;font-weight:700;text-decoration:none">← Go to Hub</a></div></div>';
-    return;
+  } else {
+    S.ghToken=gh;
+    if(zh)S.zhToken=zh;
+    var vb=document.getElementById('versionBadge');if(vb)vb.textContent='v '+APP_VERSION;
+    var profiles=loadProfiles();
+    if(!profiles.length||profiles.length>1){
+      hideLoadingOverlay();showEl('setup');renderProfileDd();
+    } else {
+      var profile=profiles[0];
+      S.activeProfile=profile;
+      S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo;}):[profile.repo];
+      if(profile.type==='group'){(profile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(!S.zhWorkspace&&profile.repos&&profile.repos[0])S.zhWorkspace=profile.repos[0].zhWorkspace||'';}
+      else if(profile.zhWorkspace){S.zhWorkspace=profile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=profile.zhWorkspace;}
+      S.ignored=loadIgnored();S.closedExcIgnored=loadClosedExcIgnored();loadScanDismissed();
+      var cache=loadCache();
+      if(cache&&cache.issues&&cache.parentsLoaded){
+        S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
+        var age=Math.round((Date.now()-cache.savedAt)/60000);
+        populateFilters();showDash();buildTabs();renderMain();
+        document.getElementById('dashTitle').textContent='📋 CentralView '+profile.name+' Issues Hub';
+        document.getElementById('dashMeta').textContent=S.issues.length+' open issues — '+todayStr();
+        setStatus('<span style="color:#fbbf24;font-size:14px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
+        hideLoadingOverlay();
+        bgRefresh();
+      } else {
+        showDash();
+        document.getElementById('dashTitle').textContent='📋 CentralView '+profile.name+' Issues Hub';
+        document.getElementById('dashMeta').textContent='Loading...';
+        setStatus('<span style="color:#fbbf24">⏳ Loading...</span>');
+        showLoadingOverlay('Loading issues...');
+        Promise.all([loadLabelColors(),loadIssues()])
+          .then(function(){setLoMsg('Loading parent links...');return loadSubIssueParents();})
+          .then(function(){setLoMsg('Loading tracking bodies...');return refreshTrackingBodies();})
+          .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();hideLoadingOverlay();runMismatchScanBackground();})
+          .catch(function(e){hideLoadingOverlay();document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
+      }
+    }
   }
-  S.ghToken=gh;
-  if(zh)S.zhToken=zh;
-  var vb=document.getElementById('versionBadge');if(vb)vb.textContent='v '+APP_VERSION;
-  var profiles=loadProfiles();
-  if(!profiles.length||profiles.length>1){showEl('setup');renderProfileDd();return;}
-  var profile=profiles[0];
-  S.activeProfile=profile;
-  S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo;}):[profile.repo];
-  if(profile.type==='group'){(profile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(!S.zhWorkspace&&profile.repos&&profile.repos[0])S.zhWorkspace=profile.repos[0].zhWorkspace||'';}
-  else if(profile.zhWorkspace){S.zhWorkspace=profile.zhWorkspace;if(S.repos[0])S.repoWorkspaceMap[S.repos[0]]=profile.zhWorkspace;}
-  S.ignored=loadIgnored();S.closedExcIgnored=loadClosedExcIgnored();loadScanDismissed();
-  var cache=loadCache();
-  if(cache&&cache.issues&&cache.parentsLoaded){
-    S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
-    var age=Math.round((Date.now()-cache.savedAt)/60000);
-    populateFilters();showDash();buildTabs();renderMain();
-    document.getElementById('dashTitle').textContent='📋 CentralView '+profile.name+' Issues Hub';
-    document.getElementById('dashMeta').textContent=S.issues.length+' open issues — '+todayStr();
-    setStatus('<span style="color:#fbbf24;font-size:14px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
-    bgRefresh();return;
-  }
-  showDash();
-  document.getElementById('dashTitle').textContent='📋 CentralView '+profile.name+' Issues Hub';
-  document.getElementById('dashMeta').textContent='Loading...';
-  setStatus('<span style="color:#fbbf24">⏳ Loading...</span>');
-  Promise.all([loadLabelColors(),loadIssues()])
-    .then(function(){return loadSubIssueParents();})
-    .then(function(){return refreshTrackingBodies();})
-    .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();runMismatchScanBackground();})
-    .catch(function(e){document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
 })();
 </script>
 </body>
