@@ -1136,40 +1136,53 @@ async function runMismatchScan(){
   if(_scanning)return;
   _scanning=true;_scanResults=null;
   loadScanDismissed();renderReport();
-  var tracking=S.issues.filter(function(i){if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;var t=i.title.trim().toLowerCase();if(t.indexOf('cs ')!==0)return false;if(t.indexOf('research items')!==-1)return false;if(t.indexOf('cs ba ')===0)return false;return true;});
+  var tracking=S.issues.filter(function(i){
+    if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
+    var t=i.title.trim().toLowerCase();
+    if(t.indexOf('cs ')!==0)return false;
+    if(t.indexOf('research items')!==-1)return false;
+    if(t.indexOf('cs ba ')===0)return false;
+    return true;
+  });
   var mismatches=[];
-  for(var ti=0;ti<tracking.length;ti++){
-    var track=tracking[ti];
-    var lines=(track.body||'').split('\n');
-    for(var li=0;li<lines.length;li++){
-      var chk=lines[li].match(/^\s*-\s*\[x\]\s*(.+)/i);if(!chk)continue;
-      var ref=chk[1].trim();var mm=ref.match(/#(\d+)/);if(!mm)continue;
-      var issueNum=parseInt(mm[1]);
-      var dkey=String(track.id)+'_'+String(issueNum);
-      if(_scanDismissed[dkey])continue;
-      var openIssue=S.issues.find(function(i){return i.id===issueNum&&i.repo===track.repo;});
-      if(openIssue){
-        mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:openIssue.title,childUrl:openIssue.url,lineText:ref,closedButChecked:false});
-      } else {
-        try{
-          var data=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum);
-          if(data&&data.state==='open'){
-            mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:false});
-          } else if(data&&data.state==='closed'){
-            var closedByPR=false,closedByUser='',closedAt=data.closed_at||'';
-            if(data.closed_by&&data.closed_by.login)closedByUser=data.closed_by.login;
-            try{var tl=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum+'/timeline?per_page=100');if(Array.isArray(tl)){tl.forEach(function(ev){if(ev.event==='closed'&&ev.commit_id)closedByPR=true;if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;});}}catch(e){}
-            mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:true,closedByPR:closedByPR,closedByUser:closedByUser,closedAt:closedAt});
+  try{
+    for(var ti=0;ti<tracking.length;ti++){
+      var track=tracking[ti];
+      var lines=(track.body||'').split('\n');
+      for(var li=0;li<lines.length;li++){
+        var chk=lines[li].match(/^\s*-\s*\[x\]\s*(.+)/i);if(!chk)continue;
+        var ref=chk[1].trim();var mm=ref.match(/#(\d+)/);if(!mm)continue;
+        var issueNum=parseInt(mm[1]);
+        var dkey=String(track.id)+'_'+String(issueNum);
+        if(_scanDismissed[dkey])continue;
+        var openIssue=S.issues.find(function(i){return i.id===issueNum&&i.repo===track.repo;});
+        if(openIssue){
+          mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:openIssue.title,childUrl:openIssue.url,lineText:ref,closedButChecked:false});
+        } else {
+          try{
+            var data=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum);
+            if(data&&data.state==='open'){
+              mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:false});
+            } else if(data&&data.state==='closed'){
+              var closedByPR=false,closedByUser='',closedAt=data.closed_at||'';
+              if(data.closed_by&&data.closed_by.login)closedByUser=data.closed_by.login;
+              try{var tl=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum+'/timeline?per_page=100');if(Array.isArray(tl)){tl.forEach(function(ev){if(ev.event==='closed'&&ev.commit_id)closedByPR=true;if(ev.event==='referenced'&&ev.commit_url)closedByPR=true;});}}catch(e){}
+              mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:true,closedByPR:closedByPR,closedByUser:closedByUser,closedAt:closedAt});
+            }
+          }catch(e){
+            mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:'(could not load)',childUrl:'https://github.com/'+track.repo+'/issues/'+issueNum,lineText:ref,closedButChecked:false,fetchError:true});
           }
-        }catch(e){
-          mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:'(could not load)',childUrl:'https://github.com/'+track.repo+'/issues/'+issueNum,lineText:ref,closedButChecked:false,fetchError:true});
         }
       }
     }
+  } finally {
+    // Always reset _scanning so the button works again even if something throws
+    _scanning=false;
   }
-  _scanResults=mismatches;_scanning=false;renderReport();
+  _scanResults=mismatches;
+  renderReport();
 }
-
+  
 function renderMismatchPanel(){
   var h='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #f59e0b">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
