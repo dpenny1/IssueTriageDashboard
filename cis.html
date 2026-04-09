@@ -917,7 +917,7 @@ function renderExcClosedTable(issues){
   });
   return h+'</tbody></table></div>';
 }
-async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});if(!list.length){sel.value='';}else if(!confirm('Move '+list.length+' issues?')){sel.value='';}else{for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}}
+async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list;if(tab==='csitems'&&_csItemsPipeline){list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.pipeline&&i.pipeline.pipelineName===_csItemsPipeline;});}else{list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});}if(!list.length){sel.value='';}else if(!confirm('Move '+list.length+' issues?')){sel.value='';}else{for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}}
 function renderMain(){
   renderStats();buildTabs();hideErr('dashErr');
   if(S.activeTab==='report'){renderReport();}
