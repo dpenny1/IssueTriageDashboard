@@ -179,7 +179,7 @@ tr:hover td{background:#f9fafb}
 </div>
 
 <script>
-var APP_VERSION='2026-04-07 v20';
+var APP_VERSION='2026-04-08 v21';
 var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],closedExcIgnored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',CLOSED_EXC_IGNORED_KEY='cis_closed_exc_ignored_v1',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
@@ -742,6 +742,19 @@ async function createLabel(){var name=document.getElementById('newLblName').valu
 async function updateLabel(oldKey){var newName=document.getElementById('leName_'+oldKey).value.trim(),newColor=document.getElementById('leColor_'+oldKey).value.replace('#','');if(!newName)return;var oldDisplay=S.labelNames[oldKey]||oldKey;try{await fetch('https://api.github.com/repos/'+S.repos[0]+'/labels/'+encodeURIComponent(oldDisplay),{method:'PATCH',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify({new_name:newName,color:newColor})});delete S.labelColors[oldKey];delete S.labelNames[oldKey];S.labelColors[newName.toLowerCase()]=newColor;S.labelNames[newName.toLowerCase()]=newName;S.issues.concat(S.closedIssues).forEach(function(i){i.labels=i.labels.map(function(l){return l.toLowerCase()===oldKey?newName:l;});});renderLabelManager();renderMain();}catch(e){alert('Failed: '+e.message);}}
 async function deleteLabel(lk){var display=S.labelNames[lk]||lk;if(!confirm('Delete label "'+display+'"? This cannot be undone.'))return;try{await ghDel('/repos/'+S.repos[0]+'/labels/'+encodeURIComponent(display));delete S.labelColors[lk];delete S.labelNames[lk];S.issues.concat(S.closedIssues).forEach(function(i){i.labels=i.labels.filter(function(l){return l.toLowerCase()!==lk;});});renderLabelManager();renderMain();}catch(e){alert('Failed: '+e.message);}}
 
+// ── Remove Failed Testing label ───────────────────────────────────────────────
+async function removeFailedTesting(id,repo){
+  if(!confirm('Remove "Failed Testing" label from #'+id+'?'))return;
+  var issue=S.issues.find(function(i){return i.id===id&&i.repo===repo;});
+  if(!issue)return;
+  var newLabels=issue.labels.filter(function(l){return l.toLowerCase()!=='failed testing';});
+  try{
+    await ghPatch('/repos/'+repo+'/issues/'+id,{labels:newLabels});
+    issue.labels=newLabels;
+    buildTabs();renderMain();
+  }catch(e){alert('Failed to remove label: '+e.message);}
+}
+
 // ── Exception reason ──────────────────────────────────────────────────────────
 function renderExcReason(issue){
   var parts=[],autoParents=findAutoCheckedParents(issue.id);
@@ -763,7 +776,7 @@ function renderExcReason(issue){
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function renderTable(issues,tab,def){
-  var isClosed=tab==='closed',isIgnored=tab==='ignored',isTesting=tab==='testing',isExc=tab==='exceptions';
+  var isClosed=tab==='closed',isIgnored=tab==='ignored',isTesting=tab==='testing',isExc=tab==='exceptions',isFailedTesting=tab==='failedtesting';
   var color=def?tabColor(def):'#374151',label=def?def.label:tab;
   var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
   var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
@@ -794,7 +807,7 @@ function renderTable(issues,tab,def){
     if(isClosed&&issue.closedAt)h+='<td style="font-size:12px;color:#059669;font-weight:600">'+new Date(issue.closedAt).toLocaleDateString()+'</td><td style="font-size:12px;color:#6b7280">'+esc(issue.closedBy||'—')+'</td>';
     else if(days!==null)h+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td>';
     else h+='<td>—</td>';
-    if(!isClosed){if(!isIgnored)h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';else h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';}
+    if(!isClosed){if(isFailedTesting)h+='<td><button class="btn-sm" style="border-color:#c2410c;color:#c2410c" onclick="removeFailedTesting('+issue.id+',\''+esc(issue.repo)+'\')">✓ Remove Label</button></td>';else if(!isIgnored)h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';else h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';}
     else h+='<td></td>';
     h+='</tr>';
   });
