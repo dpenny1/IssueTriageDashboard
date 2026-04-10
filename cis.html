@@ -530,13 +530,17 @@ async function loadIssues(){
     taskItems.forEach(function(iss){seenIds[iss.number]=1;});
     for(var j=0;j<taskItems.length;j++){
       var iss=taskItems[j];var lbls=iss.labels.map(function(l){return l.name;});
-      closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:null});
+      var closedBodyParent=null;
+      if(iss.body){var cpm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(cpm)closedBodyParent={issueNumber:parseInt(cpm[1])};}
+      closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:closedBodyParent||null});
     }
     for(var j=0;j<cd2.length;j++){
       var iss=cd2[j];if(iss.pull_request||seenIds[iss.number])continue;
       var lbls=iss.labels.map(function(l){return l.name;});
       if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))continue;
-      closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:null});
+      var closedBodyParent=null;
+      if(iss.body){var cpm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(cpm)closedBodyParent={issueNumber:parseInt(cpm[1])};}
+      closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:closedBodyParent||null});
       if(++count>=50)break;
     }
   }
