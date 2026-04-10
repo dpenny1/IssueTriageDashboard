@@ -66,12 +66,11 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
   <div class="vault-bar">
     <div class="vault-bar-top">
       <div class="vault-bar-title">
-        <span id="vaultIcon">🔒</span> Token Vault
+        <span id="vaultIcon" onclick="toggleVaultWidget()" title="Toggle vault" style="cursor:pointer">🔒</span> Token Vault
         <span class="vault-status" id="vaultStatusText">Unlock to pre-fill tokens for any dashboard</span>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="active-tokens" id="activeTokensBar" style="display:none"></div>
-        <button class="btn-sm" id="vaultToggleBtn" onclick="toggleVaultWidget()">Unlock Vault</button>
         <button class="btn-sm" id="vaultLockBtn" style="display:none;border-color:#fca5a5;color:#dc2626" onclick="lockVaultWidget()">🔒 Lock</button>
       </div>
     </div>
@@ -167,7 +166,6 @@ function toggleVaultWidget(){
   var body=document.getElementById('vaultBody');
   var open=body.style.display==='block';
   body.style.display=open?'none':'block';
-  document.getElementById('vaultToggleBtn').textContent=open?'Unlock Vault':'Hide';
 }
 
 async function unlockVault(){
@@ -180,7 +178,6 @@ async function unlockVault(){
     document.getElementById('vaultLockForm').style.display='none';
     document.getElementById('vaultUnlockedPanel').style.display='block';
     document.getElementById('vaultLockBtn').style.display='inline-flex';
-    document.getElementById('vaultToggleBtn').textContent='Hide';
     document.getElementById('vaultIcon').textContent='🔓';
     document.getElementById('vaultStatusText').textContent='Vault unlocked — assign tokens below';
     renderTokenList();
@@ -198,7 +195,6 @@ function lockVaultWidget(){
   document.getElementById('vaultUnlockedPanel').style.display='none';
   document.getElementById('vaultLockBtn').style.display='none';
   document.getElementById('vaultBody').style.display='none';
-  document.getElementById('vaultToggleBtn').textContent='Unlock Vault';
   document.getElementById('vaultIcon').textContent='🔒';
   document.getElementById('vaultStatusText').textContent='Unlock to pre-fill tokens for any dashboard';
   document.getElementById('vaultPwInput').value='';
@@ -224,6 +220,7 @@ function renderTokenList(){
       var typeColor=t.type==='gh'?'#3730a3':'#065f46';
       var typeBorder=t.type==='gh'?'#c7d2fe':'#6ee7b7';
       h+='<div style="display:flex;align-items:center;gap:6px;background:'+(isActive?typeBg:'#f9fafb')+';border:1px solid '+(isActive?typeBorder:'#e5e7eb')+';border-radius:9px;padding:8px 12px">';
+      h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;border-color:#fca5a5;color:#dc2626" onclick="idxVaultDel(\''+esc(t.name)+'\')" title="Delete token">🗑</button>';
       h+='<span style="font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:'+typeBg+';color:'+typeColor+'">'+t.type.toUpperCase()+'</span>';
       h+='<span style="font-size:13px;font-weight:600;color:#1e1b4b">'+esc(t.name)+'</span>';
       if(isActive){
@@ -232,7 +229,6 @@ function renderTokenList(){
       } else {
         h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;background:#4338ca;color:#fff;border-color:#4338ca" onclick="assignToken(\''+esc(t.name)+'\',\''+t.type+'\')">Use</button>';
       }
-      h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;border-color:#fca5a5;color:#dc2626" onclick="idxVaultDel(\''+esc(t.name)+'\')" title="Delete token">🗑</button>';
       h+='</div>';
     });
     h+='</div>';
@@ -242,8 +238,8 @@ function renderTokenList(){
     h+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
     untagged.forEach(function(t){
       h+='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:6px 10px;font-size:12px;color:#6b7280;font-weight:600;display:flex;align-items:center;gap:8px">';
-      h+=esc(t.name)+' <span style="font-weight:400;color:#9ca3af">untagged</span>';
       h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;border-color:#fca5a5;color:#dc2626" onclick="idxVaultDel(\''+esc(t.name)+'\')" title="Delete token">🗑</button>';
+      h+=esc(t.name)+' <span style="font-weight:400;color:#9ca3af">untagged</span>';
       h+='</div>';
     });
     h+='</div>';
