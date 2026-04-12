@@ -498,7 +498,7 @@ async function loadSubIssueParents(){
   var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});
   for(var i=0;i<parents.length;i++){
     var p=parents[i];
-    try{var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child)child.parent={issueNumber:p.id};});}}
+    try{var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child)child.parent={issueNumber:p.id};});}}
     catch(e){console.log('[loadSubIssueParents] failed for #'+p.id+': '+e.message);}
   }
 }
