@@ -180,7 +180,7 @@ tr:hover td{background:#f9fafb}
 
 <script>
 var APP_VERSION='2026-04-08 v21';
-var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],closedExcIgnored:[],activeTab:'newitems',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
+var S={ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],closedExcIgnored:[],activeTab:'exceptions',labelColors:{},labelNames:{},zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},activeProfile:null,sortState:{col:'age',dir:1},repoWorkspaceMap:{},autoRefreshTimer:null,zhConnected:false};
 var STORAGE_KEY='cis_hub_report_v7',IGNORED_KEY='cis_hub_ignored_v6',CLOSED_EXC_IGNORED_KEY='cis_closed_exc_ignored_v1',PROFILES_KEY='cis_profiles_v2',ZH_STORAGE='cis_zh_creds_v2',CACHE_KEY='cis_issues_cache_v1';
 var CS_LABELS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
 var TAB_DEFS=[
@@ -432,7 +432,7 @@ async function connect(){
       await loadSubIssueParents();
       setLoMsg('Loading tracking bodies...');
       await refreshTrackingBodies();
-      saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();
+      S.activeTab='exceptions';saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();
       hideLoadingOverlay();
       setTimeout(function(){runMismatchScanBackground();},0);
     } catch(e) {
@@ -453,7 +453,7 @@ async function bgRefresh(){
     await loadSubIssueParents();
     setLoMsg('Loading tracking bodies...');
     await refreshTrackingBodies();
-    saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();
+    S.activeTab='exceptions';saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();
   } catch(e) {
     setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');
   }
@@ -477,7 +477,7 @@ async function doRefresh(){
     await loadSubIssueParents();
     setLoMsg('Loading tracking bodies...');
     await refreshTrackingBodies();
-    saveCache();populateFilters();buildTabs();renderMain();
+    S.activeTab='exceptions';saveCache();populateFilters();buildTabs();renderMain();
     if(S.zhToken&&S.zhWorkspace)zhLoad();
     else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
   } catch(e){showErr('dashErr',e.message);}
