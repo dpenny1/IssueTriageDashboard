@@ -1119,7 +1119,7 @@ async function runMismatchScan(){
   _scanResults=null;
   _uncheckedClosedResults=null;
   loadScanDismissed();
-  renderReport();
+  if(S.activeTab==='report')renderReport();
   var tracking=S.issues.filter(function(i){
     if(!i.labels.some(function(l){return l.toLowerCase()==='cs task item';})){return false;}
     var t=i.title.trim().toLowerCase();
@@ -1186,7 +1186,7 @@ async function runMismatchScan(){
   _scanResults=mismatches;
   _uncheckedClosedResults=uncheckedClosed;
   _lastScanTime=new Date();
-  renderReport();
+  if(S.activeTab==='report')renderReport();
 }
 
 function renderMismatchPanel(){
