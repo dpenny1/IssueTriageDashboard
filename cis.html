@@ -142,6 +142,7 @@ tr:hover td{background:#f9fafb}
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-w">🛠 PM Tools</a>
       <button class="btn btn-w" id="refreshBtn" onclick="doRefresh()">↻ Refresh</button>
       <button class="btn btn-w" onclick="showReleaseModal()">🚀 Release</button>
+      <button class="btn btn-w" onclick="showDiagModal()">🩺 Diagnose</button>
       <button class="btn btn-w" onclick="showCfg()">⚙ Settings</button>
     </div>
   </div></div>
@@ -155,6 +156,16 @@ tr:hover td{background:#f9fafb}
       <select id="filterPipeline" onchange="renderMain()"><option value="">All pipelines</option></select>
       <button onclick="clearFilters()" style="font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;text-decoration:underline;font-weight:600">Clear</button>
     </div>
+    <div class="sb" id="globalSearchBar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <input type="text" id="globalSearchInput" placeholder="🔍 Search all issues — title, #number, label, assignee, repo…" style="flex:1;min-width:300px" oninput="renderMain()"/>
+      <select id="globalFilterState" onchange="renderMain()" style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:13px;background:#fff;outline:none;color:#374151">
+        <option value="">Open + Closed</option>
+        <option value="open">Open only</option>
+        <option value="closed">Closed only</option>
+      </select>
+      <select id="globalFilterRepo" onchange="renderMain()" style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:13px;background:#fff;outline:none;color:#374151"><option value="">All repos</option></select>
+      <button onclick="clearGlobalSearch()" style="font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;text-decoration:underline;font-weight:600">Clear</button>
+    </div>
     <div id="dashErr" style="display:none;margin-bottom:12px"></div>
     <div id="mainContent"></div>
   </div>
@@ -167,6 +178,22 @@ tr:hover td{background:#f9fafb}
       <button class="btn-sm" onclick="hideLabelManager()">✕ Close</button>
     </div>
     <div id="labelModalContent"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="diagModal">
+  <div class="modal-box" style="max-width:640px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-size:15px;font-weight:700;color:#1e1b4b">🩺 CS In Testing — Issue Diagnostics</span>
+      <button class="btn-sm" onclick="hideDiagModal()">✕ Close</button>
+    </div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:14px">Enter an issue number to find out exactly why it is or isn't appearing in the CS In Testing tab.</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+      <input type="number" id="diagIssueNum" placeholder="Issue #" min="1" style="width:130px;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none" onkeydown="if(event.key==='Enter')runDiag()"/>
+      <select id="diagRepoSel" style="flex:1;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;outline:none;color:#374151"></select>
+      <button class="btn-p" onclick="runDiag()" style="white-space:nowrap">Run Check</button>
+    </div>
+    <div id="diagResult"></div>
   </div>
 </div>
 
@@ -196,7 +223,8 @@ var TAB_DEFS=[
   {id:'taskitem',label:'CS Task Items',color:'#7c3aed',labelKey:'cs task item'},
   {id:'closed',label:'Recently Closed',color:'#374151'},
   {id:'ignored',label:'Ignored',color:'#6b7280'},
-  {id:'report',label:'Weekly Report',color:'#1e1b4b'}
+  {id:'report',label:'Weekly Report',color:'#1e1b4b'},
+  {id:'global',label:'🔍 Global Search',color:'#0369a1'}
 ];
 
 // ── Loading overlay ───────────────────────────────────────────────────────────
@@ -622,8 +650,9 @@ function isException(issue){
   if(hasCS(issue))return true;
   return false;
 }
-function populateFilters(){var ls={},rs={},ps={};S.issues.concat(S.closedIssues).forEach(function(i){i.labels.forEach(function(l){ls[l]=1;});rs[i.repo]=1;if(i.pipeline)ps[i.pipeline.pipelineName]=1;});var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');fl.innerHTML='<option value="">All labels</option>';Object.keys(ls).sort(lsort).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});fr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});fp.innerHTML='<option value="">All pipelines</option>';Object.keys(ps).sort(lsort).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});}
+function populateFilters(){var ls={},rs={},ps={};S.issues.concat(S.closedIssues).forEach(function(i){i.labels.forEach(function(l){ls[l]=1;});rs[i.repo]=1;if(i.pipeline)ps[i.pipeline.pipelineName]=1;});var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');fl.innerHTML='<option value="">All labels</option>';Object.keys(ls).sort(lsort).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});fr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});fp.innerHTML='<option value="">All pipelines</option>';Object.keys(ps).sort(lsort).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});var gfr=document.getElementById('globalFilterRepo');if(gfr){gfr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){gfr.innerHTML+='<option>'+esc(r)+'</option>';});}}
 function clearFilters(){['searchInput','filterLabel','filterRepo','filterPipeline'].forEach(function(id){document.getElementById(id).value='';});renderMain();}
+function clearGlobalSearch(){['globalSearchInput','globalFilterState','globalFilterRepo'].forEach(function(id){document.getElementById(id).value='';});renderMain();}
 function getExceptions(){return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isException(i);});}
 function getTabIssues(tab){
   var t=tab||S.activeTab;
@@ -638,7 +667,26 @@ function getTabIssues(tab){
   if(t==='uat')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});
   if(t==='failedtesting')return base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='failed testing';});});
   if(t==='csitems')return base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';});});
+  if(t==='global')return S.issues.concat(S.closedIssues);
   return base;
+}
+// Return the tab id(s) an issue would naturally appear in (for global search badges)
+function getIssueTabs(issue){
+  var tabs=[];
+  if(S.ignored.indexOf(issue.id+'_'+issue.repo)!==-1){tabs.push('ignored');return tabs;}
+  if(issue.state==='closed'){tabs.push('closed');return tabs;}
+  if(isException(issue))tabs.push('exceptions');
+  var lbls=issue.labels.map(function(l){return l.toLowerCase();});
+  if(lbls.indexOf('cs in testing')!==-1)tabs.push('testing');
+  if(lbls.indexOf('cs task item')!==-1)tabs.push('taskitem');
+  if(lbls.indexOf('production patch')!==-1&&!isException(issue))tabs.push('prod');
+  if(lbls.indexOf('uat patch')!==-1&&!isException(issue))tabs.push('uat');
+  if(lbls.indexOf('failed testing')!==-1&&!isException(issue))tabs.push('failedtesting');
+  if(tabs.length===0){
+    if(!hasCS(issue))tabs.push('newitems');
+    else if(lbls.some(function(l){return l.indexOf('cs ')===0&&l!=='cs task item'&&l!=='cs in testing';}))tabs.push('csitems');
+  }
+  return tabs;
 }
 function applyFilters(list){var q=(document.getElementById('searchInput').value||'').toLowerCase(),fl=(document.getElementById('filterLabel').value||'').toLowerCase(),fr=document.getElementById('filterRepo').value||'',fp=document.getElementById('filterPipeline').value||'';if(q)list=list.filter(function(i){return i.title.toLowerCase().indexOf(q)!==-1||String(i.id).indexOf(q)!==-1||i.labels.join(' ').toLowerCase().indexOf(q)!==-1||i.repo.toLowerCase().indexOf(q)!==-1||i.assignees.join(' ').toLowerCase().indexOf(q)!==-1;});if(fl)list=list.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()===fl;});});if(fr)list=list.filter(function(i){return i.repo===fr;});if(fp)list=list.filter(function(i){return i.pipeline&&i.pipeline.pipelineName===fp;});return list;}
 function sortIssues(list,tab){
@@ -689,12 +737,24 @@ function buildTabs(){
   var h='';
   TAB_DEFS.forEach(function(t){
     if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0)||(t.id==='failedtesting'&&fN===0))return;
+    if(t.id==='global'){
+      var active=S.activeTab==='global',c=tabColor(t);
+      h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\'global\')" style="'+(active?'color:'+c:'')+'">🔍 Global Search</button>';
+      return;
+    }
     var cnt=getTabIssues(t.id).length,active=S.activeTab===t.id,c=tabColor(t);
     h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+c:'')+'">'+esc(t.label)+'<span class="tc">'+cnt+'</span></button>';
   });
   document.getElementById('tabsWrap').innerHTML=h;
 }
-function switchTab(name){S.activeTab=name;document.getElementById('searchBar').style.display=name==='report'?'none':'flex';if(name==='closed')S.sortState={col:'closed',dir:-1};buildTabs();renderMain();}
+function switchTab(name){
+  S.activeTab=name;
+  document.getElementById('searchBar').style.display=(name==='report'||name==='global')?'none':'flex';
+  document.getElementById('globalSearchBar').style.display=name==='global'?'flex':'none';
+  if(name==='closed')S.sortState={col:'closed',dir:-1};
+  buildTabs();renderMain();
+  if(name==='global')setTimeout(function(){var gi=document.getElementById('globalSearchInput');if(gi)gi.focus();},60);
+}
 function ignoreIssue(k){if(S.ignored.indexOf(k)===-1)S.ignored.push(k);saveIgnored();buildTabs();renderMain();}
 function unignoreIssue(k){S.ignored=S.ignored.filter(function(x){return x!==k;});saveIgnored();buildTabs();renderMain();}
 
@@ -928,6 +988,7 @@ async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list;if(ta
 function renderMain(){
   renderStats();buildTabs();hideErr('dashErr');
   if(S.activeTab==='report'){renderReport();}
+  else if(S.activeTab==='global'){renderGlobalSearch();}
   else if(S.activeTab==='csitems'&&S.zhToken&&!document.getElementById('filterPipeline').value){
     var csIssues=applyFilters(getTabIssues('csitems'));
     var def=TAB_DEFS.find(function(d){return d.id==='csitems';});
@@ -941,6 +1002,57 @@ function renderMain(){
   }
 }
 
+function renderGlobalSearch(){
+  var q=(document.getElementById('globalSearchInput').value||'').trim().toLowerCase();
+  var filterState=(document.getElementById('globalFilterState').value||'');
+  var filterRepo=(document.getElementById('globalFilterRepo').value||'');
+  var mc=document.getElementById('mainContent');
+
+  if(!q&&!filterState&&!filterRepo){
+    mc.innerHTML='<div style="text-align:center;padding:60px 20px;color:#9ca3af"><div style="font-size:2.5rem;margin-bottom:12px">🔍</div><div style="font-size:15px;font-weight:600;color:#6b7280">Search across all loaded issues</div><div style="font-size:13px;margin-top:6px">Type in the search box above — searches title, issue number, labels, assignees, and repo across every tab at once.</div></div>';
+    return;
+  }
+
+  var all=S.issues.concat(S.closedIssues);
+  if(q){all=all.filter(function(i){return i.title.toLowerCase().indexOf(q)!==-1||String(i.id).indexOf(q)!==-1||i.labels.join(' ').toLowerCase().indexOf(q)!==-1||i.repo.toLowerCase().indexOf(q)!==-1||i.assignees.join(' ').toLowerCase().indexOf(q)!==-1;});}
+  if(filterState){all=all.filter(function(i){return i.state===filterState;});}
+  if(filterRepo){all=all.filter(function(i){return i.repo===filterRepo;});}
+
+  // Sort: open first then closed, newest first within each
+  all=all.slice().sort(function(a,b){
+    if(a.state!==b.state)return a.state==='open'?-1:1;
+    var da=new Date(a.state==='closed'?a.closedAt:a.createdAt),db=new Date(b.state==='closed'?b.closedAt:b.createdAt);
+    return db-da;
+  });
+
+  var TAB_COLORS={newitems:'#0891b2',exceptions:'#b91c1c',prod:'#dc2626',uat:'#d97706',failedtesting:'#c2410c',csitems:'#4338ca',testing:'#059669',taskitem:'#7c3aed',closed:'#374151',ignored:'#6b7280'};
+  var TAB_LABELS={newitems:'New Issues',exceptions:'Exceptions',prod:'Production Patch',uat:'UAT Patch',failedtesting:'Failed Testing',csitems:'CS Items',testing:'CS In Testing',taskitem:'CS Task Items',closed:'Closed',ignored:'Ignored'};
+
+  if(!all.length){
+    mc.innerHTML='<div style="text-align:center;padding:40px;color:#9ca3af;font-size:14px">No issues found matching your search.</div>';
+    return;
+  }
+
+  var h='<div style="font-size:12px;color:#6b7280;margin-bottom:10px">'+all.length+' result'+(all.length===1?'':'s')+'</div>';
+  h+='<table style="width:100%;border-collapse:collapse;font-size:13px">';
+  h+='<thead><tr style="background:#f3f4f6"><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">#</th><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">Title</th><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">Tab</th><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">Labels</th><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">Repo</th><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">State</th></tr></thead><tbody>';
+  all.forEach(function(issue,idx){
+    var tabs=getIssueTabs(issue);
+    var tabBadges=tabs.map(function(tid){var c=TAB_COLORS[tid]||'#6b7280';var l=TAB_LABELS[tid]||tid;return '<span onclick="switchTab(\''+tid+'\')" style="cursor:pointer;display:inline-block;background:'+c+'22;color:'+c+';border:1px solid '+c+'44;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap" title="Go to '+esc(l)+'">'+esc(l)+'</span>';}).join(' ');
+    var lblHtml=issue.labels.slice(0,4).map(function(l){var c=S.labelColors[l.toLowerCase()]||'e5e7eb';return '<span style="background:#'+c+';color:'+tfb(c)+';padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap">'+esc(S.labelNames[l.toLowerCase()]||l)+'</span>';}).join(' ')+(issue.labels.length>4?'<span style="font-size:11px;color:#9ca3af"> +'+( issue.labels.length-4)+' more</span>':'');
+    var stateBadge=issue.state==='open'?'<span style="background:#d1fae5;color:#065f46;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:700">open</span>':'<span style="background:#f3f4f6;color:#6b7280;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:700">closed</span>';
+    var rowBg=idx%2===0?'#fff':'#fafafa';
+    h+='<tr style="background:'+rowBg+';border-bottom:1px solid #f3f4f6"><td style="padding:8px 12px;white-space:nowrap"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:700;color:#4338ca">#'+issue.id+'</a></td>';
+    h+='<td style="padding:8px 12px;max-width:380px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#1a1a1a;font-weight:500">'+esc(issue.title)+'</a></td>';
+    h+='<td style="padding:8px 12px;white-space:nowrap">'+tabBadges+'</td>';
+    h+='<td style="padding:8px 12px"><div style="display:flex;flex-wrap:wrap;gap:3px">'+lblHtml+'</div></td>';
+    h+='<td style="padding:8px 12px;font-size:12px;color:#6b7280;white-space:nowrap">'+esc(issue.repo.split('/').pop())+'</td>';
+    h+='<td style="padding:8px 12px">'+stateBadge+'</td></tr>';
+  });
+  h+='</tbody></table>';
+  mc.innerHTML=h;
+}
+
 // ── Release Modal ─────────────────────────────────────────────────────────────
 var _releases=[],_releaseIssues=[],_releaseSelected={},_releaseAssignees=[],_collaborators=[],_defaultAssignees=[];
 var RELEASE_ASSIGNEES_KEY='cis_release_assignees_v1';
@@ -948,6 +1060,155 @@ function loadDefaultAssignees(){try{var v=localStorage.getItem(RELEASE_ASSIGNEES
 function saveDefaultAssignees(){try{localStorage.setItem(RELEASE_ASSIGNEES_KEY,JSON.stringify(_defaultAssignees));}catch(e){}}
 function showReleaseModal(){document.getElementById('releaseModal').style.display='block';_defaultAssignees=loadDefaultAssignees();_releaseAssignees=_defaultAssignees.slice();_releases=[];_releaseIssues=[];_releaseSelected={};drawReleaseModal('<div style="text-align:center;padding:30px;color:#9ca3af"><span class="spin spd"></span> Loading releases...</div>');ghFetch('/repos/'+S.repos[0]+'/releases?per_page=20').then(function(r){_releases=r;drawReleaseModal();}).catch(function(e){drawReleaseModal('<div class="err">Failed to load releases: '+esc(e.message)+'</div>');});}
 function hideReleaseModal(){document.getElementById('releaseModal').style.display='none';}
+
+// ── Diagnostics ───────────────────────────────────────────────────────────────
+function showDiagModal(){
+  var sel=document.getElementById('diagRepoSel');
+  sel.innerHTML='';
+  (S.repos.length?S.repos:['(no repos loaded)']).forEach(function(r){
+    var o=document.createElement('option');o.value=r;o.textContent=r;sel.appendChild(o);
+  });
+  document.getElementById('diagResult').innerHTML='';
+  document.getElementById('diagIssueNum').value='';
+  document.getElementById('diagModal').style.display='flex';
+  setTimeout(function(){document.getElementById('diagIssueNum').focus();},80);
+}
+function hideDiagModal(){document.getElementById('diagModal').style.display='none';}
+
+async function runDiag(){
+  var numVal=parseInt(document.getElementById('diagIssueNum').value,10);
+  var repo=document.getElementById('diagRepoSel').value;
+  var out=document.getElementById('diagResult');
+  if(!numVal||numVal<1){out.innerHTML='<div class="err">Please enter a valid issue number.</div>';return;}
+  if(!repo){out.innerHTML='<div class="err">No repo selected — load the dashboard first.</div>';return;}
+
+  out.innerHTML='<div style="font-size:13px;color:#6b7280;padding:10px 0">⏳ Checking issue #'+numVal+'…</div>';
+
+  var steps=[];
+  function pass(msg){steps.push({ok:true,msg:msg});}
+  function fail(msg){steps.push({ok:false,msg:msg});}
+  function info(msg){steps.push({ok:null,msg:msg});}
+
+  // ── Step 1: is it in the loaded data at all? ──────────────────────────────
+  var openIssue=S.issues.find(function(i){return i.id===numVal&&i.repo===repo;});
+  var closedIssue=S.closedIssues.find(function(i){return i.id===numVal&&i.repo===repo;});
+  var liveData=null;
+
+  if(!openIssue&&!closedIssue){
+    info('Issue #'+numVal+' is <strong>not in the current loaded data</strong>. Fetching live from GitHub…');
+    try{
+      liveData=await ghFetch('/repos/'+repo+'/issues/'+numVal);
+    }catch(e){
+      fail('Could not fetch issue from GitHub: '+esc(e.message)+'. Check the issue number and repo.');
+      renderDiag(steps,out);return;
+    }
+
+    var liveState=liveData.state;
+    var liveLabels=(liveData.labels||[]).map(function(l){return l.name;});
+    var hasTestingLive=liveLabels.some(function(l){return l.toLowerCase()==='cs in testing';});
+    var hasCSLabelLive=liveLabels.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});
+
+    info('GitHub reports this issue as <strong>'+liveState+'</strong>. Labels on GitHub: '+(liveLabels.length?liveLabels.map(function(l){return '<code>'+esc(l)+'</code>';}).join(', '):'<em>none</em>'));
+
+    if(liveState==='open'){
+      // Open but not loaded — shouldn't happen unless pull_request or API pagination gap
+      if(liveData.pull_request){
+        fail('This is a <strong>pull request</strong>, not an issue. Pull requests are excluded from the dashboard.');
+      } else {
+        fail('This issue is open on GitHub but was <strong>not loaded</strong> into the dashboard. This can happen when the dashboard data is stale. Try clicking <strong>↻ Refresh</strong> to reload all issues.');
+      }
+    } else {
+      // Closed — explain the loading window
+      var closedAt=liveData.closed_at?new Date(liveData.closed_at):null;
+      var daysSinceClosed=closedAt?Math.round((Date.now()-closedAt.getTime())/(86400000)):null;
+      var cutoff60=new Date(Date.now()-60*24*60*60*1000);
+
+      if(closedAt){
+        info('Closed on '+closedAt.toLocaleDateString()+' ('+daysSinceClosed+' days ago).');
+      }
+
+      if(!hasCSLabelLive){
+        fail('The issue has <strong>no CS-family labels</strong> on GitHub (cs tracking, cs in testing, cs item, etc.). Only closed issues with at least one CS label are loaded. This is why it\'s not in the dashboard.');
+      } else if(!hasTestingLive){
+        fail('The issue has CS labels but <strong>no <code>cs in testing</code> label</strong> on GitHub, so even if loaded it would not appear in the CS In Testing tab.');
+      } else if(closedAt&&closedAt<cutoff60){
+        fail('The issue was closed <strong>'+daysSinceClosed+' days ago</strong>, which is outside the <strong>60-day load window</strong> for closed issues. The dashboard only loads closed issues updated within the last 60 days.');
+      } else {
+        // Within window, has label — might be a 50-issue cap issue
+        fail('The issue appears it should qualify (closed within 60 days, has CS label) but was not loaded. The dashboard caps non-task-item closed CS issues at <strong>50 per repo</strong>. If your repo had more than 50 qualifying closed issues updated recently, this one may have been cut off. Try <strong>↻ Refresh</strong> and check again.');
+      }
+    }
+
+    if(hasTestingLive&&liveState==='open'&&!liveData.pull_request){
+      info('Once you refresh the dashboard, this issue <em>should</em> appear in CS In Testing.');
+    }
+
+    renderDiag(steps,out);
+    return;
+  }
+
+  // ── Step 2: issue IS loaded — figure out why it's not in CS In Testing ───
+  var issue=openIssue||closedIssue;
+  var lbls=issue.labels.map(function(l){return l.toLowerCase();});
+  info('Issue <strong>#'+numVal+'</strong> is in the loaded data as <strong>'+(issue.state==='open'?'open':'closed')+'</strong>.');
+  info('Labels in dashboard: '+(issue.labels.length?issue.labels.map(function(l){return '<code>'+esc(l)+'</code>';}).join(', '):'<em>none</em>'));
+
+  var hasTesting=lbls.indexOf('cs in testing')!==-1;
+  if(!hasTesting){
+    fail('The issue does <strong>not have the <code>CS In Testing</code> label</strong> in the dashboard data. This is the primary reason it\'s missing from the tab. '+
+      (liveData===null?'Note: the dashboard may have stale data — click <strong>↻ Refresh</strong> to reload from GitHub, then check if the label appears.':''));
+  } else {
+    pass('Has the <code>CS In Testing</code> label ✓');
+  }
+
+  if(issue.state==='open'){
+    var ignKey=issue.id+'_'+issue.repo;
+    var isIgnored=S.ignored.indexOf(ignKey)!==-1;
+    if(isIgnored){
+      fail('This issue is in your <strong>Ignored list</strong>. Open issues in the Ignored list are hidden from all tabs including CS In Testing. Go to the Ignored tab and click "Restore" to bring it back.');
+    } else {
+      pass('Not in the Ignored list ✓');
+    }
+  } else {
+    pass('Closed issues are never filtered by the Ignored list ✓');
+  }
+
+  // Check if it IS actually showing in the testing tab
+  var testingList=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});})
+    .concat(S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';}); }));
+  var appearsInTab=testingList.some(function(i){return i.id===numVal&&i.repo===repo;});
+
+  if(appearsInTab){
+    pass('Issue <strong>IS currently appearing</strong> in the CS In Testing tab ✓ — you may need to clear your search/label/repo filters, or scroll down to find it.');
+    // Check active filters
+    var searchVal=(document.getElementById('searchInput')||{}).value||'';
+    var filterLabel=(document.getElementById('filterLabel')||{}).value||'';
+    var filterRepo=(document.getElementById('filterRepo')||{}).value||'';
+    if(searchVal||filterLabel||filterRepo){
+      var filterParts=[];
+      if(searchVal)filterParts.push('search text "'+esc(searchVal)+'"');
+      if(filterLabel)filterParts.push('label filter "'+esc(filterLabel)+'"');
+      if(filterRepo)filterParts.push('repo filter "'+esc(filterRepo)+'"');
+      fail('Active filters are hiding it: '+filterParts.join(', ')+'. Click <strong>Clear</strong> in the search bar to remove filters.');
+    }
+  }
+
+  renderDiag(steps,out);
+}
+
+function renderDiag(steps,out){
+  var h='<div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">';
+  steps.forEach(function(s){
+    var bg=s.ok===true?'#f0fdf4':s.ok===false?'#fef2f2':'#f8fafc';
+    var border=s.ok===true?'#86efac':s.ok===false?'#fca5a5':'#e2e8f0';
+    var icon=s.ok===true?'✅':s.ok===false?'❌':'ℹ️';
+    h+='<div style="background:'+bg+';border:1px solid '+border+';border-radius:8px;padding:10px 13px;font-size:13px;line-height:1.5">';
+    h+=icon+' '+s.msg+'</div>';
+  });
+  h+='</div>';
+  out.innerHTML=h;
+}
+
 function drawReleaseModal(loadingHtml){
   var el=document.getElementById('releaseModalContent');
   if(loadingHtml){el.innerHTML=loadingHtml;return;}
