@@ -546,32 +546,37 @@ async function loadIssues(){
   var since60=new Date(Date.now()-60*24*60*60*1000).toISOString();
   // Load all repos in parallel; each repo fires its 4 API calls simultaneously
   var repoResults=await Promise.all(S.repos.map(async function(repo){
-    var results=await Promise.all([
-      ghFetchAll('/repos/'+repo+'/issues?state=open',10),
-      ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100&labels=cs+task+item&since='+since60),
-      ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100&labels=cs+in+testing&since='+since60),
-      ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=50&since='+since60)
-    ]);
-    var od=results[0];
-    var cd=Array.isArray(results[1])?results[1]:[];
-    var cdTesting=Array.isArray(results[2])?results[2]:[];
-    var cd2=Array.isArray(results[3])?results[3]:[];
-    var repoOpen=od.filter(function(i){return !i.pull_request;}).map(function(i){return parseIssue(i,repo,'open');});
-    var seenIds={};
-    var taskItems=cd.filter(function(i){return !i.pull_request;});
-    var testingItems=cdTesting.filter(function(i){return !i.pull_request;});
-    var repoClosed=[];
-    taskItems.forEach(function(iss){seenIds[iss.number]=1;repoClosed.push(parseIssue(iss,repo,'closed'));});
-    testingItems.forEach(function(iss){if(!seenIds[iss.number]){seenIds[iss.number]=1;repoClosed.push(parseIssue(iss,repo,'closed'));}});
-    var count=0;
-    for(var j=0;j<cd2.length;j++){
-      var iss=cd2[j];if(iss.pull_request||seenIds[iss.number])continue;
-      var lbls=iss.labels.map(function(l){return l.name.toLowerCase();});
-      if(!lbls.some(function(l){return CS_LABELS.indexOf(l)!==-1;}))continue;
-      seenIds[iss.number]=1;repoClosed.push(parseIssue(iss,repo,'closed'));
-      if(++count>=50)break;
+    try{
+      var results=await Promise.all([
+        ghFetchAll('/repos/'+repo+'/issues?state=open',10),
+        ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100&labels=cs+task+item&since='+since60),
+        ghFetchAll('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&labels=cs+in+testing',5),
+        ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=50&since='+since60)
+      ]);
+      var od=results[0];
+      var cd=Array.isArray(results[1])?results[1]:[];
+      var cdTesting=Array.isArray(results[2])?results[2]:[];
+      var cd2=Array.isArray(results[3])?results[3]:[];
+      var repoOpen=od.filter(function(i){return !i.pull_request;}).map(function(i){return parseIssue(i,repo,'open');});
+      var seenIds={};
+      var taskItems=cd.filter(function(i){return !i.pull_request;});
+      var testingItems=cdTesting.filter(function(i){return !i.pull_request;});
+      var repoClosed=[];
+      taskItems.forEach(function(iss){seenIds[iss.number]=1;repoClosed.push(parseIssue(iss,repo,'closed'));});
+      testingItems.forEach(function(iss){if(!seenIds[iss.number]){seenIds[iss.number]=1;repoClosed.push(parseIssue(iss,repo,'closed'));}});
+      var count=0;
+      for(var j=0;j<cd2.length;j++){
+        var iss=cd2[j];if(iss.pull_request||seenIds[iss.number])continue;
+        var lbls=iss.labels.map(function(l){return l.name.toLowerCase();});
+        if(!lbls.some(function(l){return CS_LABELS.indexOf(l)!==-1;}))continue;
+        seenIds[iss.number]=1;repoClosed.push(parseIssue(iss,repo,'closed'));
+        if(++count>=50)break;
+      }
+      return {open:repoOpen,closed:repoClosed};
+    }catch(e){
+      setStatus('<span style="color:#fca5a5">✕ Failed to load '+esc(repo)+': '+esc(e.message)+'</span>');
+      return {open:[],closed:[]};
     }
-    return {open:repoOpen,closed:repoClosed};
   }));
   var open=[],closed=[];
   repoResults.forEach(function(r){open=open.concat(r.open);closed=closed.concat(r.closed);});
@@ -1132,8 +1137,10 @@ async function runDiag(){
         fail('The issue has <strong>no CS-family labels</strong> on GitHub (cs tracking, cs in testing, cs item, etc.). Only closed issues with at least one CS label are loaded. This is why it\'s not in the dashboard.');
       } else if(!hasTestingLive){
         fail('The issue has CS labels but <strong>no <code>cs in testing</code> label</strong> on GitHub, so even if loaded it would not appear in the CS In Testing tab.');
-      } else if(closedAt&&closedAt<cutoff60){
-        fail('The issue was closed <strong>'+daysSinceClosed+' days ago</strong>, which is outside the <strong>60-day load window</strong> for closed issues. The dashboard only loads closed issues updated within the last 60 days.');
+      } else if(hasTestingLive&&closedAt&&closedAt<cutoff60){
+        info('This issue is older than 60 days but has <code>cs in testing</code> — there is no date restriction for CS In Testing closed issues. Try <strong>↻ Refresh</strong> and it should appear.');
+      } else if(!hasTestingLive&&closedAt&&closedAt<cutoff60){
+        fail('The issue was closed <strong>'+daysSinceClosed+' days ago</strong>, which is outside the <strong>60-day load window</strong> for non-CS-In-Testing closed issues. The dashboard only loads other closed issues updated within the last 60 days.');
       } else {
         // Within window, has label — stale cache most likely after the fix
         fail('The issue appears it should qualify (closed within 60 days, has <code>cs in testing</code> label) but was not in the loaded data. This was likely due to a loading bug that has now been fixed (closed issues could be crowded out by high repo activity). Click <strong>↻ Refresh</strong> to reload — it should appear after that.');
@@ -1274,8 +1281,7 @@ async function applyRelease(){
       if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#d1fae5;color:#065f46">✓ Done</span>';
     } catch(e) {
       failed++;
-      if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#fee2e2;color:#991b1b">✕ Failed</span>';
-      console.error('Failed #'+issue.id,e);
+      if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#fee2e2;color:#991b1b" title="'+esc(e.message)+'">✕ Failed</span>';
     }
     updateProgress();
   }
