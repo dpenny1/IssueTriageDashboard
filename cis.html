@@ -9,11 +9,22 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9fafb;color:#1a1a1a;min-height:100vh;font-size:15px}
 a{color:#4338ca;text-decoration:none}a:hover{text-decoration:underline}
-.hdr{background:linear-gradient(135deg,#1e1b4b 0%,#4338ca 60%,#6366f1 100%);padding:16px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
-.hdr-in{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.hdr h1{color:#fff;font-size:1.3rem;font-weight:800;margin:0}
-.hdr p{color:#c7d2fe;font-size:0.85rem;margin-top:2px}
-.hdr-btns{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hdr{background:#0f172a;padding:0 24px;border-bottom:1px solid rgba(255,255,255,0.07)}
+.hdr-in{display:flex;align-items:center;justify-content:space-between;height:52px;gap:16px}
+.hdr-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.hdr-logo{width:26px;height:26px;background:#4338ca;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;letter-spacing:-0.5px;flex-shrink:0}
+.hdr h1{color:#f1f5f9;font-size:13.5px;font-weight:700;margin:0;letter-spacing:-0.01em}
+.hdr p{color:#475569;font-size:11px;margin-top:1px}
+.hdr-right{display:flex;align-items:center;gap:2px}
+.hdr-nav a{color:#cbd5e1;font-size:12px;font-weight:600;padding:5px 9px;border-radius:5px;text-decoration:none;transition:all 0.15s;white-space:nowrap;display:inline-block}
+.hdr-nav a:hover{color:#fff;background:rgba(255,255,255,0.08);text-decoration:none}
+.hdr-sep{width:1px;height:18px;background:rgba(255,255,255,0.12);margin:0 8px;flex-shrink:0}
+.hdr-act{background:transparent;border:none;color:#cbd5e1;cursor:pointer;padding:5px 10px;border-radius:5px;font-size:12px;font-weight:600;transition:all 0.15s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.hdr-act:hover{background:rgba(255,255,255,0.08);color:#fff}
+.hdr-act:disabled{opacity:0.4;cursor:not-allowed}
+.hdr-act-hi{background:rgba(99,102,241,0.15);color:#a5b4fc;border:1px solid rgba(99,102,241,0.25)}
+.hdr-act-hi:hover{background:rgba(99,102,241,0.28);color:#c7d2fe}
+.hdr-status{font-size:11px;color:#475569;white-space:nowrap;padding-left:4px}
 .main{padding:20px 24px 48px}
 .btn{border:none;border-radius:9px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all 0.15s}
 .btn-w{background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4)}
@@ -95,16 +106,16 @@ tr:hover td{background:#f9fafb}
 
 <div id="loadingOverlay">
   <div class="lo-spin"></div>
-  <div class="lo-title">📋 CentralView</div>
+  <div class="lo-title">CentralView</div>
   <div class="lo-msg" id="loMsg">Initializing...</div>
 </div>
 
 <div id="setup">
   <div class="hdr"><div class="hdr-in">
-    <div><h1>📋 CentralView</h1><p>Select a project to get started</p></div>
-    <div style="display:flex;gap:10px">
-      <a href="index.html" class="btn btn-w">🏠 Home</a>
-      <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-w">🛠 PM Tools</a>
+    <div class="hdr-brand"><div class="hdr-logo">CV</div><div><h1>CentralView</h1><p>Select a project to get started</p></div></div>
+    <div style="display:flex;gap:4px">
+      <a href="index.html" class="hdr-act">Home</a>
+      <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
     </div>
   </div></div>
   <div class="main"><div class="sw"><div class="sc">
@@ -124,26 +135,33 @@ tr:hover td{background:#f9fafb}
 
 <div id="cfgScr">
   <div class="hdr"><div class="hdr-in">
-    <div><h1>📋 CentralView</h1><p>Manage projects</p></div>
-    <button class="btn btn-w" onclick="backToSetup()">← Back</button>
+    <div class="hdr-brand"><div class="hdr-logo">CV</div><div><h1>CentralView</h1><p>Manage projects</p></div></div>
+    <button class="hdr-act" onclick="backToSetup()">← Back</button>
   </div></div>
   <div class="main" style="max-width:620px;margin:0 auto"><div id="cfgList"></div></div>
 </div>
 
 <div id="dash">
   <div class="hdr"><div class="hdr-in">
-    <div><h1 id="dashTitle">📋 CentralView</h1><p id="dashMeta">Loading...</p></div>
-    <div class="hdr-btns">
-      <span id="versionBadge" style="font-size:11px;color:#c7d2fe;opacity:0.8"></span>
-      <span id="loadedAt" style="font-size:12px"></span>
-      <a href="index.html" class="btn btn-w">🏠 Home</a>
-      <a href="powersearch.html" target="_blank" class="btn btn-w">🔍 Power Search</a>
-      <a href="customerportal.html" target="_blank" class="btn btn-w">🌐 Customer Portal</a>
-      <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-w">🛠 PM Tools</a>
-      <button class="btn btn-w" id="refreshBtn" onclick="doRefresh()">↻ Refresh</button>
-      <button class="btn btn-w" onclick="showReleaseModal()">🚀 Release</button>
-      <button class="btn btn-w" onclick="showDiagModal()">🩺 Diagnose</button>
-      <button class="btn btn-w" onclick="showCfg()">⚙ Settings</button>
+    <div class="hdr-brand">
+      <div class="hdr-logo">CV</div>
+      <div><h1 id="dashTitle">CentralView</h1><p id="dashMeta">Loading...</p></div>
+    </div>
+    <div class="hdr-right">
+      <nav class="hdr-nav">
+        <a href="index.html">Home</a>
+        <a href="powersearch.html" target="_blank">Power Search</a>
+        <a href="customerportal.html" target="_blank">Customer Portal</a>
+        <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank">PM Tools</a>
+      </nav>
+      <div class="hdr-sep"></div>
+      <button class="hdr-act" id="refreshBtn" onclick="doRefresh()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>Refresh</button>
+      <button class="hdr-act hdr-act-hi" onclick="showReleaseModal()">Release</button>
+      <button class="hdr-act" onclick="showDiagModal()">Diagnose</button>
+      <button class="hdr-act" onclick="showCfg()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
+      <div class="hdr-sep"></div>
+      <span id="loadedAt" class="hdr-status"></span>
+      <span id="versionBadge" style="font-size:10px;color:#1e293b;margin-left:6px"></span>
     </div>
   </div></div>
   <div class="main">
@@ -492,7 +510,7 @@ function runMismatchScanBackground(){
 }
 
 async function doRefresh(){
-  var btn=document.getElementById('refreshBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
+  var btn=document.getElementById('refreshBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>Refreshing';
   try{localStorage.removeItem(CACHE_KEY);}catch(e){}
   S.zhIssueMap={};S.zhPipelines={};S.repoIds={};S.zhConnected=false;
   _scanResults=null;_uncheckedClosedResults=null;_lastScanTime=null;
@@ -506,7 +524,7 @@ async function doRefresh(){
     else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
   } catch(e){showErr('dashErr',e.message);}
   hideLoadingOverlay();
-  btn.disabled=false;btn.innerHTML='↻ Refresh';
+  btn.disabled=false;btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>Refresh';
   setTimeout(function(){runMismatchScanBackground();},0);
 }
 
@@ -582,7 +600,7 @@ async function loadIssues(){
   repoResults.forEach(function(r){open=open.concat(r.open);closed=closed.concat(r.closed);});
   S.issues=open;
   S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
-  document.getElementById('dashTitle').textContent='📋 CentralView '+(S.activeProfile?S.activeProfile.name+' Issues Hub':'Issues Hub');
+  document.getElementById('dashTitle').textContent='CentralView'+(S.activeProfile?' — '+S.activeProfile.name:'');
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
 }
 
@@ -1643,14 +1661,14 @@ function loadHistoricalData(){
         S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
         var age=Math.round((Date.now()-cache.savedAt)/60000);
         populateFilters();showDash();buildTabs();renderMain();
-        document.getElementById('dashTitle').textContent='📋 CentralView '+profile.name+' Issues Hub';
+        document.getElementById('dashTitle').textContent='CentralView — '+profile.name;
         document.getElementById('dashMeta').textContent=S.issues.length+' open issues — '+todayStr();
         setStatus('<span style="color:#fbbf24;font-size:14px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
         hideLoadingOverlay();
         bgRefresh();
       } else {
         showDash();
-        document.getElementById('dashTitle').textContent='📋 CentralView '+profile.name+' Issues Hub';
+        document.getElementById('dashTitle').textContent='CentralView — '+profile.name;
         document.getElementById('dashMeta').textContent='Loading...';
         setStatus('<span style="color:#fbbf24">⏳ Loading...</span>');
         showLoadingOverlay('Loading issues...');
