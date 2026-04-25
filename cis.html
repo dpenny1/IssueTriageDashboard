@@ -458,10 +458,8 @@ async function connect(){
     showLoadingOverlay('Loading issues...');
     try {
       await Promise.all([loadLabelColors(),loadIssues()]);
-      setLoMsg('Loading parent links...');
-      await loadSubIssueParents();
-      setLoMsg('Loading tracking bodies...');
-      await refreshTrackingBodies();
+      setLoMsg('Loading parent links & tracking bodies...');
+      await Promise.all([loadSubIssueParents(),refreshTrackingBodies()]);
       S.activeTab='exceptions';saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();
       hideLoadingOverlay();
       setTimeout(function(){runMismatchScanBackground();},0);
@@ -479,10 +477,8 @@ async function bgRefresh(){
   showLoadingOverlay('Refreshing issues...');
   try {
     await Promise.all([loadLabelColors(),loadIssues()]);
-    setLoMsg('Loading parent links...');
-    await loadSubIssueParents();
-    setLoMsg('Loading tracking bodies...');
-    await refreshTrackingBodies();
+    setLoMsg('Loading parent links & tracking bodies...');
+    await Promise.all([loadSubIssueParents(),refreshTrackingBodies()]);
     S.activeTab='exceptions';saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();
   } catch(e) {
     setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');
@@ -492,7 +488,7 @@ async function bgRefresh(){
 }
 
 function runMismatchScanBackground(){
-  runMismatchScan().then(function(){renderStats();if(S.activeTab==='report')renderReport();}).catch(function(e){console.error('Mismatch scan failed:',e);});
+  runMismatchScan().then(function(){renderStats();if(S.activeTab==='report')renderReport();}).catch(function(e){setStatus('<span style="color:#fca5a5">✕ Scan failed: '+esc(e.message)+'</span>');});
 }
 
 async function doRefresh(){
@@ -503,10 +499,8 @@ async function doRefresh(){
   showLoadingOverlay('Refreshing...');
   try {
     await Promise.all([loadLabelColors(),loadIssues()]);
-    setLoMsg('Loading parent links...');
-    await loadSubIssueParents();
-    setLoMsg('Loading tracking bodies...');
-    await refreshTrackingBodies();
+    setLoMsg('Loading parent links & tracking bodies...');
+    await Promise.all([loadSubIssueParents(),refreshTrackingBodies()]);
     S.activeTab='exceptions';saveCache();populateFilters();buildTabs();renderMain();
     if(S.zhToken&&S.zhWorkspace)zhLoad();
     else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
@@ -519,61 +513,68 @@ async function doRefresh(){
 function startAutoRefresh(){if(S.autoRefreshTimer)clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=setInterval(function(){doRefresh();},15*60*1000);}
 function stopAutoRefresh(){if(S.autoRefreshTimer){clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=null;}}
 
-async function loadLabelColors(){for(var i=0;i<S.repos.length;i++){try{var lb=await ghFetch('/repos/'+S.repos[i]+'/labels?per_page=100');lb.forEach(function(l){S.labelColors[l.name.toLowerCase()]=l.color;S.labelNames[l.name.toLowerCase()]=l.name;});}catch(e){}}}
-async function loadZHData(){S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){console.error('ZH',repo,e.message);}}S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});await loadZHDeps();}
+async function loadLabelColors(){await Promise.all(S.repos.map(async function(repo){try{var lb=await ghFetch('/repos/'+repo+'/labels?per_page=100');lb.forEach(function(l){S.labelColors[l.name.toLowerCase()]=l.color;S.labelNames[l.name.toLowerCase()]=l.name;});}catch(e){};}));}
+async function loadZHData(){S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){setStatus('<span style="color:#fca5a5">✕ ZenHub failed for '+esc(repo)+': '+esc(e.message)+'</span>');}}S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});await loadZHDeps();}
 async function loadZHDeps(){for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace,repoId=S.repoIds[repo];if(!S.zhToken||!ws||!repoId)continue;try{var ed=await zhGet('/p2/workspaces/'+ws+'/repositories/'+repoId+'/epics');for(var j=0;j<(ed.epic_issues||[]).length;j++){var ep=ed.epic_issues[j];try{var edet=await zhGet('/p2/workspaces/'+ws+'/repositories/'+(ep.repo_id||repoId)+'/epics/'+ep.issue_number);(edet.issues||[]).forEach(function(child){var cr=repoForId(child.repo_id)||repo;var ci=S.issues.find(function(iss){return iss.id===child.issue_number&&iss.repo===cr;});if(ci)ci.parent={issueNumber:ep.issue_number};});}catch(e){}}}catch(e){}}}
 function repoForId(id){return Object.keys(S.repoIds).find(function(r){return S.repoIds[r]===id;})||null;}
 
 async function loadSubIssueParents(){
   var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});
-  for(var i=0;i<parents.length;i++){
-    var p=parents[i];
-    try{var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child)child.parent={issueNumber:p.id};});}}
-    catch(e){console.log('[loadSubIssueParents] failed for #'+p.id+': '+e.message);}
-  }
+  await Promise.all(parents.map(async function(p){
+    try{
+      var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');
+      if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child)child.parent={issueNumber:p.id};});}
+    }catch(e){/* non-fatal: sub-issue links are best-effort */}
+  }));
 }
 async function refreshTrackingBodies(){
   var tracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
-  for(var i=0;i<tracking.length;i++){
-    try{var fresh=await ghFetch('/repos/'+tracking[i].repo+'/issues/'+tracking[i].id);tracking[i].body=fresh.body||'';}
-    catch(e){console.error('[refreshTrackingBodies] failed #'+tracking[i].id,e);}
-  }
+  await Promise.all(tracking.map(async function(item){
+    try{var fresh=await ghFetch('/repos/'+item.repo+'/issues/'+item.id);item.body=fresh.body||'';}
+    catch(e){/* non-fatal: tracking body refresh is best-effort */}
+  }));
+}
+function parseIssue(iss,repo,state){
+  var bodyParent=null;
+  if(iss.body){var pm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(pm)bodyParent={issueNumber:parseInt(pm[1])};}
+  var base={id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:state,pipeline:null,parent:bodyParent||null};
+  if(state==='open')base.subIssuesTotal=(iss.sub_issues_summary&&iss.sub_issues_summary.total)||0;
+  if(state==='closed'){base.closedAt=iss.closed_at;base.closedBy=(iss.closed_by&&iss.closed_by.login)||'';}
+  return base;
 }
 async function loadIssues(){
-  var open=[],closed=[];
-  for(var i=0;i<S.repos.length;i++){
-    var repo=S.repos[i];
-    var od=await ghFetchAll('/repos/'+repo+'/issues?state=open',10);
-    od.forEach(function(iss){
-      if(iss.pull_request)return;
-      var bodyParent=null;
-      if(iss.body){var pm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(pm)bodyParent={issueNumber:parseInt(pm[1])};}
-      open.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:iss.labels.map(function(l){return l.name;}),assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,url:iss.html_url,state:'open',pipeline:null,parent:bodyParent||null,subIssuesTotal:(iss.sub_issues_summary&&iss.sub_issues_summary.total)||0});
-    });
-    var since60=new Date(Date.now()-60*24*60*60*1000).toISOString();
-    var cd=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100&labels=cs+task+item&since='+since60);
-    if(!Array.isArray(cd))cd=[];
-    var taskItems=cd.filter(function(iss){return !iss.pull_request;}).slice(0,100);
-    var cd2=await ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=50&since='+since60);
-    if(!Array.isArray(cd2))cd2=[];
-    var count=0,seenIds={};
-    taskItems.forEach(function(iss){seenIds[iss.number]=1;});
-    for(var j=0;j<taskItems.length;j++){
-      var iss=taskItems[j];var lbls=iss.labels.map(function(l){return l.name;});
-      var closedBodyParent=null;
-      if(iss.body){var cpm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(cpm)closedBodyParent={issueNumber:parseInt(cpm[1])};}
-      closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:closedBodyParent||null});
-    }
+  var since60=new Date(Date.now()-60*24*60*60*1000).toISOString();
+  // Load all repos in parallel; each repo fires its 4 API calls simultaneously
+  var repoResults=await Promise.all(S.repos.map(async function(repo){
+    var results=await Promise.all([
+      ghFetchAll('/repos/'+repo+'/issues?state=open',10),
+      ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100&labels=cs+task+item&since='+since60),
+      ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=100&labels=cs+in+testing&since='+since60),
+      ghFetch('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&per_page=50&since='+since60)
+    ]);
+    var od=results[0];
+    var cd=Array.isArray(results[1])?results[1]:[];
+    var cdTesting=Array.isArray(results[2])?results[2]:[];
+    var cd2=Array.isArray(results[3])?results[3]:[];
+    var repoOpen=od.filter(function(i){return !i.pull_request;}).map(function(i){return parseIssue(i,repo,'open');});
+    var seenIds={};
+    var taskItems=cd.filter(function(i){return !i.pull_request;});
+    var testingItems=cdTesting.filter(function(i){return !i.pull_request;});
+    var repoClosed=[];
+    taskItems.forEach(function(iss){seenIds[iss.number]=1;repoClosed.push(parseIssue(iss,repo,'closed'));});
+    testingItems.forEach(function(iss){if(!seenIds[iss.number]){seenIds[iss.number]=1;repoClosed.push(parseIssue(iss,repo,'closed'));}});
+    var count=0;
     for(var j=0;j<cd2.length;j++){
       var iss=cd2[j];if(iss.pull_request||seenIds[iss.number])continue;
-      var lbls=iss.labels.map(function(l){return l.name;});
-      if(!lbls.some(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;}))continue;
-      var closedBodyParent=null;
-      if(iss.body){var cpm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(cpm)closedBodyParent={issueNumber:parseInt(cpm[1])};}
-      closed.push({id:iss.number,repo:repo,title:iss.title,body:iss.body||'',labels:lbls,assignees:iss.assignees.map(function(a){return a.login;}),createdAt:iss.created_at,closedAt:iss.closed_at,closedBy:(iss.closed_by&&iss.closed_by.login)||'',url:iss.html_url,state:'closed',pipeline:null,parent:closedBodyParent||null});
+      var lbls=iss.labels.map(function(l){return l.name.toLowerCase();});
+      if(!lbls.some(function(l){return CS_LABELS.indexOf(l)!==-1;}))continue;
+      seenIds[iss.number]=1;repoClosed.push(parseIssue(iss,repo,'closed'));
       if(++count>=50)break;
     }
-  }
+    return {open:repoOpen,closed:repoClosed};
+  }));
+  var open=[],closed=[];
+  repoResults.forEach(function(r){open=open.concat(r.open);closed=closed.concat(r.closed);});
   S.issues=open;
   S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
   document.getElementById('dashTitle').textContent='📋 CentralView '+(S.activeProfile?S.activeProfile.name+' Issues Hub':'Issues Hub');
@@ -1134,8 +1135,8 @@ async function runDiag(){
       } else if(closedAt&&closedAt<cutoff60){
         fail('The issue was closed <strong>'+daysSinceClosed+' days ago</strong>, which is outside the <strong>60-day load window</strong> for closed issues. The dashboard only loads closed issues updated within the last 60 days.');
       } else {
-        // Within window, has label — might be a 50-issue cap issue
-        fail('The issue appears it should qualify (closed within 60 days, has CS label) but was not loaded. The dashboard caps non-task-item closed CS issues at <strong>50 per repo</strong>. If your repo had more than 50 qualifying closed issues updated recently, this one may have been cut off. Try <strong>↻ Refresh</strong> and check again.');
+        // Within window, has label — stale cache most likely after the fix
+        fail('The issue appears it should qualify (closed within 60 days, has <code>cs in testing</code> label) but was not in the loaded data. This was likely due to a loading bug that has now been fixed (closed issues could be crowded out by high repo activity). Click <strong>↻ Refresh</strong> to reload — it should appear after that.');
       }
     }
 

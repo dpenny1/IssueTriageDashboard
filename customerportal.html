@@ -243,7 +243,7 @@ async function vaultUnlock(target){
   if(!pw){if(errEl)errEl.textContent='Enter a password.';}
   else{try{await Vault.unlock(pw);renderVaultPanel(target);}catch(e){if(errEl)errEl.textContent=e.message;}}
 }
-function vaultLockAll(){Vault.lock();_activeVaultTarget=null;var p=document.getElementById('vaultPanelGH');if(p)p.style.display='none';}
+function vaultLockAll(){Vault.lock();_activeVaultTarget=null;['GH','ZH'].forEach(function(t){var p=document.getElementById('vaultPanel'+t);if(p)p.style.display='none';});}
 async function vaultUse(target,name){
   try{
     var tok=await Vault.get(name);
