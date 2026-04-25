@@ -8,12 +8,14 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9fafb;color:#1a1a1a;min-height:100vh;font-size:15px}
-.hdr{background:linear-gradient(135deg,#1e1b4b 0%,#4338ca 60%,#6366f1 100%);padding:16px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
-.hdr-in{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.hdr h1{color:#fff;font-size:1.3rem;font-weight:800;margin:0}
-.hdr p{color:#c7d2fe;font-size:0.85rem;margin-top:2px}
-.btn-w{background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:9px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:all 0.15s}
-.btn-w:hover{background:rgba(255,255,255,0.32);transform:translateY(-1px)}
+.hdr{background:#0f172a;padding:0 24px;border-bottom:1px solid rgba(255,255,255,0.07)}
+.hdr-in{display:flex;align-items:center;justify-content:space-between;height:52px;gap:16px}
+.hdr-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.hdr-logo{width:26px;height:26px;background:#4338ca;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;letter-spacing:-0.5px;flex-shrink:0}
+.hdr h1{color:#f1f5f9;font-size:13.5px;font-weight:700;margin:0;letter-spacing:-0.01em}
+.hdr p{color:#475569;font-size:11px;margin-top:1px}
+.hdr-act{background:transparent;border:none;color:#cbd5e1;cursor:pointer;padding:5px 10px;border-radius:5px;font-size:12px;font-weight:600;transition:all 0.15s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;text-decoration:none}
+.hdr-act:hover{background:rgba(255,255,255,0.08);color:#fff;text-decoration:none}
 .btn-sm{padding:6px 12px;font-size:12px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:7px;cursor:pointer;font-weight:600}
 .btn-sm:hover{background:#f9fafb}
 .btn-p{background:#4338ca;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer}
@@ -56,8 +58,11 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 <body>
 <div class="hdr">
   <div class="hdr-in">
-    <div><h1>📋 CentralView Issue Triage Hub</h1><p>Select a project dashboard to get started</p></div>
-    <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn-w">🛠 PM Tools</a>
+    <div class="hdr-brand">
+      <div class="hdr-logo">CV</div>
+      <div><h1>CentralView</h1><p>Select a project dashboard to get started</p></div>
+    </div>
+    <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
   </div>
 </div>
 <div class="main">
