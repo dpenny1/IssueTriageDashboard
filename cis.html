@@ -106,13 +106,13 @@ tr:hover td{background:#f9fafb}
 
 <div id="loadingOverlay">
   <div class="lo-spin"></div>
-  <div class="lo-title">CentralView</div>
+  <div class="lo-title">CentralView GitHub Issue Triage</div>
   <div class="lo-msg" id="loMsg">Initializing...</div>
 </div>
 
 <div id="setup">
   <div class="hdr"><div class="hdr-in">
-    <div class="hdr-brand"><div class="hdr-logo">CV</div><div><h1>CentralView</h1><p>Select a project to get started</p></div></div>
+    <div class="hdr-brand"><div class="hdr-logo">CV</div><div><h1>CentralView GitHub Issue Triage</h1></div></div>
     <div style="display:flex;gap:4px">
       <a href="index.html" class="hdr-act">Home</a>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
@@ -135,7 +135,7 @@ tr:hover td{background:#f9fafb}
 
 <div id="cfgScr">
   <div class="hdr"><div class="hdr-in">
-    <div class="hdr-brand"><div class="hdr-logo">CV</div><div><h1>CentralView</h1><p>Manage projects</p></div></div>
+    <div class="hdr-brand"><div class="hdr-logo">CV</div><div><h1>CentralView GitHub Issue Triage</h1></div></div>
     <button class="hdr-act" onclick="backToSetup()">← Back</button>
   </div></div>
   <div class="main" style="max-width:620px;margin:0 auto"><div id="cfgList"></div></div>
@@ -145,7 +145,7 @@ tr:hover td{background:#f9fafb}
   <div class="hdr"><div class="hdr-in">
     <div class="hdr-brand">
       <div class="hdr-logo">CV</div>
-      <div><h1 id="dashTitle">CentralView</h1><p id="dashMeta">Loading...</p></div>
+      <div><h1 id="dashTitle">CentralView GitHub Issue Triage</h1><p id="dashMeta" style="display:none">Loading...</p></div>
     </div>
     <div class="hdr-right">
       <nav class="hdr-nav">
@@ -600,7 +600,7 @@ async function loadIssues(){
   repoResults.forEach(function(r){open=open.concat(r.open);closed=closed.concat(r.closed);});
   S.issues=open;
   S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
-  document.getElementById('dashTitle').textContent='CentralView'+(S.activeProfile?' — '+S.activeProfile.name:'');
+  document.getElementById('dashTitle').textContent='CentralView GitHub Issue Triage'+(S.activeProfile?' — '+S.activeProfile.name:'');
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
 }
 
@@ -1661,14 +1661,14 @@ function loadHistoricalData(){
         S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
         var age=Math.round((Date.now()-cache.savedAt)/60000);
         populateFilters();showDash();buildTabs();renderMain();
-        document.getElementById('dashTitle').textContent='CentralView — '+profile.name;
+        document.getElementById('dashTitle').textContent='CentralView GitHub Issue Triage — '+profile.name;
         document.getElementById('dashMeta').textContent=S.issues.length+' open issues — '+todayStr();
         setStatus('<span style="color:#fbbf24;font-size:14px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
         hideLoadingOverlay();
         bgRefresh();
       } else {
         showDash();
-        document.getElementById('dashTitle').textContent='CentralView — '+profile.name;
+        document.getElementById('dashTitle').textContent='CentralView GitHub Issue Triage — '+profile.name;
         document.getElementById('dashMeta').textContent='Loading...';
         setStatus('<span style="color:#fbbf24">⏳ Loading...</span>');
         showLoadingOverlay('Loading issues...');

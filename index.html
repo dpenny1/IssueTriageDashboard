@@ -60,7 +60,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
   <div class="hdr-in">
     <div class="hdr-brand">
       <div class="hdr-logo">CV</div>
-      <div><h1>CentralView</h1><p>Select a project dashboard to get started</p></div>
+      <div><h1>CentralView GitHub Issue Triage</h1></div>
     </div>
     <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
   </div>
@@ -326,14 +326,4 @@ function renderActiveBar(){
   var zhName=sessionStorage.getItem('cv_session_zh_name');
   var h='';
   if(ghName)h+='<div class="at-chip">🔑 GH: '+esc(ghName)+'<button onclick="unassignToken(\'gh\')" title="Remove">✕</button></div>';
-  if(zhName)h+='<div class="at-chip">🔑 ZH: '+esc(zhName)+'<button onclick="unassignToken(\'zh\')" title="Remove">✕</button></div>';
-  bar.innerHTML=h;
-  bar.style.display=(ghName||zhName)?'flex':'none';
-}
-
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-
-renderActiveBar();
-</script>
-</body>
-</html>
+  if(zhName)h+='<div class="at-chip">🔑 ZH: '+esc(zhNa
