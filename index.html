@@ -326,4 +326,12 @@ function renderActiveBar(){
   var zhName=sessionStorage.getItem('cv_session_zh_name');
   var h='';
   if(ghName)h+='<div class="at-chip">🔑 GH: '+esc(ghName)+'<button onclick="unassignToken(\'gh\')" title="Remove">✕</button></div>';
-  if(zhName)h+='<div class="at-chip">🔑 ZH: '+esc(zhNa
+  if(zhName)h+='<div class="at-chip">🔑 ZH: '+esc(zhName)+'<button onclick="unassignToken(\'zh\')" title="Remove">✕</button></div>';
+  bar.innerHTML=h;
+  bar.style.display=h?'flex':'none';
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+</script>
+</body>
+</html>
