@@ -21,7 +21,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .btn-p{background:#4338ca;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer}
 .btn-p:hover{background:#3730a3}
 .main{padding:40px 24px}
-.grid{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;max-width:900px;margin:0 auto}
+.grid{display:flex;flex-wrap:nowrap;gap:20px;justify-content:center;max-width:1150px;margin:0 auto}
 .card{background:#fff;border-radius:14px;padding:28px 32px;box-shadow:0 2px 8px rgba(0,0,0,0.07);border-top:4px solid transparent;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;text-decoration:none;color:inherit;flex:1;min-width:220px;max-width:260px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px}
 .card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.12)}
 .card-icon{font-size:2.6rem}
@@ -114,6 +114,13 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
   <div class="grid">
     <div class="section-label">Active Dashboards</div>
 
+    <a href="http://localhost:8765/TFS-Triage-Dashboard.html" target="_blank" class="card" style="border-top-color:#7c3aed">
+      <div class="card-icon">📋</div>
+      <div class="card-name">Financials</div>
+      <div class="card-desc">Financials Dashboard — no token required</div>
+      <span class="card-badge" style="background:#ede9fe;color:#5b21b6">Live</span>
+    </a>
+
     <a href="cis.html" class="card" style="border-top-color:#4338ca">
       <div class="card-icon">🛡️</div>
       <div class="card-name">CIS</div>
@@ -133,13 +140,6 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="card-name">Customer Portal</div>
       <div class="card-desc">Issues dashboard — tracking, search &amp; triage</div>
       <span class="card-badge" style="background:#d1fae5;color:#065f46">Live</span>
-    </a>
-
-    <a href="http://localhost:8765/TFS-Triage-Dashboard.html" target="_blank" class="card" style="border-top-color:#7c3aed">
-      <div class="card-icon">📋</div>
-      <div class="card-name">Financials</div>
-      <div class="card-desc">Financials Dashboard — no token required</div>
-      <span class="card-badge" style="background:#ede9fe;color:#5b21b6">Live</span>
     </a>
   </div>
 </div>
