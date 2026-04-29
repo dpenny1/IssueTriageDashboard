@@ -7,30 +7,37 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f0f9ff;color:#1a1a1a;min-height:100vh;font-size:15px}
-a{color:#0891b2;text-decoration:none}a:hover{text-decoration:underline}
-.hdr{background:linear-gradient(135deg,#0c4a6e 0%,#0891b2 60%,#22d3ee 100%);padding:16px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
-.hdr-in{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.hdr h1{color:#fff;font-size:1.3rem;font-weight:800;margin:0}
-.hdr p{color:#bae6fd;font-size:0.85rem;margin-top:2px}
-.hdr-btns{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9fafb;color:#1a1a1a;min-height:100vh;font-size:15px}
+a{color:#4338ca;text-decoration:none}a:hover{text-decoration:underline}
+.hdr{background:#0f172a;padding:0 24px;border-bottom:1px solid rgba(255,255,255,0.07)}
+.hdr-in{display:flex;align-items:center;justify-content:space-between;height:52px;gap:16px}
+.hdr-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.hdr-logo{width:26px;height:26px;background:#4338ca;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;letter-spacing:-0.5px;flex-shrink:0}
+.hdr h1{color:#f1f5f9;font-size:13.5px;font-weight:700;margin:0;letter-spacing:-0.01em}
+.hdr p{color:#475569;font-size:11px;margin-top:1px}
+.hdr-right{display:flex;align-items:center;gap:2px}
+.hdr-nav a{color:#cbd5e1;font-size:12px;font-weight:600;padding:5px 9px;border-radius:5px;text-decoration:none;transition:all 0.15s;white-space:nowrap;display:inline-block}
+.hdr-nav a:hover{color:#fff;background:rgba(255,255,255,0.08);text-decoration:none}
+.hdr-sep{width:1px;height:18px;background:rgba(255,255,255,0.12);margin:0 8px;flex-shrink:0}
+.hdr-act{background:transparent;border:none;color:#cbd5e1;cursor:pointer;padding:5px 10px;border-radius:5px;font-size:12px;font-weight:600;transition:all 0.15s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.hdr-act:hover{background:rgba(255,255,255,0.08);color:#fff}
+.hdr-act:disabled{opacity:0.4;cursor:not-allowed}
+.hdr-status{font-size:11px;color:#475569;white-space:nowrap;padding-left:4px}
 .main{padding:20px 24px 48px}
 .btn{border:none;border-radius:9px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all 0.15s}
-.btn-w{background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4)}
-.btn-w:hover{background:rgba(255,255,255,0.32);transform:translateY(-1px)}
 .btn-sm{padding:6px 12px;font-size:12px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:7px;cursor:pointer;font-weight:600}
 .btn-sm:hover:not(:disabled){background:#f9fafb}
-.btn-p{background:#0891b2;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer}
-.btn-p:hover{background:#0e7490}
-.btn-p:disabled{background:#7dd3fc;cursor:not-allowed}
+.btn-p{background:#4338ca;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer}
+.btn-p:hover{background:#3730a3}
+.btn-p:disabled{background:#a5b4fc;cursor:not-allowed}
 .btn-d{padding:6px 12px;font-size:12px;border:1px solid #fca5a5;background:#fff;color:#dc2626;border-radius:7px;cursor:pointer;font-weight:600}
 .sw{max-width:560px;margin:24px auto}
 .sc{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:24px 28px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
-.sc h2{font-size:1rem;font-weight:700;color:#0c4a6e;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e0f2fe}
+.sc h2{font-size:1rem;font-weight:700;color:#1e1b4b;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e5e7eb}
 .fg{margin-bottom:14px}
 .fg label{font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px}
 .fg input,.fg select{width:100%;padding:10px 13px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;background:#fff;color:#374151}
-.fg input:focus,.fg select:focus{border-color:#0891b2;box-shadow:0 0 0 3px rgba(8,145,178,0.1)}
+.fg input:focus,.fg select:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
 .hint{font-size:12px;color:#9ca3af;margin-top:4px}
 .err{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;color:#991b1b;font-size:13px;margin-top:10px}
 .sgrid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;justify-content:center}
@@ -38,45 +45,45 @@ a{color:#0891b2;text-decoration:none}a:hover{text-decoration:underline}
 .sc2:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,0.12)}
 .sn{font-size:2.8rem;font-weight:800;margin-bottom:4px}
 .sl{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em}
-.tw{display:flex;gap:0;border-bottom:2px solid #e0f2fe;margin-bottom:20px;width:100%}
+.tw{display:flex;gap:0;border-bottom:2px solid #e5e7eb;margin-bottom:20px;width:100%}
 .tab{padding:12px 0;font-size:13px;font-weight:600;border-radius:8px 8px 0 0;border:none;background:transparent;color:#6b7280;cursor:pointer;white-space:nowrap;flex:1;text-align:center}
-.tab.on{border:1px solid #bae6fd;border-bottom:2px solid #f0f9ff;background:#f0f9ff;color:#0891b2;margin-bottom:-2px;position:relative;z-index:1}
+.tab.on{border:1px solid #e5e7eb;border-bottom:2px solid #f9fafb;background:#f9fafb;color:#4338ca;margin-bottom:-2px;position:relative;z-index:1}
 .tc{margin-left:5px;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:700;background:#f3f4f6;color:#6b7280}
-.tab.on .tc{background:#e0f2fe;color:#0891b2}
+.tab.on .tc{background:#e0e7ff;color:#4338ca}
 .sb{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
-.sb input,.sb select{border:1px solid #e0f2fe;border-radius:8px;padding:8px 12px;font-size:13px;background:#fff;outline:none;color:#374151}
-.sb input:focus,.sb select:focus{border-color:#0891b2}
+.sb input,.sb select{border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:13px;background:#fff;outline:none;color:#374151}
+.sb input:focus,.sb select:focus{border-color:#6366f1}
 .gh{border-radius:10px 10px 0 0;padding:11px 16px;display:flex;align-items:center;justify-content:space-between}
 .gt{font-weight:700;font-size:14px;color:#fff}
 .gc{background:rgba(255,255,255,0.25);color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;margin-left:8px}
-.tw2{border:1px solid #e0f2fe;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;margin-bottom:24px}
+.tw2{border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;margin-bottom:24px}
 table{width:100%;border-collapse:collapse;text-align:left}
-thead{background:#f0f9ff;border-bottom:1px solid #e0f2fe}
+thead{background:#f9fafb;border-bottom:1px solid #e5e7eb}
 th{padding:9px 13px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#6b7280;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
-th:hover{background:#e0f2fe}
+th:hover{background:#f0f0f0}
 th .si{margin-left:3px;opacity:0.4;font-size:10px}
-th.sorted .si{opacity:1;color:#0891b2}
-td{padding:8px 13px;border-bottom:1px solid #f0f9ff;font-size:13px;vertical-align:middle}
+th.sorted .si{opacity:1;color:#4338ca}
+td{padding:8px 13px;border-bottom:1px solid #f3f4f6;font-size:13px;vertical-align:middle}
 tr:last-child td{border-bottom:none}
-tr:hover td{background:#f0f9ff}
+tr:hover td{background:#f9fafb}
 .badge{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600;display:inline-block}
 .er{text-align:center;color:#9ca3af;padding:28px;font-size:13px}
 .ao{color:#059669;font-weight:700}.aw{color:#d97706;font-weight:700}.ab{color:#dc2626;font-weight:700}
 .rw{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.07);overflow-x:auto}
 .es{background:#fff;border-radius:10px;padding:3rem;text-align:center;color:#9ca3af;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
 .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:sp 0.7s linear infinite;vertical-align:middle;margin-right:5px}
-.spd{border:2px solid #e0f2fe;border-top-color:#0891b2}
+.spd{border:2px solid #e5e7eb;border-top-color:#6366f1}
 @keyframes sp{to{transform:rotate(360deg)}}
-.vault-chip{display:inline-flex;align-items:center;gap:4px;background:#e0f2fe;border:1px solid #bae6fd;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#0c4a6e;cursor:pointer;border:none}
-.vault-chip:hover{background:#bae6fd}
+.vault-chip{display:inline-flex;align-items:center;gap:4px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3;cursor:pointer;border:none}
+.vault-chip:hover{background:#c7d2fe}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;overflow-y:auto}
 .modal-box{background:#fff;border-radius:14px;max-width:560px;margin:40px auto;padding:24px 28px;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
 #setup,#cfgScr,#dash{display:none}
-#loadingOverlay{position:fixed;inset:0;background:rgba(12,74,110,0.88);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;backdrop-filter:blur(3px)}
-#loadingOverlay .lo-spin{width:52px;height:52px;border:5px solid rgba(255,255,255,0.2);border-top-color:#7dd3fc;border-radius:50%;animation:sp 0.8s linear infinite}
+#loadingOverlay{position:fixed;inset:0;background:rgba(30,27,75,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;backdrop-filter:blur(3px)}
+#loadingOverlay .lo-spin{width:52px;height:52px;border:5px solid rgba(255,255,255,0.2);border-top-color:#a5b4fc;border-radius:50%;animation:sp 0.8s linear infinite}
 #loadingOverlay .lo-title{color:#fff;font-size:1.1rem;font-weight:700}
-#loadingOverlay .lo-msg{color:#bae6fd;font-size:13px;min-height:20px;text-align:center}
-.group-header{background:#e0f2fe;padding:8px 13px;font-size:12px;font-weight:700;color:#0c4a6e;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #bae6fd}
+#loadingOverlay .lo-msg{color:#c7d2fe;font-size:13px;min-height:20px;text-align:center}
+.group-header{background:#e0e7ff;padding:8px 13px;font-size:12px;font-weight:700;color:#1e1b4b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #c7d2fe}
 </style>
 </head>
 <body>
@@ -90,10 +97,10 @@ tr:hover td{background:#f0f9ff}
 <!-- Setup screen -->
 <div id="setup">
   <div class="hdr"><div class="hdr-in">
-    <div><h1>🔍 Power Search</h1></div>
-    <div style="display:flex;gap:10px">
-      <a href="index.html" class="btn btn-w">🏠 Home</a>
-      <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-w">🛠 PM Tools</a>
+    <div class="hdr-brand"><div class="hdr-logo">PS</div><div><h1>Power Search</h1></div></div>
+    <div style="display:flex;gap:4px">
+      <a href="index.html" class="hdr-act">Home</a>
+      <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
     </div>
   </div></div>
   <div class="main"><div class="sw">
@@ -104,7 +111,7 @@ tr:hover td{background:#f0f9ff}
           <input type="password" id="ghToken" placeholder="ghp_..." autocomplete="new-password" style="flex:1"/>
           <button class="vault-chip" onclick="toggleVault('gh')">🔒 Vault</button>
         </div>
-        <div id="vaultPanelGH" style="display:none;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px;margin-top:8px">
+        <div id="vaultPanelGH" style="display:none;background:#f5f3ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px;margin-top:8px">
           <div id="vaultInnerGH"></div>
         </div>
       </div>
@@ -121,7 +128,7 @@ tr:hover td{background:#f0f9ff}
     </div>
 
     <!-- Session token info -->
-    <div id="sessionTokenInfo" style="display:none;background:#e0f2fe;border:1px solid #bae6fd;border-radius:10px;padding:12px 16px;font-size:13px;color:#0c4a6e;margin-top:8px">
+    <div id="sessionTokenInfo" style="display:none;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px 16px;font-size:13px;color:#1e1b4b;margin-top:8px">
       🔑 Token pre-filled from vault session. <button class="btn-sm" style="font-size:11px;padding:2px 8px;margin-left:6px" onclick="clearSessionToken()">Clear</button>
     </div>
   </div></div>
@@ -130,8 +137,8 @@ tr:hover td{background:#f0f9ff}
 <!-- Config screen -->
 <div id="cfgScr">
   <div class="hdr"><div class="hdr-in">
-    <div><h1>🔍 Power Search</h1></div>
-    <button class="btn btn-w" onclick="backToSetup()">← Back</button>
+    <div class="hdr-brand"><div class="hdr-logo">PS</div><div><h1>Power Search</h1></div></div>
+    <button class="hdr-act" onclick="backToSetup()">← Back</button>
   </div></div>
   <div class="main" style="max-width:620px;margin:0 auto"><div id="cfgList"></div></div>
 </div>
@@ -139,15 +146,22 @@ tr:hover td{background:#f0f9ff}
 <!-- Dashboard screen -->
 <div id="dash">
   <div class="hdr"><div class="hdr-in">
-    <div><h1 id="dashTitle">🔍 Power Search</h1><p id="dashMeta" style="display:none">Loading...</p></div>
-    <div class="hdr-btns">
-      <span id="loadedAt" style="font-size:12px"></span>
-      <a href="index.html" class="btn btn-w">🏠 Home</a>
-      <a href="cis.html" target="_blank" class="btn btn-w">📋 CentralView</a>
-      <a href="customerportal.html" target="_blank" class="btn btn-w">🌐 Customer Portal</a>
-      <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="btn btn-w">🛠 PM Tools</a>
-      <button class="btn btn-w" id="refreshBtn" onclick="doRefresh()">↻ Refresh</button>
-      <button class="btn btn-w" onclick="showCfg()">⚙ Settings</button>
+    <div class="hdr-brand">
+      <div class="hdr-logo">PS</div>
+      <div><h1 id="dashTitle">Power Search</h1><p id="dashMeta" style="display:none">Loading...</p></div>
+    </div>
+    <div class="hdr-right">
+      <nav class="hdr-nav">
+        <a href="index.html">Home</a>
+        <a href="cis.html" target="_blank">CentralView</a>
+        <a href="customerportal.html" target="_blank">Customer Portal</a>
+        <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank">PM Tools</a>
+      </nav>
+      <div class="hdr-sep"></div>
+      <button class="hdr-act" id="refreshBtn" onclick="doRefresh()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>Refresh</button>
+      <button class="hdr-act" onclick="showCfg()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
+      <div class="hdr-sep"></div>
+      <span id="loadedAt" class="hdr-status"></span>
     </div>
   </div></div>
   <div class="main">
@@ -158,7 +172,7 @@ tr:hover td{background:#f0f9ff}
       <select id="filterLabel" onchange="renderMain()"><option value="">All labels</option></select>
       <select id="filterRepo" onchange="renderMain()"><option value="">All repos</option></select>
       <select id="filterAssignee" onchange="renderMain()"><option value="">All assignees</option></select>
-      <button onclick="clearFilters()" style="font-size:12px;color:#0891b2;background:none;border:none;cursor:pointer;text-decoration:underline;font-weight:600">Clear</button>
+      <button onclick="clearFilters()" style="font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;text-decoration:underline;font-weight:600">Clear</button>
     </div>
     <div id="dashErr" style="display:none;margin-bottom:12px"></div>
     <div id="mainContent"></div>
@@ -212,8 +226,8 @@ function renderVaultPanel(target){
   var h='';
   if(!Vault.isUnlocked()){
     h+='<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">🔒 Unlock Vault</div>';
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="password" id="vaultPw" placeholder="Master password..." autocomplete="new-password" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid #bae6fd;border-radius:8px;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')vaultUnlock(\''+target+'\')"/>';
-    h+='<button class="btn-sm" style="background:#0891b2;color:#fff;border-color:#0891b2" onclick="vaultUnlock(\''+target+'\')">Unlock</button></div>';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="password" id="vaultPw" placeholder="Master password..." autocomplete="new-password" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none" onkeydown="if(event.key===\'Enter\')vaultUnlock(\''+target+'\')"/>';
+    h+='<button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="vaultUnlock(\''+target+'\')">Unlock</button></div>';
     h+='<div id="vaultErr" style="font-size:12px;color:#dc2626;margin-top:6px;min-height:16px"></div>';
     h+='<div class="hint" style="margin-top:4px">New vault? Enter any password to create one.</div>';
   } else {
@@ -222,12 +236,12 @@ function renderVaultPanel(target){
     if(tokens.length){
       h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
       tokens.forEach(function(t){
-        var badge=t.type?'<span style="font-size:10px;padding:1px 6px;border-radius:999px;font-weight:700;background:#e0f2fe;color:#0c4a6e;margin-left:4px">'+t.type.toUpperCase()+'</span>':'<span style="font-size:10px;color:#f59e0b;font-weight:700;margin-left:4px">⚠</span>';
+        var badge=t.type?'<span style="font-size:10px;padding:1px 6px;border-radius:999px;font-weight:700;background:#e0e7ff;color:#1e1b4b;margin-left:4px">'+t.type.toUpperCase()+'</span>':'<span style="font-size:10px;color:#f59e0b;font-weight:700;margin-left:4px">⚠</span>';
         h+='<button class="vault-chip" onclick="vaultUse(\''+target+'\',\''+esc(t.name)+'\')">'+esc(t.name)+badge+' ▶</button>';
       });
       h+='</div>';
     } else {h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:8px">No tokens saved yet.</div>';}
-    h+='<div style="border-top:1px solid #e0f2fe;padding-top:10px"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Save New Token</div>';
+    h+='<div style="border-top:1px solid #e5e7eb;padding-top:10px"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Save New Token</div>';
     h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
     h+='<input type="text" id="vaultNewName_'+target+'" placeholder="Name" style="width:110px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>';
     h+='<select id="vaultNewType_'+target+'" style="padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;color:#374151"><option value="">Type...</option><option value="gh">GitHub (GH)</option><option value="zh">ZenHub (ZH)</option></select>';
@@ -321,9 +335,9 @@ function renderCfg(){
   if(profiles.length){
     h+='<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">';
     profiles.forEach(function(p){
-      h+='<div style="background:#fff;border:1px solid #e0f2fe;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.05)"><div style="display:flex;align-items:center;gap:10px"><div style="flex:1">';
-      h+='<div style="display:flex;align-items:center;gap:8px"><div style="font-size:14px;font-weight:700;color:#0c4a6e">'+esc(p.name)+'</div>';
-      if(p.type==='group')h+='<span class="badge" style="background:#e0f2fe;color:#0c4a6e">Group</span>';
+      h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.05)"><div style="display:flex;align-items:center;gap:10px"><div style="flex:1">';
+      h+='<div style="display:flex;align-items:center;gap:8px"><div style="font-size:14px;font-weight:700;color:#1e1b4b">'+esc(p.name)+'</div>';
+      if(p.type==='group')h+='<span class="badge" style="background:#e0e7ff;color:#1e1b4b">Group</span>';
       h+='</div>';
       if(p.type==='group')(p.repos||[]).forEach(function(r){h+='<div style="font-size:12px;color:#6b7280;margin-top:3px">• '+esc(r.repo)+'</div>';});
       else h+='<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(p.repo)+'</div>';
@@ -331,9 +345,9 @@ function renderCfg(){
     });
     h+='</div>';
   } else {h+='<div class="es" style="margin-bottom:20px">No projects yet. Add one below.</div>';}
-  h+='<div style="background:#fff;border:1px solid #e0f2fe;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">';
-  h+='<div style="font-size:15px;font-weight:700;color:#0c4a6e;margin-bottom:16px">Add Project</div>';
-  h+='<div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn-sm" id="ctS" onclick="showCfgTab(\'s\')" style="background:#0891b2;color:#fff;border-color:#0891b2">Individual Repo</button><button class="btn-sm" id="ctG" onclick="showCfgTab(\'g\')">Repo Group</button></div>';
+  h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">';
+  h+='<div style="font-size:15px;font-weight:700;color:#1e1b4b;margin-bottom:16px">Add Project</div>';
+  h+='<div style="display:flex;gap:8px;margin-bottom:16px"><button class="btn-sm" id="ctS" onclick="showCfgTab(\'s\')" style="background:#4338ca;color:#fff;border-color:#4338ca">Individual Repo</button><button class="btn-sm" id="ctG" onclick="showCfgTab(\'g\')">Repo Group</button></div>';
   h+='<div id="cfgS">';
   h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Display name</label><input type="text" id="pName" placeholder="e.g. Power Search" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
   h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">GitHub repo (owner/repo)</label><input type="text" id="pRepo" placeholder="e.g. myorg/powersearch" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
@@ -346,9 +360,9 @@ function renderCfg(){
   h+='<div id="gErr" style="display:none;margin-top:8px"></div><div style="margin-top:14px"><button class="btn-p" onclick="saveGroup()">Save group</button></div></div></div>';
   document.getElementById('cfgList').innerHTML=h;window._gr=[];
 }
-function showCfgTab(t){document.getElementById('cfgS').style.display=t==='s'?'block':'none';document.getElementById('cfgG').style.display=t==='g'?'block':'none';document.getElementById('ctS').style.cssText=t==='s'?'background:#0891b2;color:#fff;border-color:#0891b2':'';document.getElementById('ctG').style.cssText=t==='g'?'background:#0891b2;color:#fff;border-color:#0891b2':'';}
+function showCfgTab(t){document.getElementById('cfgS').style.display=t==='s'?'block':'none';document.getElementById('cfgG').style.display=t==='g'?'block':'none';document.getElementById('ctS').style.cssText=t==='s'?'background:#4338ca;color:#fff;border-color:#4338ca':'';document.getElementById('ctG').style.cssText=t==='g'?'background:#4338ca;color:#fff;border-color:#4338ca':'';}
 function addGRepo(){var r=document.getElementById('gRI').value.trim();if(!r){showErr('gErr','Repo required.');}else{if(!window._gr)window._gr=[];window._gr.push({repo:r});document.getElementById('gRI').value='';renderGRepos();}}
-function renderGRepos(){var el=document.getElementById('gRepoList');if(!el)return;if(!window._gr||!window._gr.length){el.innerHTML='<div style="font-size:12px;color:#9ca3af">No repos added yet.</div>';}else{el.innerHTML=window._gr.map(function(r,i){return '<div style="display:flex;align-items:center;gap:8px;background:#f0f9ff;border:1px solid #e0f2fe;border-radius:7px;padding:7px 10px;font-size:12px"><span style="flex:1;font-weight:600">'+esc(r.repo)+'</span><button class="btn-d" style="padding:2px 8px;font-size:11px" onclick="remGRepo('+i+')">✕</button></div>';}).join('');}}
+function renderGRepos(){var el=document.getElementById('gRepoList');if(!el)return;if(!window._gr||!window._gr.length){el.innerHTML='<div style="font-size:12px;color:#9ca3af">No repos added yet.</div>';}else{el.innerHTML=window._gr.map(function(r,i){return '<div style="display:flex;align-items:center;gap:8px;background:#f5f3ff;border:1px solid #e5e7eb;border-radius:7px;padding:7px 10px;font-size:12px"><span style="flex:1;font-weight:600">'+esc(r.repo)+'</span><button class="btn-d" style="padding:2px 8px;font-size:11px" onclick="remGRepo('+i+')">✕</button></div>';}).join('');}}
 function remGRepo(i){window._gr.splice(i,1);renderGRepos();}
 function saveGroup(){var n=document.getElementById('gName').value.trim();if(!n){showErr('gErr','Name required.');}else if(!window._gr||!window._gr.length){showErr('gErr','Add at least one repo.');}else{var p=loadProfiles();p.push({id:'ps_'+Date.now(),name:n,type:'group',repos:window._gr.slice()});saveProfiles(p);window._gr=[];renderCfg();}}
 function saveNewProfile(){var n=document.getElementById('pName').value.trim(),r=document.getElementById('pRepo').value.trim();if(!n||!r){showErr('pErr','Name and repo required.');}else{var p=loadProfiles();p.push({id:'ps_'+Date.now(),name:n,repo:r,type:'single'});saveProfiles(p);renderCfg();}}
@@ -435,7 +449,7 @@ async function connect(){
     S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
     var age=Math.round((Date.now()-cache.savedAt)/60000);
     populateFilters();showDash();buildTabs();renderMain();
-    setStatus('<span style="color:#fbbf24;font-size:13px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
+    setStatus('<span style="color:#f59e0b;font-size:13px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
     btn.disabled=false;btn.innerHTML='▶ Load Dashboard';
     bgRefresh();
   } else {
@@ -444,7 +458,7 @@ async function connect(){
       await loadLabelColors();
       await loadIssues();
       saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();
-      setStatus('<span style="color:#6ee7b7">✓ Loaded</span> &nbsp;<span style="color:#bae6fd;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
+      setStatus('<span style="color:#a5b4fc">✓ Loaded</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
     }catch(e){showErr('setupErr',e.message);}
     hideLoadingOverlay();
     btn.disabled=false;btn.innerHTML='▶ Load Dashboard';
@@ -457,7 +471,7 @@ async function bgRefresh(){
     S.labelColors={};S.labelNames={};
     await loadLabelColors();await loadIssues();
     saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();
-    setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#bae6fd;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
+    setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
   }catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}
   hideLoadingOverlay();
 }
@@ -470,7 +484,7 @@ async function doRefresh(){
     S.labelColors={};S.labelNames={};
     await loadLabelColors();await loadIssues();
     saveCache();populateFilters();buildTabs();renderMain();
-    setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#bae6fd;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
+    setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
   }catch(e){showErr('dashErr',e.message);}
   hideLoadingOverlay();
   btn.disabled=false;btn.innerHTML='↻ Refresh';
@@ -534,7 +548,7 @@ function renderStats(){
   var overdue=S.issues.filter(function(i){return ageDays(i.createdAt)>7;}).length;
   var unassigned=S.issues.filter(function(i){return i.assignees.length===0;}).length;
   var stats=[
-    {n:open,l:'Open Issues',c:'#0891b2',tab:'all'},
+    {n:open,l:'Open Issues',c:'#4338ca',tab:'all'},
     {n:overdue,l:'Overdue (>7d)',c:'#dc2626',tab:'overdue'},
     {n:unassigned,l:'Unassigned',c:'#d97706',tab:'unassigned'},
     {n:closed,l:'Closed (30d)',c:'#059669',tab:'closed'}
@@ -550,8 +564,8 @@ function renderStats(){
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 var TAB_DEFS=[
-  {id:'all',label:'All Open',color:'#0891b2'},
-  {id:'new',label:'New (<3d)',color:'#0e7490'},
+  {id:'all',label:'All Open',color:'#4338ca'},
+  {id:'new',label:'New (<3d)',color:'#0ea5e9'},
   {id:'overdue',label:'Overdue (>7d)',color:'#dc2626'},
   {id:'unassigned',label:'Unassigned',color:'#d97706'},
   {id:'bylabel',label:'By Label',color:'#7c3aed'},
@@ -615,8 +629,8 @@ function issueRow(iss,showClosed){
   var asgn=iss.assignees.length?iss.assignees.map(function(a){return '<span style="display:inline-flex;align-items:center;gap:3px"><img src="https://github.com/'+esc(a)+'.png?size=20" width="16" height="16" style="border-radius:50%;vertical-align:middle"/> '+esc(a)+'</span>';}).join(', '):'<span style="color:#9ca3af;font-style:italic">Unassigned</span>';
   var repoShort=iss.repo.split('/')[1]||iss.repo;
   var h='<tr>';
-  h+='<td><a href="'+esc(iss.url)+'" target="_blank" style="color:#0891b2;font-weight:600">#'+iss.id+'</a></td>';
-  h+='<td style="max-width:380px"><div style="font-weight:600;line-height:1.4"><a href="'+esc(iss.url)+'" target="_blank" style="color:#1a1a1a;text-decoration:none" onmouseover="this.style.color=\'#0891b2\'" onmouseout="this.style.color=\'#1a1a1a\'">'+esc(iss.title)+'</a></div>';
+  h+='<td><a href="'+esc(iss.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+iss.id+'</a></td>';
+  h+='<td style="max-width:380px"><div style="font-weight:600;line-height:1.4"><a href="'+esc(iss.url)+'" target="_blank" style="color:#1a1a1a;text-decoration:none" onmouseover="this.style.color=\'#4338ca\'" onmouseout="this.style.color=\'#1a1a1a\'">'+esc(iss.title)+'</a></div>';
   if(lbls)h+='<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">'+lbls+'</div>';
   h+='</td>';
   if(S.repos.length>1)h+='<td style="white-space:nowrap;color:#6b7280;font-size:12px">'+esc(repoShort)+'</td>';
@@ -636,7 +650,7 @@ function issueRow(iss,showClosed){
 function openTable(issues,emptyMsg){
   if(!issues.length)return '<div class="es">'+esc(emptyMsg||'No issues found.')+'</div>';
   var multiRepo=S.repos.length>1;
-  var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#0c4a6e,#0891b2)"><span class="gt">Issues <span class="gc">'+issues.length+'</span></span></div>';
+  var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)"><span class="gt">Issues <span class="gc">'+issues.length+'</span></span></div>';
   h+='<div class="tw2"><table><thead><tr>';
   h+='<th onclick="thClick(\'id\')"'+thCls('id')+'>No.'+thArrow('id')+'</th>';
   h+='<th onclick="thClick(\'title\')"'+thCls('title')+'>Title'+thArrow('title')+'</th>';
