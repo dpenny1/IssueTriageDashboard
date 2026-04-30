@@ -255,7 +255,7 @@ var Vault=(function(){
 
 // ── Tile config ───────────────────────────────────────────────────────────────
 var TILE_CONFIG={
-  financials:{href:'http://localhost:8765/TFS-Triage-Dashboard.html',icon:'📋',name:'Financials',accentClass:'amber',required:['tfs']},
+  financials:{href:'http://localhost:8765/TFS-Triage-Dashboard.html',icon:'📋',name:'Financials',accentClass:'amber',required:[]},
   cis:{href:'cis.html',icon:'🛡️',name:'CIS',accentClass:'',required:['gh','zh']},
   powersearch:{href:'powersearch.html',icon:'🔍',name:'Power Search',accentClass:'',required:['gh','zh']},
   customerportal:{href:'customerportal.html',icon:'🌐',name:'Customer Portal',accentClass:'',required:['gh','zh']}
@@ -270,8 +270,14 @@ function saveFinancialsSettingsFromForm(){
     server:document.getElementById('fs_server').value.trim().replace(/\/+$/,''),
     collection:document.getElementById('fs_collection').value.trim()||'DefaultCollection',
     project:document.getElementById('fs_project').value.trim(),
-    user:document.getElementById('fs_user').value.trim()
+    user:document.getElementById('fs_user').value.trim(),
+    password:document.getElementById('fs_password').value
   };
+  // Don't overwrite a saved password with blank if user left field empty
+  if(!s.password){
+    var existing=loadFinancialsSettings();
+    if(existing.password)s.password=existing.password;
+  }
   localStorage.setItem(FINANCIALS_KEY,JSON.stringify(s));
   var msg=document.getElementById('settingsSaveMsg');
   msg.style.color='#059669';msg.textContent='✓ Settings saved';
@@ -322,14 +328,17 @@ function renderTileChips(){
       if(name){
         h+='<span class="ttok-chip ttok-set'+(cfg.accentClass?' '+cfg.accentClass:'')+'" title="'+esc(TYPE_LABELS[type]||type)+' token assigned">'+esc(name)+'</span>';
       } else {
-        h+='<span class="ttok-chip ttok-unset">'+(type==='tfs'?'Password':'GH'==='gh'?'GitHub':esc(type.toUpperCase()))+' not set</span>';
+        h+='<span class="ttok-chip ttok-unset">'+(type==='tfs'?'Password':type==='gh'?'GitHub':esc(type.toUpperCase()))+' not set</span>';
       }
     });
-    // Financials: also show connection settings preview if configured
+    // Financials: show project chip and password status
     if(id==='financials'){
       var fs=loadFinancialsSettings();
       if(fs.project){
         h+='<span class="ttok-chip" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a" title="TFS project">'+esc(fs.project)+'</span>';
+      }
+      if(!fs.password){
+        h+='<span class="ttok-chip ttok-unset">No password</span>';
       }
     }
     el.innerHTML=h;
@@ -339,7 +348,8 @@ function renderTileChips(){
 // ── Tile click → launch ───────────────────────────────────────────────────────
 function openTile(id){
   var cfg=TILE_CONFIG[id];
-  if(!Vault.isUnlocked()){
+  // Only gate on vault if this tile actually needs vault tokens
+  if(cfg.required.length>0&&!Vault.isUnlocked()){
     var vaultBody=document.getElementById('vaultBody');
     vaultBody.style.display='block';
     var vaultBar=document.getElementById('vaultBar');
@@ -367,7 +377,7 @@ async function launchTile(id){
   var card=document.getElementById('tile-'+id);
   if(card)card.style.opacity='0.7';
   try{
-    var tfsPass='';
+    // Decrypt and push vault tokens into sessionStorage (GH tiles)
     for(var i=0;i<cfg.required.length;i++){
       var type=cfg.required[i];
       var name=asgn[type];
@@ -375,7 +385,6 @@ async function launchTile(id){
       if(!value)throw new Error('Could not decrypt '+name);
       sessionStorage.setItem('cv_session_'+type,value);
       sessionStorage.setItem('cv_session_'+type+'_name',name);
-      if(type==='tfs')tfsPass=value;
     }
     // Build destination URL
     var href=cfg.href;
@@ -386,7 +395,7 @@ async function launchTile(id){
       if(fs.collection)h+='&cv_collection='+encodeURIComponent(fs.collection);
       if(fs.project)h+='&cv_project='+encodeURIComponent(fs.project);
       if(fs.user)h+='&cv_user='+encodeURIComponent(fs.user);
-      if(tfsPass)h+='&cv_pass='+encodeURIComponent(tfsPass);
+      if(fs.password)h+='&cv_pass='+encodeURIComponent(fs.password);
       href=cfg.href+h;
     }
     window.location.href=href;
@@ -416,11 +425,10 @@ function openSettings(id,event){
     body+='<input class="slot-input" id="fs_project" placeholder="YourProject" value="'+esc(fs.project||'')+'"/></div>';
     body+='<div class="modal-slot"><label class="slot-label">Domain\\User</label>';
     body+='<input class="slot-input" id="fs_user" placeholder="DOMAIN\\username" value="'+esc(fs.user||'')+'"/></div>';
-    var tfsTokenName=Vault.getByType('tfs');
-    body+='<div class="info-box">🔑 <strong>Password:</strong> ';
-    if(tfsTokenName){body+='Using vault token <strong>'+esc(tfsTokenName)+'</strong>';}
-    else{body+='No TFS token in vault — add one via the Token Vault above.';}
-    body+='</div>';
+    body+='<div class="modal-slot"><label class="slot-label">Password</label>';
+    body+='<input class="slot-input" type="password" id="fs_password" placeholder="Leave blank to keep saved password" autocomplete="new-password"/></div>';
+    if(fs.password){body+='<div class="info-box">🔑 Password is saved — enter a new one above to replace it.</div>';}
+    else{body+='<div class="info-box" style="color:#d97706;border-color:#fde68a;background:#fffbeb">⚠ No password saved yet — enter one above and save.</div>';}
     body+='<div id="settingsSaveMsg" style="font-size:12px;margin-top:8px;min-height:16px"></div>';
     actions='<button class="btn-cancel" onclick="closeSettings()">Cancel</button>';
     actions+='<button class="btn-launch amber" onclick="saveFinancialsSettingsFromForm()">Save Settings</button>';
@@ -474,9 +482,8 @@ async function unlockVault(){
     document.getElementById('vaultLockBtn').style.display='inline-flex';
     document.getElementById('vaultIcon').textContent='🔓';
     document.getElementById('vaultTileHint').style.display='none';
-    var tokens=Vault.list().filter(function(t){return t.type&&t.type!=='asana';});
-    document.getElementById('vaultStatusText').textContent='Vault unlocked — '+tokens.length+' token'+(tokens.length!==1?'s':'')+' assigned to tiles';
     autoAssignFromVault();
+    document.getElementById('vaultStatusText').textContent=vaultStatusMsg();
     renderVaultTokenList();
   }catch(e){
     document.getElementById('vaultPwErr').textContent=e.message;
@@ -538,8 +545,7 @@ async function idxVaultSave(){
       msg.textContent='';
       renderVaultTokenList();
       autoAssignFromVault();
-      var active=Vault.list().filter(function(t){return t.type&&t.type!=='asana';});
-      document.getElementById('vaultStatusText').textContent='Vault unlocked — '+active.length+' token'+(active.length!==1?'s':'')+' assigned to tiles';
+      document.getElementById('vaultStatusText').textContent=vaultStatusMsg();
     },800);
   }catch(e){msg.style.color='#dc2626';msg.textContent=e.message;}
 }
@@ -549,8 +555,20 @@ function idxVaultDel(name){
   Vault.del(name);
   renderVaultTokenList();
   autoAssignFromVault();
-  var active=Vault.list().filter(function(t){return t.type&&t.type!=='asana';});
-  document.getElementById('vaultStatusText').textContent='Vault unlocked — '+active.length+' token'+(active.length!==1?'s':'')+' assigned to tiles';
+  document.getElementById('vaultStatusText').textContent=vaultStatusMsg();
+}
+
+// ── Vault token count (only types required by at least one tile) ──────────────
+function countActiveVaultTokens(){
+  var needed=[];
+  Object.keys(TILE_CONFIG).forEach(function(id){
+    TILE_CONFIG[id].required.forEach(function(t){if(needed.indexOf(t)<0)needed.push(t);});
+  });
+  return Vault.list().filter(function(t){return t.type&&needed.indexOf(t.type)>=0;}).length;
+}
+function vaultStatusMsg(){
+  var n=countActiveVaultTokens();
+  return'Vault unlocked — '+n+' token'+(n!==1?'s':'')+' assigned to tiles';
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
