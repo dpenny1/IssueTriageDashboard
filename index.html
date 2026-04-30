@@ -22,40 +22,78 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .btn-p:hover{background:#3730a3}
 .main{padding:40px 24px}
 .grid{display:flex;flex-wrap:nowrap;gap:20px;justify-content:center;max-width:1150px;margin:0 auto}
-.card{background:#fff;border-radius:14px;padding:28px 32px;box-shadow:0 2px 8px rgba(0,0,0,0.07);border-top:4px solid transparent;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;text-decoration:none;color:inherit;flex:1;min-width:220px;max-width:260px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px}
+
+/* Card tiles */
+.card{background:#fff;border-radius:14px;padding:28px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.07);border-top:4px solid transparent;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;color:inherit;flex:1;min-width:220px;max-width:260px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;user-select:none}
 .card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.12)}
+.card:focus-visible{outline:3px solid #6366f1;outline-offset:2px}
 .card-icon{font-size:2.6rem}
 .card-name{font-size:1.1rem;font-weight:800;color:#1e1b4b}
 .card-desc{font-size:12px;color:#9ca3af;font-weight:500}
-.card-badge{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:700;margin-top:4px}
-.coming{opacity:0.5;cursor:default;pointer-events:none}
-.section-label{width:100%;max-width:900px;margin:0 auto 16px;font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;padding:0 4px}
+.card-badge{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:700}
+
+/* Tile token chips (on card) */
+.tile-tokens{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:2px;width:100%}
+.ttok-chip{font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;line-height:1.6;white-space:nowrap}
+.ttok-set{background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe}
+.ttok-set.amber{background:#fef3c7;color:#92400e;border-color:#fde68a}
+.ttok-unset{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+.tile-configure{font-size:10px;color:#9ca3af;font-weight:500;margin-top:1px}
 
 /* Vault widget */
-.vault-bar{background:#fff;border:1px solid #e0e7ff;border-radius:14px;padding:18px 24px;max-width:900px;margin:0 auto 32px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.vault-bar{background:#fff;border:1px solid #e0e7ff;border-radius:14px;padding:18px 24px;max-width:900px;margin:0 auto 32px;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:box-shadow 0.3s}
+.vault-bar.pulse{box-shadow:0 0 0 3px #6366f1,0 2px 8px rgba(0,0,0,0.06)}
 .vault-bar-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .vault-bar-title{font-size:13px;font-weight:700;color:#1e1b4b;display:flex;align-items:center;gap:7px}
 .vault-status{font-size:12px;color:#6b7280}
 .vault-body{margin-top:14px;display:none}
-.vault-tokens{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
-.vault-token-chip{display:flex;align-items:center;gap:8px;background:#f8f7ff;border:1px solid #c7d2fe;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;color:#3730a3}
-.vault-token-chip button{background:none;border:none;cursor:pointer;font-size:11px;color:#6b7280;padding:0}
-.vault-token-chip button:hover{color:#4338ca}
-.tok-active{background:#e0fdf4;border-color:#6ee7b7;color:#065f46}
-.tok-badge{font-size:10px;padding:2px 7px;border-radius:999px;font-weight:700;background:#e0e7ff;color:#3730a3;margin-left:4px}
-.tok-badge.active{background:#d1fae5;color:#065f46}
 .pw-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .pw-row input{flex:1;min-width:180px;padding:9px 13px;border:1px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none}
 .pw-row input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
 .err-msg{font-size:12px;color:#dc2626;margin-top:5px;min-height:16px}
 .hint{font-size:12px;color:#9ca3af;margin-top:4px}
-.active-tokens{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.at-chip{display:inline-flex;align-items:center;gap:5px;background:#e0fdf4;border:1px solid #6ee7b7;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#065f46}
-.at-chip button{background:none;border:none;cursor:pointer;font-size:11px;color:#059669;padding:0;line-height:1}
-.at-chip button:hover{color:#dc2626}
+
+/* Vault token chips (in vault panel) */
+.vault-tokens{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.vtok{display:inline-flex;align-items:center;gap:7px;background:#f8f7ff;border:1px solid #c7d2fe;border-radius:9px;padding:7px 12px;font-size:13px;font-weight:600;color:#3730a3}
+.vtok.zh{background:#f0fdf4;border-color:#86efac;color:#15803d}
+.vtok.tfs{background:#fffbeb;border-color:#fde68a;color:#92400e}
+.vtok.asana{background:#fdf4ff;border-color:#e9d5ff;color:#7e22ce}
+.vtok.untagged{background:#f9fafb;border-color:#e5e7eb;color:#6b7280}
+.vtok-badge{font-size:10px;padding:1px 7px;border-radius:999px;font-weight:700;background:#e0e7ff;color:#3730a3}
+.vtok-badge.zh{background:#dcfce7;color:#15803d}
+.vtok-badge.tfs{background:#fef3c7;color:#92400e}
+.vtok-badge.asana{background:#f3e8ff;color:#7e22ce}
+
+/* Tile modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);z-index:1000;align-items:center;justify-content:center}
+.modal-box{background:#fff;border-radius:16px;padding:32px;max-width:460px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative}
+.modal-head{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #f1f5f9}
+.modal-icon{font-size:2rem;line-height:1}
+.modal-name{font-size:1.1rem;font-weight:800;color:#1e1b4b}
+.modal-sub{font-size:11px;color:#9ca3af;margin-top:2px}
+.modal-slot{margin-bottom:14px}
+.slot-label{font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px}
+.req-pill{font-size:10px;padding:1px 7px;background:#fee2e2;color:#dc2626;border-radius:999px;margin-left:5px;font-weight:700}
+.slot-select{width:100%;padding:9px 12px;border:1.5px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none;color:#1e1b4b;background:#fff;cursor:pointer}
+.slot-select:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
+.slot-empty{font-size:12px;color:#9ca3af;background:#f9fafb;border:1px dashed #d1d5db;border-radius:7px;padding:8px 12px}
+.modal-actions{display:flex;gap:10px;margin-top:22px;align-items:center}
+.btn-launch{background:#4338ca;color:#fff;border:none;border-radius:8px;padding:11px 22px;font-size:14px;font-weight:700;cursor:pointer;flex:1;transition:background 0.15s}
+.btn-launch:hover:not(:disabled){background:#3730a3}
+.btn-launch:disabled{opacity:0.45;cursor:not-allowed}
+.btn-launch.amber{background:#d97706}
+.btn-launch.amber:hover:not(:disabled){background:#b45309}
+.btn-cancel{background:#fff;color:#6b7280;border:1px solid #d1d5db;border-radius:8px;padding:11px 16px;font-size:13px;font-weight:600;cursor:pointer}
+.btn-cancel:hover{background:#f9fafb}
+.modal-hint{font-size:11px;color:#9ca3af;margin-top:10px;text-align:center}
+.modal-err{font-size:12px;color:#dc2626;margin-top:8px;min-height:16px;text-align:center}
+.modal-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:18px;color:#9ca3af;cursor:pointer;line-height:1;padding:4px}
+.modal-close:hover{color:#374151}
 </style>
 </head>
 <body>
+
 <div class="hdr">
   <div class="hdr-in">
     <div class="hdr-brand">
@@ -65,23 +103,24 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
     <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
   </div>
 </div>
+
 <div class="main">
 
   <!-- Vault Widget -->
-  <div class="vault-bar">
+  <div class="vault-bar" id="vaultBar">
     <div class="vault-bar-top">
       <div class="vault-bar-title">
         <span id="vaultIcon" onclick="toggleVaultWidget()" title="Toggle vault" style="cursor:pointer">🔒</span> Token Vault
-        <span class="vault-status" id="vaultStatusText">Unlock to pre-fill tokens for any dashboard</span>
+        <span class="vault-status" id="vaultStatusText">Unlock to assign tokens to dashboards</span>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <div class="active-tokens" id="activeTokensBar" style="display:none"></div>
-        <button class="btn-sm" id="vaultLockBtn" style="display:none;border-color:#fca5a5;color:#dc2626" onclick="lockVaultWidget()">🔒 Lock</button>
+        <button class="btn-sm" id="vaultLockBtn" style="display:none;border-color:#fca5a5;color:#dc2626" onclick="lockVaultWidget()">🔒 Lock Vault</button>
       </div>
     </div>
     <div class="vault-body" id="vaultBody">
       <!-- Locked state -->
       <div id="vaultLockForm">
+        <div id="vaultTileHint" style="display:none;font-size:12px;font-weight:600;color:#4338ca;background:#e0e7ff;border-radius:8px;padding:8px 12px;margin-bottom:10px"></div>
         <div class="pw-row">
           <input type="password" id="vaultPwInput" placeholder="Master password..." autocomplete="new-password" onkeydown="if(event.key==='Enter')unlockVault()"/>
           <button class="btn-p" onclick="unlockVault()">Unlock</button>
@@ -91,7 +130,8 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       </div>
       <!-- Unlocked state -->
       <div id="vaultUnlockedPanel" style="display:none">
-        <div id="vaultTokenList"></div>
+        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Vault tokens — click a tile card to assign:</div>
+        <div id="vaultTokenList" class="vault-tokens"></div>
         <div style="border-top:1px solid #e5e7eb;margin-top:14px;padding-top:14px">
           <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">➕ Add New Token</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -100,6 +140,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
               <option value="">Type...</option>
               <option value="gh">GitHub (GH)</option>
               <option value="zh">ZenHub (ZH)</option>
+              <option value="tfs">TFS</option>
               <option value="asana">Asana</option>
             </select>
             <input type="password" id="idxNewTok" placeholder="Token value" autocomplete="new-password" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>
@@ -111,34 +152,74 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
     </div>
   </div>
 
+  <!-- Tile Grid -->
   <div class="grid">
-    <a href="http://localhost:8765/TFS-Triage-Dashboard.html" class="card" style="border-top-color:#d97706;background:#fffbeb;">
+
+    <div class="card" style="border-top-color:#d97706;background:#fffbeb" id="tile-financials"
+         onclick="openTile('financials')" role="button" tabindex="0"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openTile('financials')">
       <div class="card-icon">📋</div>
       <div class="card-name">Financials</div>
-      <div class="card-desc">Financials Dashboard — no token required</div>
+      <div class="card-desc">Financials Dashboard</div>
       <span class="card-badge" style="background:#fef3c7;color:#92400e">Live</span>
-    </a>
+      <div class="tile-tokens" id="tile-tokens-financials"></div>
+      <div class="tile-configure" id="tile-cfg-financials"></div>
+    </div>
 
-    <a href="cis.html" class="card" style="border-top-color:#4338ca">
+    <div class="card" style="border-top-color:#4338ca" id="tile-cis"
+         onclick="openTile('cis')" role="button" tabindex="0"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openTile('cis')">
       <div class="card-icon">🛡️</div>
       <div class="card-name">CIS</div>
       <div class="card-desc">CS Issues Hub — tracking, patches, exceptions &amp; weekly report</div>
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
-    </a>
+      <div class="tile-tokens" id="tile-tokens-cis"></div>
+      <div class="tile-configure" id="tile-cfg-cis"></div>
+    </div>
 
-    <a href="powersearch.html" class="card" style="border-top-color:#4338ca">
+    <div class="card" style="border-top-color:#4338ca" id="tile-powersearch"
+         onclick="openTile('powersearch')" role="button" tabindex="0"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openTile('powersearch')">
       <div class="card-icon">🔍</div>
       <div class="card-name">Power Search</div>
       <div class="card-desc">Issues dashboard — tracking, search &amp; triage</div>
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
-    </a>
+      <div class="tile-tokens" id="tile-tokens-powersearch"></div>
+      <div class="tile-configure" id="tile-cfg-powersearch"></div>
+    </div>
 
-    <a href="customerportal.html" class="card" style="border-top-color:#4338ca">
+    <div class="card" style="border-top-color:#4338ca" id="tile-customerportal"
+         onclick="openTile('customerportal')" role="button" tabindex="0"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openTile('customerportal')">
       <div class="card-icon">🌐</div>
       <div class="card-name">Customer Portal</div>
       <div class="card-desc">Issues dashboard — tracking, search &amp; triage</div>
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
-    </a>
+      <div class="tile-tokens" id="tile-tokens-customerportal"></div>
+      <div class="tile-configure" id="tile-cfg-customerportal"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Tile Launch Modal -->
+<div class="modal-overlay" id="tileModal" onclick="if(event.target===this)closeTileModal()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeTileModal()" title="Close">✕</button>
+    <div class="modal-head">
+      <div class="modal-icon" id="modalIcon"></div>
+      <div>
+        <div class="modal-name" id="modalTitle"></div>
+        <div class="modal-sub" id="modalSub">Assign tokens then launch</div>
+      </div>
+    </div>
+    <div id="modalSlots"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeTileModal()">Cancel</button>
+      <button class="btn-launch" id="modalLaunchBtn" onclick="launchTile()" disabled>Launch ↗</button>
+    </div>
+    <div class="modal-err" id="modalErr"></div>
+    <div class="modal-hint">Need more tokens? Close and add them via the Token Vault above.</div>
   </div>
 </div>
 
@@ -153,27 +234,76 @@ var Vault=(function(){
   function save(d){localStorage.setItem(KEY,JSON.stringify(d));_data=d;}
   return{
     isUnlocked:function(){return _pw!==null;},
-    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}}  _pw=pw;_data=data;},
+    unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}} _pw=pw;_data=data;},
     lock:function(){_pw=null;_data=[];},
     list:function(){return _data.map(function(e){return {name:e.name,type:e.type||''};});},
     get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
     add:async function(name,tok,type){if(_data.find(function(e){return e.name===name;}))throw new Error('Name already exists');var enc=await encrypt(tok,_pw);save(_data.concat([{name:name,enc:enc,type:type||''}]));},
-    setType:function(name,type){var d=_data.map(function(e){return e.name===name?{name:e.name,enc:e.enc,type:type}:e;});save(d);},
-    rename:function(oldName,newName){var d=_data.map(function(e){return e.name===oldName?{name:newName,enc:e.enc,type:e.type||''}:e;});save(d);},
     del:function(name){save(_data.filter(function(e){return e.name!==name;}));}
   };
 })();
 
-var SESSION_GH='cv_session_gh',SESSION_ZH='cv_session_zh';
+// ── Tile config ───────────────────────────────────────────────────────────────
+var TILE_CONFIG={
+  financials:{href:'http://localhost:8765/TFS-Triage-Dashboard.html',icon:'📋',name:'Financials',accentClass:'amber',required:['tfs']},
+  cis:{href:'cis.html',icon:'🛡️',name:'CIS',accentClass:'',required:['gh','zh']},
+  powersearch:{href:'powersearch.html',icon:'🔍',name:'Power Search',accentClass:'',required:['gh','zh']},
+  customerportal:{href:'customerportal.html',icon:'🌐',name:'Customer Portal',accentClass:'',required:['gh','zh']}
+};
 
-function getSessionTokens(){
-  return{gh:sessionStorage.getItem(SESSION_GH)||null,zh:sessionStorage.getItem(SESSION_ZH)||null};
+var TYPE_LABELS={gh:'GitHub',zh:'ZenHub',tfs:'TFS',asana:'Asana'};
+
+// ── Per-tile token assignments ────────────────────────────────────────────────
+var ASSIGN_KEY='cv_tile_assignments_v1';
+function loadAssignments(){try{var v=localStorage.getItem(ASSIGN_KEY);return v?JSON.parse(v):{};}catch(e){return{};}}
+function saveAssignments(a){try{localStorage.setItem(ASSIGN_KEY,JSON.stringify(a));}catch(e){}}
+function getTileAssignment(id){return loadAssignments()[id]||{};}
+function setTileSlot(tileId,type,tokenName){
+  var a=loadAssignments();
+  if(!a[tileId])a[tileId]={};
+  if(tokenName)a[tileId][type]=tokenName;
+  else delete a[tileId][type];
+  saveAssignments(a);
+}
+function tileIsReady(id){
+  var asgn=getTileAssignment(id);
+  return TILE_CONFIG[id].required.every(function(t){return!!asgn[t];});
 }
 
+// ── Render tile chips on all cards ───────────────────────────────────────────
+function renderTileChips(){
+  Object.keys(TILE_CONFIG).forEach(function(id){
+    var el=document.getElementById('tile-tokens-'+id);
+    var cfgEl=document.getElementById('tile-cfg-'+id);
+    if(!el)return;
+    var cfg=TILE_CONFIG[id];
+    var asgn=getTileAssignment(id);
+    var allSet=true;
+    var h='';
+    cfg.required.forEach(function(type){
+      var name=asgn[type];
+      if(name){
+        h+='<span class="ttok-chip ttok-set'+( cfg.accentClass?' '+cfg.accentClass:'')+'" title="'+esc(TYPE_LABELS[type]||type)+' token assigned">'+esc(TYPE_LABELS[type])+': '+esc(name)+'</span>';
+      } else {
+        allSet=false;
+        h+='<span class="ttok-chip ttok-unset" title="'+esc(TYPE_LABELS[type]||type)+' token not assigned">'+esc(TYPE_LABELS[type])+' not set</span>';
+      }
+    });
+    el.innerHTML=h;
+    if(cfgEl){
+      if(allSet){
+        cfgEl.textContent='';
+      } else {
+        cfgEl.textContent='Click to assign tokens';
+      }
+    }
+  });
+}
+
+// ── Vault widget UI ───────────────────────────────────────────────────────────
 function toggleVaultWidget(){
   var body=document.getElementById('vaultBody');
-  var open=body.style.display==='block';
-  body.style.display=open?'none':'block';
+  body.style.display=body.style.display==='block'?'none':'block';
 }
 
 async function unlockVault(){
@@ -187,9 +317,9 @@ async function unlockVault(){
     document.getElementById('vaultUnlockedPanel').style.display='block';
     document.getElementById('vaultLockBtn').style.display='inline-flex';
     document.getElementById('vaultIcon').textContent='🔓';
-    document.getElementById('vaultStatusText').textContent='Vault unlocked — assign tokens below';
-    renderTokenList();
-    renderActiveBar();
+    document.getElementById('vaultStatusText').textContent='Vault unlocked — click a tile to assign tokens';
+    document.getElementById('vaultTileHint').style.display='none';
+    renderVaultTokenList();
   }catch(e){
     document.getElementById('vaultPwErr').textContent=e.message;
   }
@@ -197,84 +327,37 @@ async function unlockVault(){
 
 function lockVaultWidget(){
   Vault.lock();
-  sessionStorage.removeItem(SESSION_GH);
-  sessionStorage.removeItem(SESSION_ZH);
   document.getElementById('vaultLockForm').style.display='block';
   document.getElementById('vaultUnlockedPanel').style.display='none';
   document.getElementById('vaultLockBtn').style.display='none';
   document.getElementById('vaultBody').style.display='none';
   document.getElementById('vaultIcon').textContent='🔒';
-  document.getElementById('vaultStatusText').textContent='Unlock to pre-fill tokens for any dashboard';
+  document.getElementById('vaultStatusText').textContent='Unlock to assign tokens to dashboards';
   document.getElementById('vaultPwInput').value='';
-  document.getElementById('activeTokensBar').style.display='none';
-  renderActiveBar();
+  document.getElementById('vaultTileHint').style.display='none';
 }
 
-function renderTokenList(){
+function renderVaultTokenList(){
   var tokens=Vault.list();
   var el=document.getElementById('vaultTokenList');
-  if(!tokens.length){el.innerHTML='<div style="font-size:13px;color:#9ca3af">No tokens found. Add tokens from a dashboard first.</div>';return;}
-  var ghName=sessionStorage.getItem('cv_session_gh_name')||null;
-  var zhName=sessionStorage.getItem('cv_session_zh_name')||null;
-  var tagged=tokens.filter(function(t){return t.type;});
-  var untagged=tokens.filter(function(t){return !t.type;});
+  if(!tokens.length){
+    el.innerHTML='<div style="font-size:13px;color:#9ca3af">No tokens yet. Add one below.</div>';
+    return;
+  }
   var h='';
-  if(tagged.length){
-    h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Tagged tokens — click to load into session:</div>';
-    h+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">';
-    tagged.forEach(function(t){
-      var isActive=(t.type==='gh'&&ghName===t.name)||(t.type==='zh'&&zhName===t.name);
-      var typeBg=t.type==='gh'?'#e0e7ff':'#d1fae5';
-      var typeColor=t.type==='gh'?'#3730a3':'#065f46';
-      var typeBorder=t.type==='gh'?'#c7d2fe':'#6ee7b7';
-      h+='<div style="display:flex;align-items:center;gap:6px;background:'+(isActive?typeBg:'#f9fafb')+';border:1px solid '+(isActive?typeBorder:'#e5e7eb')+';border-radius:9px;padding:8px 12px">';
-      h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;border-color:#fca5a5;color:#dc2626" onclick="idxVaultDel(\''+esc(t.name)+'\')" title="Delete token">🗑</button>';
-      h+='<span style="font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;background:'+typeBg+';color:'+typeColor+'">'+t.type.toUpperCase()+'</span>';
-      h+='<span style="font-size:13px;font-weight:600;color:#1e1b4b">'+esc(t.name)+'</span>';
-      if(isActive){
-        h+='<span style="font-size:11px;color:'+typeColor+';font-weight:700">✓ Active</span>';
-        h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;border-color:#fca5a5;color:#dc2626" onclick="unassignToken(\''+t.type+'\')">Remove</button>';
-      } else {
-        h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;background:#4338ca;color:#fff;border-color:#4338ca" onclick="assignToken(\''+esc(t.name)+'\',\''+t.type+'\')">Use</button>';
-      }
-      h+='</div>';
-    });
-    h+='</div>';
-  }
-  if(untagged.length){
-    h+='<div style="font-size:12px;color:#9ca3af;margin-bottom:6px">⚠ These tokens have no type tag — open a dashboard vault to tag them as GH or ZH:</div>';
-    h+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
-    untagged.forEach(function(t){
-      h+='<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:7px;padding:6px 10px;font-size:12px;color:#6b7280;font-weight:600;display:flex;align-items:center;gap:8px">';
-      h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;border-color:#fca5a5;color:#dc2626" onclick="idxVaultDel(\''+esc(t.name)+'\')" title="Delete token">🗑</button>';
-      h+=esc(t.name)+' <span style="font-weight:400;color:#9ca3af">untagged</span>';
-      h+='</div>';
-    });
-    h+='</div>';
-  }
-  el.innerHTML=h;
-}
-
-async function assignToken(name,type){
-  try{
-    var tok=await Vault.get(name);
-    if(type==='gh'){
-      sessionStorage.setItem(SESSION_GH,tok);
-      sessionStorage.setItem('cv_session_gh_name',name);
-    } else {
-      sessionStorage.setItem(SESSION_ZH,tok);
-      sessionStorage.setItem('cv_session_zh_name',name);
+  tokens.forEach(function(t){
+    var typeClass=t.type||'untagged';
+    var badgeClass=t.type?(' '+typeClass):'';
+    var typeLabel=t.type?TYPE_LABELS[t.type]||t.type:'untagged';
+    h+='<div class="vtok '+typeClass+'">';
+    h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;border-color:#fca5a5;color:#dc2626" onclick="idxVaultDel(\''+esc(t.name)+'\')" title="Delete">🗑</button>';
+    if(t.type){
+      h+='<span class="vtok-badge'+badgeClass+'">'+esc(typeLabel)+'</span>';
     }
-    renderTokenList();
-    renderActiveBar();
-  }catch(e){alert('Failed: '+e.message);}
-}
-
-function unassignToken(type){
-  if(type==='gh'){sessionStorage.removeItem(SESSION_GH);sessionStorage.removeItem('cv_session_gh_name');}
-  else{sessionStorage.removeItem(SESSION_ZH);sessionStorage.removeItem('cv_session_zh_name');}
-  renderTokenList();
-  renderActiveBar();
+    h+='<span style="font-size:13px;font-weight:600;color:inherit">'+esc(t.name)+'</span>';
+    h+='</div>';
+  });
+  el.innerHTML=h;
 }
 
 async function idxVaultSave(){
@@ -287,56 +370,145 @@ async function idxVaultSave(){
   try{
     await Vault.add(name,tok,type);
     msg.style.color='#059669';
-    msg.textContent='"'+name+'" saved!'+(type?' Tagged as '+type.toUpperCase()+'.':'');
+    msg.textContent='"'+name+'" saved!'+(type?' Tagged as '+(TYPE_LABELS[type]||type)+'.':'');
     document.getElementById('idxNewName').value='';
     document.getElementById('idxNewType').value='';
     document.getElementById('idxNewTok').value='';
-    setTimeout(function(){msg.textContent='';renderTokenList();},800);
+    setTimeout(function(){msg.textContent='';renderVaultTokenList();},800);
   }catch(e){msg.style.color='#dc2626';msg.textContent=e.message;}
 }
 
 function idxVaultDel(name){
-  if(!confirm('Delete "'+name+'"?'))return;
+  if(!confirm('Delete "'+name+'" from vault?'))return;
   Vault.del(name);
-  ['gh','zh','asana'].forEach(function(type){
-    if(sessionStorage.getItem('cv_session_'+type+'_name')===name){
-      sessionStorage.removeItem('cv_session_'+type);
-      sessionStorage.removeItem('cv_session_'+type+'_name');
-    }
+  // Remove from tile assignments if used
+  var a=loadAssignments();
+  Object.keys(a).forEach(function(tileId){
+    Object.keys(a[tileId]).forEach(function(type){
+      if(a[tileId][type]===name)delete a[tileId][type];
+    });
   });
-  renderTokenList();
-  renderActiveBar();
+  saveAssignments(a);
+  renderVaultTokenList();
+  renderTileChips();
 }
 
-function idxVaultRename(name){
-  var newName=prompt('Rename "'+name+'" to:',name);
-  if(!newName||newName===name)return;
-  newName=newName.trim();
-  if(!newName)return;
+// ── Tile launch modal ─────────────────────────────────────────────────────────
+var _currentTile=null;
+
+function openTile(id){
+  if(!Vault.isUnlocked()){
+    // Direct user to unlock vault
+    var vaultBody=document.getElementById('vaultBody');
+    vaultBody.style.display='block';
+    var vaultBar=document.getElementById('vaultBar');
+    vaultBar.scrollIntoView({behavior:'smooth',block:'center'});
+    vaultBar.classList.add('pulse');
+    setTimeout(function(){vaultBar.classList.remove('pulse');},1800);
+    var hint=document.getElementById('vaultTileHint');
+    hint.textContent='Unlock the vault to assign tokens to '+TILE_CONFIG[id].name;
+    hint.style.display='block';
+    setTimeout(function(){document.getElementById('vaultPwInput').focus();},400);
+    return;
+  }
+  _currentTile=id;
+  renderTileModal(id);
+  document.getElementById('tileModal').style.display='flex';
+}
+
+function closeTileModal(){
+  document.getElementById('tileModal').style.display='none';
+  _currentTile=null;
+}
+
+function renderTileModal(id){
+  var cfg=TILE_CONFIG[id];
+  var asgn=getTileAssignment(id);
   var tokens=Vault.list();
-  if(tokens.find(function(t){return t.name===newName;})){alert('"'+newName+'" already exists.');return;}
-  Vault.rename(name,newName);
-  ['gh','zh','asana'].forEach(function(type){
-    if(sessionStorage.getItem('cv_session_'+type+'_name')===name){
-      sessionStorage.setItem('cv_session_'+type+'_name',newName);
-    }
-  });
-  renderTokenList();
-  renderActiveBar();
-}
 
-function renderActiveBar(){
-  var bar=document.getElementById('activeTokensBar');
-  var ghName=sessionStorage.getItem('cv_session_gh_name');
-  var zhName=sessionStorage.getItem('cv_session_zh_name');
+  document.getElementById('modalIcon').textContent=cfg.icon;
+  document.getElementById('modalTitle').textContent=cfg.name;
+  document.getElementById('modalErr').textContent='';
+
+  // Style launch button for financials (amber) vs others (indigo)
+  var launchBtn=document.getElementById('modalLaunchBtn');
+  if(cfg.accentClass==='amber'){launchBtn.classList.add('amber');}else{launchBtn.classList.remove('amber');}
+  launchBtn.textContent='Launch ↗';
+
   var h='';
-  if(ghName)h+='<div class="at-chip">🔑 GH: '+esc(ghName)+'<button onclick="unassignToken(\'gh\')" title="Remove">✕</button></div>';
-  if(zhName)h+='<div class="at-chip">🔑 ZH: '+esc(zhName)+'<button onclick="unassignToken(\'zh\')" title="Remove">✕</button></div>';
-  bar.innerHTML=h;
-  bar.style.display=h?'flex':'none';
+  cfg.required.forEach(function(type){
+    var label=TYPE_LABELS[type]||type;
+    var ofType=tokens.filter(function(t){return t.type===type;});
+    var assigned=asgn[type]||'';
+    h+='<div class="modal-slot">';
+    h+='<label class="slot-label">'+label+' token <span class="req-pill">required</span></label>';
+    if(ofType.length===0){
+      h+='<div class="slot-empty">No '+esc(label)+' tokens in vault — add one above first</div>';
+    } else {
+      h+='<select class="slot-select" data-type="'+type+'" onchange="onModalSlotChange(this)">';
+      h+='<option value="">— select '+esc(label)+' token —</option>';
+      ofType.forEach(function(t){
+        h+='<option value="'+esc(t.name)+'"'+(assigned===t.name?' selected':'')+'>'+esc(t.name)+'</option>';
+      });
+      h+='</select>';
+    }
+    h+='</div>';
+  });
+  document.getElementById('modalSlots').innerHTML=h;
+
+  updateLaunchBtn();
 }
 
+function onModalSlotChange(sel){
+  if(!_currentTile)return;
+  var type=sel.getAttribute('data-type');
+  var name=sel.value||null;
+  setTileSlot(_currentTile,type,name);
+  renderTileChips();
+  updateLaunchBtn();
+}
+
+function updateLaunchBtn(){
+  var btn=document.getElementById('modalLaunchBtn');
+  var ready=_currentTile&&tileIsReady(_currentTile);
+  btn.disabled=!ready;
+  btn.title=ready?'':'Assign all required tokens first';
+}
+
+async function launchTile(){
+  if(!_currentTile)return;
+  var id=_currentTile;
+  var cfg=TILE_CONFIG[id];
+  var asgn=getTileAssignment(id);
+  var btn=document.getElementById('modalLaunchBtn');
+  var errEl=document.getElementById('modalErr');
+  btn.textContent='Opening…';
+  btn.disabled=true;
+  errEl.textContent='';
+  try{
+    // Decrypt each required token and place in sessionStorage
+    for(var i=0;i<cfg.required.length;i++){
+      var type=cfg.required[i];
+      var tokenName=asgn[type];
+      if(!tokenName)throw new Error('Missing '+(TYPE_LABELS[type]||type)+' token assignment');
+      var value=await Vault.get(tokenName);
+      if(!value)throw new Error('Could not decrypt token "'+tokenName+'"');
+      sessionStorage.setItem('cv_session_'+type,value);
+      sessionStorage.setItem('cv_session_'+type+'_name',tokenName);
+    }
+    window.location.href=cfg.href;
+  }catch(e){
+    btn.textContent='Launch ↗';
+    btn.disabled=false;
+    errEl.textContent='Error: '+e.message;
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+renderTileChips();
 </script>
 </body>
 </html>
