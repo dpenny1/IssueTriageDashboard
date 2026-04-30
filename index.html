@@ -13,7 +13,6 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .hdr-brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .hdr-logo{width:26px;height:26px;background:#4338ca;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;letter-spacing:-0.5px;flex-shrink:0}
 .hdr h1{color:#f1f5f9;font-size:13.5px;font-weight:700;margin:0;letter-spacing:-0.01em}
-.hdr p{color:#475569;font-size:11px;margin-top:1px}
 .hdr-act{background:transparent;border:none;color:#cbd5e1;cursor:pointer;padding:5px 10px;border-radius:5px;font-size:12px;font-weight:600;transition:all 0.15s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;text-decoration:none}
 .hdr-act:hover{background:rgba(255,255,255,0.08);color:#fff;text-decoration:none}
 .btn-sm{padding:6px 12px;font-size:12px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:7px;cursor:pointer;font-weight:600}
@@ -32,13 +31,12 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .card-desc{font-size:12px;color:#9ca3af;font-weight:500}
 .card-badge{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:700}
 
-/* Tile token chips (on card) */
+/* Tile token chips */
 .tile-tokens{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:2px;width:100%}
 .ttok-chip{font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;line-height:1.6;white-space:nowrap}
 .ttok-set{background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe}
 .ttok-set.amber{background:#fef3c7;color:#92400e;border-color:#fde68a}
 .ttok-unset{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
-.tile-configure{font-size:10px;color:#9ca3af;font-weight:500;margin-top:1px}
 
 /* Vault widget */
 .vault-bar{background:#fff;border:1px solid #e0e7ff;border-radius:14px;padding:18px 24px;max-width:900px;margin:0 auto 32px;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:box-shadow 0.3s}
@@ -53,8 +51,8 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .err-msg{font-size:12px;color:#dc2626;margin-top:5px;min-height:16px}
 .hint{font-size:12px;color:#9ca3af;margin-top:4px}
 
-/* Vault token chips (in vault panel) */
-.vault-tokens{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+/* Vault token list */
+.vault-tokens{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px}
 .vtok{display:inline-flex;align-items:center;gap:7px;background:#f8f7ff;border:1px solid #c7d2fe;border-radius:9px;padding:7px 12px;font-size:13px;font-weight:600;color:#3730a3}
 .vtok.zh{background:#f0fdf4;border-color:#86efac;color:#15803d}
 .vtok.tfs{background:#fffbeb;border-color:#fde68a;color:#92400e}
@@ -65,31 +63,11 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .vtok-badge.tfs{background:#fef3c7;color:#92400e}
 .vtok-badge.asana{background:#f3e8ff;color:#7e22ce}
 
-/* Tile modal */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);z-index:1000;align-items:center;justify-content:center}
-.modal-box{background:#fff;border-radius:16px;padding:32px;max-width:460px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative}
-.modal-head{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #f1f5f9}
-.modal-icon{font-size:2rem;line-height:1}
-.modal-name{font-size:1.1rem;font-weight:800;color:#1e1b4b}
-.modal-sub{font-size:11px;color:#9ca3af;margin-top:2px}
-.modal-slot{margin-bottom:14px}
-.slot-label{font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px}
-.req-pill{font-size:10px;padding:1px 7px;background:#fee2e2;color:#dc2626;border-radius:999px;margin-left:5px;font-weight:700}
-.slot-select{width:100%;padding:9px 12px;border:1.5px solid #c7d2fe;border-radius:8px;font-size:13px;outline:none;color:#1e1b4b;background:#fff;cursor:pointer}
-.slot-select:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
-.slot-empty{font-size:12px;color:#9ca3af;background:#f9fafb;border:1px dashed #d1d5db;border-radius:7px;padding:8px 12px}
-.modal-actions{display:flex;gap:10px;margin-top:22px;align-items:center}
-.btn-launch{background:#4338ca;color:#fff;border:none;border-radius:8px;padding:11px 22px;font-size:14px;font-weight:700;cursor:pointer;flex:1;transition:background 0.15s}
-.btn-launch:hover:not(:disabled){background:#3730a3}
-.btn-launch:disabled{opacity:0.45;cursor:not-allowed}
-.btn-launch.amber{background:#d97706}
-.btn-launch.amber:hover:not(:disabled){background:#b45309}
-.btn-cancel{background:#fff;color:#6b7280;border:1px solid #d1d5db;border-radius:8px;padding:11px 16px;font-size:13px;font-weight:600;cursor:pointer}
-.btn-cancel:hover{background:#f9fafb}
-.modal-hint{font-size:11px;color:#9ca3af;margin-top:10px;text-align:center}
-.modal-err{font-size:12px;color:#dc2626;margin-top:8px;min-height:16px;text-align:center}
-.modal-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:18px;color:#9ca3af;cursor:pointer;line-height:1;padding:4px}
-.modal-close:hover{color:#374151}
+/* Toast */
+#toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(10px);background:#1e1b4b;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity 0.2s,transform 0.2s;pointer-events:none;z-index:2000;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.warn{background:#b45309}
+#toast.err{background:#dc2626}
 </style>
 </head>
 <body>
@@ -111,13 +89,14 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
     <div class="vault-bar-top">
       <div class="vault-bar-title">
         <span id="vaultIcon" onclick="toggleVaultWidget()" title="Toggle vault" style="cursor:pointer">🔒</span> Token Vault
-        <span class="vault-status" id="vaultStatusText">Unlock to assign tokens to dashboards</span>
+        <span class="vault-status" id="vaultStatusText">Unlock to load tokens into tiles</span>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn-sm" id="vaultLockBtn" style="display:none;border-color:#fca5a5;color:#dc2626" onclick="lockVaultWidget()">🔒 Lock Vault</button>
       </div>
     </div>
     <div class="vault-body" id="vaultBody">
+
       <!-- Locked state -->
       <div id="vaultLockForm">
         <div id="vaultTileHint" style="display:none;font-size:12px;font-weight:600;color:#4338ca;background:#e0e7ff;border-radius:8px;padding:8px 12px;margin-bottom:10px"></div>
@@ -126,17 +105,18 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
           <button class="btn-p" onclick="unlockVault()">Unlock</button>
         </div>
         <div class="err-msg" id="vaultPwErr"></div>
-        <div class="hint">Tokens saved in your vault on any dashboard are available here.</div>
+        <div class="hint">Tokens are automatically assigned to tiles on unlock — one per type.</div>
       </div>
+
       <!-- Unlocked state -->
       <div id="vaultUnlockedPanel" style="display:none">
-        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Vault tokens — click a tile card to assign:</div>
+        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Vault tokens — one per type, auto-assigned to tiles on unlock:</div>
         <div id="vaultTokenList" class="vault-tokens"></div>
         <div style="border-top:1px solid #e5e7eb;margin-top:14px;padding-top:14px">
-          <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">➕ Add New Token</div>
+          <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">➕ Add / Replace Token</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <input type="text" id="idxNewName" placeholder="Name" style="width:120px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"/>
-            <select id="idxNewType" style="padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;color:#374151">
+            <select id="idxNewType" style="padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;color:#374151" onchange="onTypeSelectChange()">
               <option value="">Type...</option>
               <option value="gh">GitHub (GH)</option>
               <option value="zh">ZenHub (ZH)</option>
@@ -144,8 +124,9 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
               <option value="asana">Asana</option>
             </select>
             <input type="password" id="idxNewTok" placeholder="Token value" autocomplete="new-password" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>
-            <button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="idxVaultSave()">＋ Save</button>
+            <button class="btn-sm" id="idxSaveBtn" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="idxVaultSave()">＋ Save</button>
           </div>
+          <div id="idxTypeWarning" style="font-size:11px;color:#d97706;font-weight:600;margin-top:4px;display:none">⚠ A token of this type already exists — saving will replace it.</div>
           <div id="idxSaveMsg" style="font-size:12px;margin-top:5px;min-height:16px"></div>
         </div>
       </div>
@@ -163,7 +144,6 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="card-desc">Financials Dashboard</div>
       <span class="card-badge" style="background:#fef3c7;color:#92400e">Live</span>
       <div class="tile-tokens" id="tile-tokens-financials"></div>
-      <div class="tile-configure" id="tile-cfg-financials"></div>
     </div>
 
     <div class="card" style="border-top-color:#4338ca" id="tile-cis"
@@ -174,7 +154,6 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="card-desc">CS Issues Hub — tracking, patches, exceptions &amp; weekly report</div>
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
       <div class="tile-tokens" id="tile-tokens-cis"></div>
-      <div class="tile-configure" id="tile-cfg-cis"></div>
     </div>
 
     <div class="card" style="border-top-color:#4338ca" id="tile-powersearch"
@@ -185,7 +164,6 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="card-desc">Issues dashboard — tracking, search &amp; triage</div>
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
       <div class="tile-tokens" id="tile-tokens-powersearch"></div>
-      <div class="tile-configure" id="tile-cfg-powersearch"></div>
     </div>
 
     <div class="card" style="border-top-color:#4338ca" id="tile-customerportal"
@@ -196,32 +174,13 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="card-desc">Issues dashboard — tracking, search &amp; triage</div>
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
       <div class="tile-tokens" id="tile-tokens-customerportal"></div>
-      <div class="tile-configure" id="tile-cfg-customerportal"></div>
     </div>
 
   </div>
 </div>
 
-<!-- Tile Launch Modal -->
-<div class="modal-overlay" id="tileModal" onclick="if(event.target===this)closeTileModal()">
-  <div class="modal-box">
-    <button class="modal-close" onclick="closeTileModal()" title="Close">✕</button>
-    <div class="modal-head">
-      <div class="modal-icon" id="modalIcon"></div>
-      <div>
-        <div class="modal-name" id="modalTitle"></div>
-        <div class="modal-sub" id="modalSub">Assign tokens then launch</div>
-      </div>
-    </div>
-    <div id="modalSlots"></div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeTileModal()">Cancel</button>
-      <button class="btn-launch" id="modalLaunchBtn" onclick="launchTile()" disabled>Launch ↗</button>
-    </div>
-    <div class="modal-err" id="modalErr"></div>
-    <div class="modal-hint">Need more tokens? Close and add them via the Token Vault above.</div>
-  </div>
-</div>
+<!-- Toast notification -->
+<div id="toast"></div>
 
 <script>
 // ── Vault (AES-GCM) ───────────────────────────────────────────────────────────
@@ -236,9 +195,18 @@ var Vault=(function(){
     isUnlocked:function(){return _pw!==null;},
     unlock:async function(pw){var data=load();if(data.length){try{await decrypt(data[0].enc,pw);}catch(e){throw new Error('Incorrect password');}} _pw=pw;_data=data;},
     lock:function(){_pw=null;_data=[];},
-    list:function(){return _data.map(function(e){return {name:e.name,type:e.type||''};});},
+    list:function(){return _data.map(function(e){return{name:e.name,type:e.type||''};});},
     get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
-    add:async function(name,tok,type){if(_data.find(function(e){return e.name===name;}))throw new Error('Name already exists');var enc=await encrypt(tok,_pw);save(_data.concat([{name:name,enc:enc,type:type||''}]));},
+    // Add a token; if a typed token already exists for that type, replace it
+    upsertByType:async function(name,tok,type){
+      var enc=await encrypt(tok,_pw);
+      var existing=type?_data.filter(function(e){return e.type===type;}):[];
+      // Remove old token(s) of same type (should only ever be one) and any with same name
+      var filtered=_data.filter(function(e){return e.name!==name&&(!type||e.type!==type);});
+      save(filtered.concat([{name:name,enc:enc,type:type||''}]));
+    },
+    hasType:function(type){return!!_data.find(function(e){return e.type===type;});},
+    getByType:function(type){var e=_data.find(function(e){return e.type===type;});return e?e.name:null;},
     del:function(name){save(_data.filter(function(e){return e.name!==name;}));}
   };
 })();
@@ -250,54 +218,106 @@ var TILE_CONFIG={
   powersearch:{href:'powersearch.html',icon:'🔍',name:'Power Search',accentClass:'',required:['gh','zh']},
   customerportal:{href:'customerportal.html',icon:'🌐',name:'Customer Portal',accentClass:'',required:['gh','zh']}
 };
-
 var TYPE_LABELS={gh:'GitHub',zh:'ZenHub',tfs:'TFS',asana:'Asana'};
 
-// ── Per-tile token assignments ────────────────────────────────────────────────
+// ── Tile assignment (auto-derived from vault, persisted for display) ───────────
 var ASSIGN_KEY='cv_tile_assignments_v1';
 function loadAssignments(){try{var v=localStorage.getItem(ASSIGN_KEY);return v?JSON.parse(v):{};}catch(e){return{};}}
 function saveAssignments(a){try{localStorage.setItem(ASSIGN_KEY,JSON.stringify(a));}catch(e){}}
-function getTileAssignment(id){return loadAssignments()[id]||{};}
-function setTileSlot(tileId,type,tokenName){
-  var a=loadAssignments();
-  if(!a[tileId])a[tileId]={};
-  if(tokenName)a[tileId][type]=tokenName;
-  else delete a[tileId][type];
+
+// Called after unlock or vault change — assigns the single token of each type to all tiles that need it
+function autoAssignFromVault(){
+  var a={};
+  Object.keys(TILE_CONFIG).forEach(function(id){
+    a[id]={};
+    TILE_CONFIG[id].required.forEach(function(type){
+      var name=Vault.getByType(type);
+      if(name)a[id][type]=name;
+    });
+  });
   saveAssignments(a);
+  renderTileChips();
 }
+
+// Clear assignments on lock (names stay visible from localStorage until next unlock)
+function clearAssignments(){
+  var a={};
+  Object.keys(TILE_CONFIG).forEach(function(id){a[id]={};});
+  saveAssignments(a);
+  renderTileChips();
+}
+
 function tileIsReady(id){
-  var asgn=getTileAssignment(id);
+  var asgn=loadAssignments()[id]||{};
   return TILE_CONFIG[id].required.every(function(t){return!!asgn[t];});
 }
 
-// ── Render tile chips on all cards ───────────────────────────────────────────
+// ── Render tile token chips ───────────────────────────────────────────────────
 function renderTileChips(){
+  var asgns=loadAssignments();
   Object.keys(TILE_CONFIG).forEach(function(id){
     var el=document.getElementById('tile-tokens-'+id);
-    var cfgEl=document.getElementById('tile-cfg-'+id);
     if(!el)return;
     var cfg=TILE_CONFIG[id];
-    var asgn=getTileAssignment(id);
-    var allSet=true;
+    var asgn=asgns[id]||{};
     var h='';
     cfg.required.forEach(function(type){
       var name=asgn[type];
       if(name){
-        h+='<span class="ttok-chip ttok-set'+( cfg.accentClass?' '+cfg.accentClass:'')+'" title="'+esc(TYPE_LABELS[type]||type)+' token assigned">'+esc(TYPE_LABELS[type])+': '+esc(name)+'</span>';
+        h+='<span class="ttok-chip ttok-set'+(cfg.accentClass?' '+cfg.accentClass:'')+'" title="'+esc(TYPE_LABELS[type]||type)+' token">'+esc(TYPE_LABELS[type])+': '+esc(name)+'</span>';
       } else {
-        allSet=false;
-        h+='<span class="ttok-chip ttok-unset" title="'+esc(TYPE_LABELS[type]||type)+' token not assigned">'+esc(TYPE_LABELS[type])+' not set</span>';
+        h+='<span class="ttok-chip ttok-unset">'+esc(TYPE_LABELS[type]||type)+' not set</span>';
       }
     });
     el.innerHTML=h;
-    if(cfgEl){
-      if(allSet){
-        cfgEl.textContent='';
-      } else {
-        cfgEl.textContent='Click to assign tokens';
-      }
-    }
   });
+}
+
+// ── Tile click → auto-launch ──────────────────────────────────────────────────
+function openTile(id){
+  var cfg=TILE_CONFIG[id];
+  if(!Vault.isUnlocked()){
+    var vaultBody=document.getElementById('vaultBody');
+    vaultBody.style.display='block';
+    var vaultBar=document.getElementById('vaultBar');
+    vaultBar.scrollIntoView({behavior:'smooth',block:'center'});
+    vaultBar.classList.add('pulse');
+    setTimeout(function(){vaultBar.classList.remove('pulse');},1800);
+    var hint=document.getElementById('vaultTileHint');
+    hint.textContent='Unlock the vault to load tokens for '+cfg.name;
+    hint.style.display='block';
+    setTimeout(function(){document.getElementById('vaultPwInput').focus();},300);
+    return;
+  }
+  if(!tileIsReady(id)){
+    var asgn=loadAssignments()[id]||{};
+    var missing=cfg.required.filter(function(t){return!asgn[t];}).map(function(t){return TYPE_LABELS[t]||t;});
+    showToast(cfg.name+' needs: '+missing.join(', ')+' token'+(missing.length>1?'s':'')+' — add to vault first','warn');
+    return;
+  }
+  launchTile(id);
+}
+
+async function launchTile(id){
+  var cfg=TILE_CONFIG[id];
+  var asgn=loadAssignments()[id]||{};
+  // Briefly mark tile as launching
+  var card=document.getElementById('tile-'+id);
+  if(card){card.style.opacity='0.7';}
+  try{
+    for(var i=0;i<cfg.required.length;i++){
+      var type=cfg.required[i];
+      var name=asgn[type];
+      var value=await Vault.get(name);
+      if(!value)throw new Error('Could not decrypt '+name);
+      sessionStorage.setItem('cv_session_'+type,value);
+      sessionStorage.setItem('cv_session_'+type+'_name',name);
+    }
+    window.location.href=cfg.href;
+  }catch(e){
+    if(card){card.style.opacity='';}
+    showToast('Launch failed: '+e.message,'err');
+  }
 }
 
 // ── Vault widget UI ───────────────────────────────────────────────────────────
@@ -317,8 +337,10 @@ async function unlockVault(){
     document.getElementById('vaultUnlockedPanel').style.display='block';
     document.getElementById('vaultLockBtn').style.display='inline-flex';
     document.getElementById('vaultIcon').textContent='🔓';
-    document.getElementById('vaultStatusText').textContent='Vault unlocked — click a tile to assign tokens';
     document.getElementById('vaultTileHint').style.display='none';
+    var tokens=Vault.list().filter(function(t){return t.type&&t.type!=='asana';});
+    document.getElementById('vaultStatusText').textContent='Vault unlocked — '+tokens.length+' token'+(tokens.length!==1?'s':'')+' assigned to tiles';
+    autoAssignFromVault();
     renderVaultTokenList();
   }catch(e){
     document.getElementById('vaultPwErr').textContent=e.message;
@@ -327,12 +349,13 @@ async function unlockVault(){
 
 function lockVaultWidget(){
   Vault.lock();
+  clearAssignments();
   document.getElementById('vaultLockForm').style.display='block';
   document.getElementById('vaultUnlockedPanel').style.display='none';
   document.getElementById('vaultLockBtn').style.display='none';
   document.getElementById('vaultBody').style.display='none';
   document.getElementById('vaultIcon').textContent='🔒';
-  document.getElementById('vaultStatusText').textContent='Unlock to assign tokens to dashboards';
+  document.getElementById('vaultStatusText').textContent='Unlock to load tokens into tiles';
   document.getElementById('vaultPwInput').value='';
   document.getElementById('vaultTileHint').style.display='none';
 }
@@ -346,18 +369,27 @@ function renderVaultTokenList(){
   }
   var h='';
   tokens.forEach(function(t){
-    var typeClass=t.type||'untagged';
-    var badgeClass=t.type?(' '+typeClass):'';
-    var typeLabel=t.type?TYPE_LABELS[t.type]||t.type:'untagged';
-    h+='<div class="vtok '+typeClass+'">';
+    var cls=t.type||'untagged';
+    var typeLabel=t.type?(TYPE_LABELS[t.type]||t.type):'untagged';
+    h+='<div class="vtok '+cls+'">';
     h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;border-color:#fca5a5;color:#dc2626" onclick="idxVaultDel(\''+esc(t.name)+'\')" title="Delete">🗑</button>';
-    if(t.type){
-      h+='<span class="vtok-badge'+badgeClass+'">'+esc(typeLabel)+'</span>';
-    }
-    h+='<span style="font-size:13px;font-weight:600;color:inherit">'+esc(t.name)+'</span>';
+    if(t.type){h+='<span class="vtok-badge '+cls+'">'+esc(typeLabel)+'</span>';}
+    h+='<span>'+esc(t.name)+'</span>';
+    if(!t.type){h+='<span style="font-size:11px;color:#9ca3af;font-weight:400">untagged</span>';}
     h+='</div>';
   });
   el.innerHTML=h;
+}
+
+// Warn when selected type already exists in vault
+function onTypeSelectChange(){
+  var type=document.getElementById('idxNewType').value;
+  var warn=document.getElementById('idxTypeWarning');
+  if(type&&Vault.hasType(type)){
+    warn.style.display='block';
+  } else {
+    warn.style.display='none';
+  }
 }
 
 async function idxVaultSave(){
@@ -368,140 +400,44 @@ async function idxVaultSave(){
   msg.textContent='';
   if(!name||!tok){msg.style.color='#dc2626';msg.textContent='Name and token are required.';return;}
   try{
-    await Vault.add(name,tok,type);
+    await Vault.upsertByType(name,tok,type);
     msg.style.color='#059669';
+    var replaced=type&&Vault.hasType(type);
     msg.textContent='"'+name+'" saved!'+(type?' Tagged as '+(TYPE_LABELS[type]||type)+'.':'');
     document.getElementById('idxNewName').value='';
     document.getElementById('idxNewType').value='';
     document.getElementById('idxNewTok').value='';
-    setTimeout(function(){msg.textContent='';renderVaultTokenList();},800);
+    document.getElementById('idxTypeWarning').style.display='none';
+    setTimeout(function(){
+      msg.textContent='';
+      renderVaultTokenList();
+      autoAssignFromVault();
+      // Update status count
+      var active=Vault.list().filter(function(t){return t.type&&t.type!=='asana';});
+      document.getElementById('vaultStatusText').textContent='Vault unlocked — '+active.length+' token'+(active.length!==1?'s':'')+' assigned to tiles';
+    },800);
   }catch(e){msg.style.color='#dc2626';msg.textContent=e.message;}
 }
 
 function idxVaultDel(name){
   if(!confirm('Delete "'+name+'" from vault?'))return;
   Vault.del(name);
-  // Remove from tile assignments if used
-  var a=loadAssignments();
-  Object.keys(a).forEach(function(tileId){
-    Object.keys(a[tileId]).forEach(function(type){
-      if(a[tileId][type]===name)delete a[tileId][type];
-    });
-  });
-  saveAssignments(a);
   renderVaultTokenList();
-  renderTileChips();
+  autoAssignFromVault();
+  var active=Vault.list().filter(function(t){return t.type&&t.type!=='asana';});
+  document.getElementById('vaultStatusText').textContent='Vault unlocked — '+active.length+' token'+(active.length!==1?'s':'')+' assigned to tiles';
 }
 
-// ── Tile launch modal ─────────────────────────────────────────────────────────
-var _currentTile=null;
-
-function openTile(id){
-  if(!Vault.isUnlocked()){
-    // Direct user to unlock vault
-    var vaultBody=document.getElementById('vaultBody');
-    vaultBody.style.display='block';
-    var vaultBar=document.getElementById('vaultBar');
-    vaultBar.scrollIntoView({behavior:'smooth',block:'center'});
-    vaultBar.classList.add('pulse');
-    setTimeout(function(){vaultBar.classList.remove('pulse');},1800);
-    var hint=document.getElementById('vaultTileHint');
-    hint.textContent='Unlock the vault to assign tokens to '+TILE_CONFIG[id].name;
-    hint.style.display='block';
-    setTimeout(function(){document.getElementById('vaultPwInput').focus();},400);
-    return;
-  }
-  _currentTile=id;
-  renderTileModal(id);
-  document.getElementById('tileModal').style.display='flex';
-}
-
-function closeTileModal(){
-  document.getElementById('tileModal').style.display='none';
-  _currentTile=null;
-}
-
-function renderTileModal(id){
-  var cfg=TILE_CONFIG[id];
-  var asgn=getTileAssignment(id);
-  var tokens=Vault.list();
-
-  document.getElementById('modalIcon').textContent=cfg.icon;
-  document.getElementById('modalTitle').textContent=cfg.name;
-  document.getElementById('modalErr').textContent='';
-
-  // Style launch button for financials (amber) vs others (indigo)
-  var launchBtn=document.getElementById('modalLaunchBtn');
-  if(cfg.accentClass==='amber'){launchBtn.classList.add('amber');}else{launchBtn.classList.remove('amber');}
-  launchBtn.textContent='Launch ↗';
-
-  var h='';
-  cfg.required.forEach(function(type){
-    var label=TYPE_LABELS[type]||type;
-    var ofType=tokens.filter(function(t){return t.type===type;});
-    var assigned=asgn[type]||'';
-    h+='<div class="modal-slot">';
-    h+='<label class="slot-label">'+label+' token <span class="req-pill">required</span></label>';
-    if(ofType.length===0){
-      h+='<div class="slot-empty">No '+esc(label)+' tokens in vault — add one above first</div>';
-    } else {
-      h+='<select class="slot-select" data-type="'+type+'" onchange="onModalSlotChange(this)">';
-      h+='<option value="">— select '+esc(label)+' token —</option>';
-      ofType.forEach(function(t){
-        h+='<option value="'+esc(t.name)+'"'+(assigned===t.name?' selected':'')+'>'+esc(t.name)+'</option>';
-      });
-      h+='</select>';
-    }
-    h+='</div>';
-  });
-  document.getElementById('modalSlots').innerHTML=h;
-
-  updateLaunchBtn();
-}
-
-function onModalSlotChange(sel){
-  if(!_currentTile)return;
-  var type=sel.getAttribute('data-type');
-  var name=sel.value||null;
-  setTileSlot(_currentTile,type,name);
-  renderTileChips();
-  updateLaunchBtn();
-}
-
-function updateLaunchBtn(){
-  var btn=document.getElementById('modalLaunchBtn');
-  var ready=_currentTile&&tileIsReady(_currentTile);
-  btn.disabled=!ready;
-  btn.title=ready?'':'Assign all required tokens first';
-}
-
-async function launchTile(){
-  if(!_currentTile)return;
-  var id=_currentTile;
-  var cfg=TILE_CONFIG[id];
-  var asgn=getTileAssignment(id);
-  var btn=document.getElementById('modalLaunchBtn');
-  var errEl=document.getElementById('modalErr');
-  btn.textContent='Opening…';
-  btn.disabled=true;
-  errEl.textContent='';
-  try{
-    // Decrypt each required token and place in sessionStorage
-    for(var i=0;i<cfg.required.length;i++){
-      var type=cfg.required[i];
-      var tokenName=asgn[type];
-      if(!tokenName)throw new Error('Missing '+(TYPE_LABELS[type]||type)+' token assignment');
-      var value=await Vault.get(tokenName);
-      if(!value)throw new Error('Could not decrypt token "'+tokenName+'"');
-      sessionStorage.setItem('cv_session_'+type,value);
-      sessionStorage.setItem('cv_session_'+type+'_name',tokenName);
-    }
-    window.location.href=cfg.href;
-  }catch(e){
-    btn.textContent='Launch ↗';
-    btn.disabled=false;
-    errEl.textContent='Error: '+e.message;
-  }
+// ── Toast ─────────────────────────────────────────────────────────────────────
+var _toastTimer=null;
+function showToast(msg,type){
+  var el=document.getElementById('toast');
+  el.textContent=msg;
+  el.className=type||'';
+  void el.offsetWidth; // reflow
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(function(){el.classList.remove('show');},3500);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
