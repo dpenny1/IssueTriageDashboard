@@ -31,6 +31,7 @@ a{color:#4338ca;text-decoration:none}a:hover{text-decoration:underline}
 .btn-p:hover{background:#3730a3}
 .btn-p:disabled{background:#a5b4fc;cursor:not-allowed}
 .btn-d{padding:6px 12px;font-size:12px;border:1px solid #fca5a5;background:#fff;color:#dc2626;border-radius:7px;cursor:pointer;font-weight:600}
+.btn-ig{padding:4px 9px;font-size:11px;border:1px solid #e5e7eb;background:#fff;color:#9ca3af;border-radius:6px;cursor:pointer}
 .sw{max-width:560px;margin:24px auto}
 .sc{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:24px 28px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
 .sc h2{font-size:1rem;font-weight:700;color:#1e1b4b;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e5e7eb}
@@ -180,14 +181,14 @@ tr:hover td{background:#f9fafb}
 <script>
 var APP_VERSION='2026-04-15 v2';
 var S={
-  ghToken:'',repos:[],issues:[],closedIssues:[],
+  ghToken:'',repos:[],issues:[],closedIssues:[],ignored:[],
   activeTab:'all',
   labelColors:{},labelNames:{},
   activeProfile:null,
   sortState:{col:'age',dir:1},
   autoRefreshTimer:null
 };
-var STORAGE_KEY='cp_issues_cache_v1',PROFILES_KEY='cp_profiles_v1';
+var STORAGE_KEY='cp_issues_cache_v1',PROFILES_KEY='cp_profiles_v1',IGNORED_KEY='cp_ignored_v1';
 
 // ── Loading overlay ───────────────────────────────────────────────────────────
 function showLoadingOverlay(msg){var o=document.getElementById('loadingOverlay');if(o)o.style.display='flex';var m=document.getElementById('loMsg');if(m)m.textContent=msg||'Loading...';}
@@ -305,6 +306,10 @@ function loadProfiles(){try{var v=localStorage.getItem(PROFILES_KEY);return v?JS
 function saveProfiles(p){try{localStorage.setItem(PROFILES_KEY,JSON.stringify(p));}catch(e){}}
 function saveCache(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({issues:S.issues,closedIssues:S.closedIssues,labelColors:S.labelColors,labelNames:S.labelNames,savedAt:Date.now()}));}catch(e){}}
 function loadCache(){try{var v=localStorage.getItem(STORAGE_KEY);return v?JSON.parse(v):null;}catch(e){return null;}}
+function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+function saveIgnored(){try{localStorage.setItem(IGNORED_KEY,JSON.stringify(S.ignored));}catch(e){}}
+function ignoreIssue(k){if(S.ignored.indexOf(k)===-1)S.ignored.push(k);saveIgnored();buildTabs();renderMain();}
+function unignoreIssue(k){S.ignored=S.ignored.filter(function(x){return x!==k;});saveIgnored();buildTabs();renderMain();}
 function showErr(id,msg){var el=document.getElementById(id);el.className='err';el.textContent=msg;el.style.display='block';}
 function hideErr(id){document.getElementById(id).style.display='none';}
 function showEl(id){document.getElementById(id).style.display='block';}
@@ -441,6 +446,7 @@ async function connect(){
   if(!rp){showErr('setupErr','Please select a project.');return;}
   S.ghToken=tok;
   S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
+  S.ignored=loadIgnored();
   var btn=document.getElementById('connectBtn');btn.disabled=true;btn.innerHTML='<span class="spin spd"></span>Loading...';
   var cache=loadCache();
   if(cache&&cache.issues){
@@ -541,15 +547,16 @@ function applyFilters(issues){
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 function renderStats(){
-  var open=S.issues.length;
+  var open=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
   var closed=S.closedIssues.length;
-  var overdue=S.issues.filter(function(i){return ageDays(i.createdAt)>7;}).length;
-  var unassigned=S.issues.filter(function(i){return i.assignees.length===0;}).length;
+  var overdue=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&ageDays(i.createdAt)>7;}).length;
+  var unassigned=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.assignees.length===0;}).length;
   var stats=[
     {n:open,l:'Open Issues',c:'#4338ca',tab:'all'},
     {n:overdue,l:'Overdue (>7d)',c:'#dc2626',tab:'overdue'},
     {n:unassigned,l:'Unassigned',c:'#d97706',tab:'unassigned'},
-    {n:closed,l:'Closed (30d)',c:'#059669',tab:'closed'}
+    {n:closed,l:'Closed (30d)',c:'#059669',tab:'closed'},
+    {n:S.ignored.length,l:'Ignored',c:'#6b7280',tab:'ignored'}
   ];
   var h='';
   stats.forEach(function(s){
@@ -567,16 +574,18 @@ var TAB_DEFS=[
   {id:'overdue',label:'Overdue (>7d)',color:'#dc2626'},
   {id:'unassigned',label:'Unassigned',color:'#d97706'},
   {id:'bylabel',label:'By Label',color:'#7c3aed'},
-  {id:'closed',label:'Recently Closed',color:'#059669'}
+  {id:'closed',label:'Recently Closed',color:'#059669'},
+  {id:'ignored',label:'Ignored',color:'#6b7280'}
 ];
 
 function tabCount(id){
-  if(id==='all')return S.issues.length;
-  if(id==='new')return S.issues.filter(function(i){return ageDays(i.createdAt)<3;}).length;
-  if(id==='overdue')return S.issues.filter(function(i){return ageDays(i.createdAt)>7;}).length;
-  if(id==='unassigned')return S.issues.filter(function(i){return i.assignees.length===0;}).length;
-  if(id==='bylabel')return S.issues.length;
+  if(id==='all')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
+  if(id==='new')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&ageDays(i.createdAt)<3;}).length;
+  if(id==='overdue')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&ageDays(i.createdAt)>7;}).length;
+  if(id==='unassigned')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.assignees.length===0;}).length;
+  if(id==='bylabel')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
   if(id==='closed')return S.closedIssues.length;
+  if(id==='ignored')return S.ignored.length;
   return 0;
 }
 
@@ -620,12 +629,13 @@ function thArrow(col){if(S.sortState.col!==col)return '<span class="si">↕</spa
 function thCls(col){return S.sortState.col===col?' class="sorted"':'';}
 
 // ── Issue row renderer ────────────────────────────────────────────────────────
-function issueRow(iss,showClosed){
+function issueRow(iss,showClosed,showRestore){
   var age=ageDays(iss.createdAt);
   var cls=ageCls(age);
   var lbls=iss.labels.slice(0,4).map(lblBadge).join(' ');
   var asgn=iss.assignees.length?iss.assignees.map(function(a){return '<span style="display:inline-flex;align-items:center;gap:3px"><img src="https://github.com/'+esc(a)+'.png?size=20" width="16" height="16" style="border-radius:50%;vertical-align:middle"/> '+esc(a)+'</span>';}).join(', '):'<span style="color:#9ca3af;font-style:italic">Unassigned</span>';
   var repoShort=iss.repo.split('/')[1]||iss.repo;
+  var ikey=iss.id+'_'+iss.repo;
   var h='<tr>';
   h+='<td><a href="'+esc(iss.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+iss.id+'</a></td>';
   h+='<td style="max-width:380px"><div style="font-weight:600;line-height:1.4"><a href="'+esc(iss.url)+'" target="_blank" style="color:#1a1a1a;text-decoration:none" onmouseover="this.style.color=\'#4338ca\'" onmouseout="this.style.color=\'#1a1a1a\'">'+esc(iss.title)+'</a></div>';
@@ -639,12 +649,14 @@ function issueRow(iss,showClosed){
     h+='<td style="white-space:nowrap;font-size:12px;color:#6b7280">'+esc(iss.closedBy||'—')+'</td>';
   } else {
     h+='<td style="white-space:nowrap"><span class="'+cls+'">'+age+'d</span></td>';
+    if(showRestore)h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';
+    else h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
   }
   h+='</tr>';
   return h;
 }
 
-function openTable(issues,emptyMsg){
+function openTable(issues,emptyMsg,showRestore){
   if(!issues.length)return '<div class="es">'+esc(emptyMsg||'No issues found.')+'</div>';
   var multiRepo=S.repos.length>1;
   var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)"><span class="gt">Issues <span class="gc">'+issues.length+'</span></span></div>';
@@ -654,8 +666,9 @@ function openTable(issues,emptyMsg){
   if(multiRepo)h+='<th onclick="thClick(\'repo\')"'+thCls('repo')+'>Repo'+thArrow('repo')+'</th>';
   h+='<th onclick="thClick(\'assignee\')"'+thCls('assignee')+'>Assignee'+thArrow('assignee')+'</th>';
   h+='<th onclick="thClick(\'age\')"'+thCls('age')+'>Age'+thArrow('age')+'</th>';
+  h+='<th></th>';
   h+='</tr></thead><tbody>';
-  sortIssues(issues).forEach(function(iss){h+=issueRow(iss,false);});
+  sortIssues(issues).forEach(function(iss){h+=issueRow(iss,false,showRestore);});
   h+='</tbody></table></div></div>';
   return h;
 }
@@ -696,8 +709,8 @@ function byLabelView(issues){
     h+='<span class="gt" style="color:'+tfb(c)+'">'+esc(display)+'<span class="gc">'+grpIssues.length+'</span></span></div>';
     h+='<div class="tw2"><table><thead><tr><th>No.</th><th>Title</th>';
     if(S.repos.length>1)h+='<th>Repo</th>';
-    h+='<th>Assignee</th><th>Age</th></tr></thead><tbody>';
-    grpIssues.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);}).forEach(function(iss){h+=issueRow(iss,false);});
+    h+='<th>Assignee</th><th>Age</th><th></th></tr></thead><tbody>';
+    grpIssues.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);}).forEach(function(iss){h+=issueRow(iss,false,false);});
     h+='</tbody></table></div></div>';
   });
   if(unlabeled.length){
@@ -705,8 +718,8 @@ function byLabelView(issues){
     h+='<span class="gt">Unlabeled<span class="gc">'+unlabeled.length+'</span></span></div>';
     h+='<div class="tw2"><table><thead><tr><th>No.</th><th>Title</th>';
     if(S.repos.length>1)h+='<th>Repo</th>';
-    h+='<th>Assignee</th><th>Age</th></tr></thead><tbody>';
-    unlabeled.forEach(function(iss){h+=issueRow(iss,false);});
+    h+='<th>Assignee</th><th>Age</th><th></th></tr></thead><tbody>';
+    unlabeled.forEach(function(iss){h+=issueRow(iss,false,false);});
     h+='</tbody></table></div></div>';
   }
   return h;
@@ -718,22 +731,28 @@ function renderMain(){
   var content=document.getElementById('mainContent');
   if(!content)return;
 
+  if(tab==='ignored'){
+    var filtered=applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;}));
+    content.innerHTML=openTable(filtered,'No ignored issues.',true);
+    return;
+  }
+
   if(tab==='closed'){
     content.innerHTML=closedTable(applyFilters(S.closedIssues));
     return;
   }
   if(tab==='bylabel'){
-    content.innerHTML=byLabelView(applyFilters(S.issues));
+    content.innerHTML=byLabelView(applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;})));
     return;
   }
 
-  var src=S.issues;
-  if(tab==='new')src=S.issues.filter(function(i){return ageDays(i.createdAt)<3;});
-  else if(tab==='overdue')src=S.issues.filter(function(i){return ageDays(i.createdAt)>7;});
-  else if(tab==='unassigned')src=S.issues.filter(function(i){return i.assignees.length===0;});
+  var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
+  if(tab==='new')src=src.filter(function(i){return ageDays(i.createdAt)<3;});
+  else if(tab==='overdue')src=src.filter(function(i){return ageDays(i.createdAt)>7;});
+  else if(tab==='unassigned')src=src.filter(function(i){return i.assignees.length===0;});
 
   var emptyMsgs={all:'No open issues — all clear!',new:'No issues opened in the last 3 days.',overdue:'No overdue issues — great!',unassigned:'All issues are assigned!'};
-  content.innerHTML=openTable(applyFilters(src),emptyMsgs[tab]||'No issues found.');
+  content.innerHTML=openTable(applyFilters(src),emptyMsgs[tab]||'No issues found.',false);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
