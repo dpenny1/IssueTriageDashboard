@@ -23,13 +23,15 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .grid{display:flex;flex-wrap:nowrap;gap:20px;justify-content:center;max-width:1150px;margin:0 auto}
 
 /* Card tiles */
-.card{background:#fff;border-radius:14px;padding:28px 24px;box-shadow:0 2px 8px rgba(0,0,0,0.07);border-top:4px solid transparent;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;color:inherit;flex:1;min-width:220px;max-width:260px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;user-select:none}
+.card{position:relative;background:#fff;border-radius:14px;padding:28px 24px 22px;box-shadow:0 2px 8px rgba(0,0,0,0.07);border-top:4px solid transparent;cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;color:inherit;flex:1;min-width:220px;max-width:260px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;user-select:none}
 .card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.12)}
 .card:focus-visible{outline:3px solid #6366f1;outline-offset:2px}
 .card-icon{font-size:2.6rem}
 .card-name{font-size:1.1rem;font-weight:800;color:#1e1b4b}
 .card-desc{font-size:12px;color:#9ca3af;font-weight:500}
 .card-badge{font-size:11px;padding:3px 10px;border-radius:999px;font-weight:700}
+.card-gear{position:absolute;top:8px;right:9px;background:none;border:none;cursor:pointer;color:#d1d5db;font-size:15px;padding:3px 5px;border-radius:5px;line-height:1;transition:color 0.15s,background 0.15s;z-index:2}
+.card-gear:hover{color:#6b7280;background:rgba(0,0,0,0.06)}
 
 /* Tile token chips */
 .tile-tokens{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:2px;width:100%}
@@ -51,17 +53,40 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .err-msg{font-size:12px;color:#dc2626;margin-top:5px;min-height:16px}
 .hint{font-size:12px;color:#9ca3af;margin-top:4px}
 
-/* Vault token list */
+/* Vault token list — no type badge, just name + delete */
 .vault-tokens{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px}
 .vtok{display:inline-flex;align-items:center;gap:7px;background:#f8f7ff;border:1px solid #c7d2fe;border-radius:9px;padding:7px 12px;font-size:13px;font-weight:600;color:#3730a3}
 .vtok.zh{background:#f0fdf4;border-color:#86efac;color:#15803d}
 .vtok.tfs{background:#fffbeb;border-color:#fde68a;color:#92400e}
 .vtok.asana{background:#fdf4ff;border-color:#e9d5ff;color:#7e22ce}
 .vtok.untagged{background:#f9fafb;border-color:#e5e7eb;color:#6b7280}
+/* vtok-badge kept for settings modal info rows only */
 .vtok-badge{font-size:10px;padding:1px 7px;border-radius:999px;font-weight:700;background:#e0e7ff;color:#3730a3}
 .vtok-badge.zh{background:#dcfce7;color:#15803d}
 .vtok-badge.tfs{background:#fef3c7;color:#92400e}
 .vtok-badge.asana{background:#f3e8ff;color:#7e22ce}
+
+/* Settings modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);z-index:1000;align-items:center;justify-content:center}
+.modal-box{background:#fff;border-radius:16px;padding:32px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);position:relative;max-height:90vh;overflow-y:auto}
+.modal-head{display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #f1f5f9}
+.modal-icon{font-size:2rem;line-height:1}
+.modal-name{font-size:1.1rem;font-weight:800;color:#1e1b4b}
+.modal-sub{font-size:11px;color:#9ca3af;margin-top:2px}
+.modal-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:18px;color:#9ca3af;cursor:pointer;line-height:1;padding:4px}
+.modal-close:hover{color:#374151}
+.modal-slot{margin-bottom:14px}
+.slot-label{font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:5px}
+.slot-input{width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;outline:none;color:#1e1b4b;background:#fff}
+.slot-input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.1)}
+.modal-actions{display:flex;gap:10px;margin-top:22px;align-items:center}
+.btn-launch{background:#4338ca;color:#fff;border:none;border-radius:8px;padding:11px 22px;font-size:14px;font-weight:700;cursor:pointer;flex:1;transition:background 0.15s;text-align:center;display:flex;align-items:center;justify-content:center;text-decoration:none}
+.btn-launch:hover{background:#3730a3}
+.btn-launch.amber{background:#d97706}
+.btn-launch.amber:hover{background:#b45309}
+.btn-cancel{background:#fff;color:#6b7280;border:1px solid #d1d5db;border-radius:8px;padding:11px 16px;font-size:13px;font-weight:600;cursor:pointer}
+.btn-cancel:hover{background:#f9fafb}
+.info-box{font-size:12px;color:#6b7280;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 13px;margin-top:4px}
 
 /* Toast */
 #toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(10px);background:#1e1b4b;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:600;opacity:0;transition:opacity 0.2s,transform 0.2s;pointer-events:none;z-index:2000;white-space:nowrap}
@@ -124,7 +149,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
               <option value="asana">Asana</option>
             </select>
             <input type="password" id="idxNewTok" placeholder="Token value" autocomplete="new-password" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>
-            <button class="btn-sm" id="idxSaveBtn" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="idxVaultSave()">＋ Save</button>
+            <button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="idxVaultSave()">＋ Save</button>
           </div>
           <div id="idxTypeWarning" style="font-size:11px;color:#d97706;font-weight:600;margin-top:4px;display:none">⚠ A token of this type already exists — saving will replace it.</div>
           <div id="idxSaveMsg" style="font-size:12px;margin-top:5px;min-height:16px"></div>
@@ -139,6 +164,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
     <div class="card" style="border-top-color:#d97706;background:#fffbeb" id="tile-financials"
          onclick="openTile('financials')" role="button" tabindex="0"
          onkeydown="if(event.key==='Enter'||event.key===' ')openTile('financials')">
+      <button class="card-gear" onclick="openSettings('financials',event)" title="Financials settings">⚙</button>
       <div class="card-icon">📋</div>
       <div class="card-name">Financials</div>
       <div class="card-desc">Financials Dashboard</div>
@@ -149,6 +175,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
     <div class="card" style="border-top-color:#4338ca" id="tile-cis"
          onclick="openTile('cis')" role="button" tabindex="0"
          onkeydown="if(event.key==='Enter'||event.key===' ')openTile('cis')">
+      <button class="card-gear" onclick="openSettings('cis',event)" title="CIS settings">⚙</button>
       <div class="card-icon">🛡️</div>
       <div class="card-name">CIS</div>
       <div class="card-desc">CS Issues Hub — tracking, patches, exceptions &amp; weekly report</div>
@@ -159,6 +186,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
     <div class="card" style="border-top-color:#4338ca" id="tile-powersearch"
          onclick="openTile('powersearch')" role="button" tabindex="0"
          onkeydown="if(event.key==='Enter'||event.key===' ')openTile('powersearch')">
+      <button class="card-gear" onclick="openSettings('powersearch',event)" title="Power Search settings">⚙</button>
       <div class="card-icon">🔍</div>
       <div class="card-name">Power Search</div>
       <div class="card-desc">Issues dashboard — tracking, search &amp; triage</div>
@@ -169,6 +197,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
     <div class="card" style="border-top-color:#4338ca" id="tile-customerportal"
          onclick="openTile('customerportal')" role="button" tabindex="0"
          onkeydown="if(event.key==='Enter'||event.key===' ')openTile('customerportal')">
+      <button class="card-gear" onclick="openSettings('customerportal',event)" title="Customer Portal settings">⚙</button>
       <div class="card-icon">🌐</div>
       <div class="card-name">Customer Portal</div>
       <div class="card-desc">Issues dashboard — tracking, search &amp; triage</div>
@@ -176,6 +205,22 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="tile-tokens" id="tile-tokens-customerportal"></div>
     </div>
 
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal" onclick="if(event.target===this)closeSettings()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeSettings()">✕</button>
+    <div class="modal-head">
+      <div class="modal-icon" id="settingsIcon"></div>
+      <div>
+        <div class="modal-name" id="settingsTitle"></div>
+        <div class="modal-sub">Settings</div>
+      </div>
+    </div>
+    <div id="settingsBody"></div>
+    <div class="modal-actions" id="settingsActions"></div>
   </div>
 </div>
 
@@ -197,11 +242,8 @@ var Vault=(function(){
     lock:function(){_pw=null;_data=[];},
     list:function(){return _data.map(function(e){return{name:e.name,type:e.type||''};});},
     get:async function(name){var e=_data.find(function(x){return x.name===name;});if(!e)return null;return decrypt(e.enc,_pw);},
-    // Add a token; if a typed token already exists for that type, replace it
     upsertByType:async function(name,tok,type){
       var enc=await encrypt(tok,_pw);
-      var existing=type?_data.filter(function(e){return e.type===type;}):[];
-      // Remove old token(s) of same type (should only ever be one) and any with same name
       var filtered=_data.filter(function(e){return e.name!==name&&(!type||e.type!==type);});
       save(filtered.concat([{name:name,enc:enc,type:type||''}]));
     },
@@ -218,14 +260,29 @@ var TILE_CONFIG={
   powersearch:{href:'powersearch.html',icon:'🔍',name:'Power Search',accentClass:'',required:['gh','zh']},
   customerportal:{href:'customerportal.html',icon:'🌐',name:'Customer Portal',accentClass:'',required:['gh','zh']}
 };
-var TYPE_LABELS={gh:'GitHub',zh:'ZenHub',tfs:'TFS',asana:'Asana'};
+var TYPE_LABELS={gh:'GitHub',zh:'ZenHub',tfs:'TFS (Password)',asana:'Asana'};
 
-// ── Tile assignment (auto-derived from vault, persisted for display) ───────────
+// ── Financials connection settings ────────────────────────────────────────────
+var FINANCIALS_KEY='cv_financials_settings_v1';
+function loadFinancialsSettings(){try{var v=localStorage.getItem(FINANCIALS_KEY);return v?JSON.parse(v):{};}catch(e){return{};}}
+function saveFinancialsSettingsFromForm(){
+  var s={
+    server:document.getElementById('fs_server').value.trim().replace(/\/+$/,''),
+    collection:document.getElementById('fs_collection').value.trim()||'DefaultCollection',
+    project:document.getElementById('fs_project').value.trim(),
+    user:document.getElementById('fs_user').value.trim()
+  };
+  localStorage.setItem(FINANCIALS_KEY,JSON.stringify(s));
+  var msg=document.getElementById('settingsSaveMsg');
+  msg.style.color='#059669';msg.textContent='✓ Settings saved';
+  setTimeout(function(){msg.textContent='';},2000);
+}
+
+// ── Tile assignment ───────────────────────────────────────────────────────────
 var ASSIGN_KEY='cv_tile_assignments_v1';
 function loadAssignments(){try{var v=localStorage.getItem(ASSIGN_KEY);return v?JSON.parse(v):{};}catch(e){return{};}}
 function saveAssignments(a){try{localStorage.setItem(ASSIGN_KEY,JSON.stringify(a));}catch(e){}}
 
-// Called after unlock or vault change — assigns the single token of each type to all tiles that need it
 function autoAssignFromVault(){
   var a={};
   Object.keys(TILE_CONFIG).forEach(function(id){
@@ -239,7 +296,6 @@ function autoAssignFromVault(){
   renderTileChips();
 }
 
-// Clear assignments on lock (names stay visible from localStorage until next unlock)
 function clearAssignments(){
   var a={};
   Object.keys(TILE_CONFIG).forEach(function(id){a[id]={};});
@@ -252,7 +308,7 @@ function tileIsReady(id){
   return TILE_CONFIG[id].required.every(function(t){return!!asgn[t];});
 }
 
-// ── Render tile token chips ───────────────────────────────────────────────────
+// ── Tile chips ────────────────────────────────────────────────────────────────
 function renderTileChips(){
   var asgns=loadAssignments();
   Object.keys(TILE_CONFIG).forEach(function(id){
@@ -264,16 +320,23 @@ function renderTileChips(){
     cfg.required.forEach(function(type){
       var name=asgn[type];
       if(name){
-        h+='<span class="ttok-chip ttok-set'+(cfg.accentClass?' '+cfg.accentClass:'')+'" title="'+esc(TYPE_LABELS[type]||type)+' token">'+esc(TYPE_LABELS[type])+': '+esc(name)+'</span>';
+        h+='<span class="ttok-chip ttok-set'+(cfg.accentClass?' '+cfg.accentClass:'')+'" title="'+esc(TYPE_LABELS[type]||type)+' token assigned">'+esc(name)+'</span>';
       } else {
-        h+='<span class="ttok-chip ttok-unset">'+esc(TYPE_LABELS[type]||type)+' not set</span>';
+        h+='<span class="ttok-chip ttok-unset">'+(type==='tfs'?'Password':'GH'==='gh'?'GitHub':esc(type.toUpperCase()))+' not set</span>';
       }
     });
+    // Financials: also show connection settings preview if configured
+    if(id==='financials'){
+      var fs=loadFinancialsSettings();
+      if(fs.project){
+        h+='<span class="ttok-chip" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a" title="TFS project">'+esc(fs.project)+'</span>';
+      }
+    }
     el.innerHTML=h;
   });
 }
 
-// ── Tile click → auto-launch ──────────────────────────────────────────────────
+// ── Tile click → launch ───────────────────────────────────────────────────────
 function openTile(id){
   var cfg=TILE_CONFIG[id];
   if(!Vault.isUnlocked()){
@@ -292,7 +355,7 @@ function openTile(id){
   if(!tileIsReady(id)){
     var asgn=loadAssignments()[id]||{};
     var missing=cfg.required.filter(function(t){return!asgn[t];}).map(function(t){return TYPE_LABELS[t]||t;});
-    showToast(cfg.name+' needs: '+missing.join(', ')+' token'+(missing.length>1?'s':'')+' — add to vault first','warn');
+    showToast(cfg.name+' needs: '+missing.join(', ')+' — add to vault first','warn');
     return;
   }
   launchTile(id);
@@ -301,10 +364,10 @@ function openTile(id){
 async function launchTile(id){
   var cfg=TILE_CONFIG[id];
   var asgn=loadAssignments()[id]||{};
-  // Briefly mark tile as launching
   var card=document.getElementById('tile-'+id);
-  if(card){card.style.opacity='0.7';}
+  if(card)card.style.opacity='0.7';
   try{
+    var tfsPass='';
     for(var i=0;i<cfg.required.length;i++){
       var type=cfg.required[i];
       var name=asgn[type];
@@ -312,12 +375,85 @@ async function launchTile(id){
       if(!value)throw new Error('Could not decrypt '+name);
       sessionStorage.setItem('cv_session_'+type,value);
       sessionStorage.setItem('cv_session_'+type+'_name',name);
+      if(type==='tfs')tfsPass=value;
     }
-    window.location.href=cfg.href;
+    // Build destination URL
+    var href=cfg.href;
+    if(id==='financials'){
+      var fs=loadFinancialsSettings();
+      var h='#cv_auto=1';
+      if(fs.server)h+='&cv_server='+encodeURIComponent(fs.server);
+      if(fs.collection)h+='&cv_collection='+encodeURIComponent(fs.collection);
+      if(fs.project)h+='&cv_project='+encodeURIComponent(fs.project);
+      if(fs.user)h+='&cv_user='+encodeURIComponent(fs.user);
+      if(tfsPass)h+='&cv_pass='+encodeURIComponent(tfsPass);
+      href=cfg.href+h;
+    }
+    window.location.href=href;
   }catch(e){
-    if(card){card.style.opacity='';}
+    if(card)card.style.opacity='';
     showToast('Launch failed: '+e.message,'err');
   }
+}
+
+// ── Settings modal ────────────────────────────────────────────────────────────
+function openSettings(id,event){
+  event.stopPropagation();
+  var cfg=TILE_CONFIG[id];
+  document.getElementById('settingsIcon').textContent=cfg.icon;
+  document.getElementById('settingsTitle').textContent=cfg.name;
+
+  var body='',actions='';
+
+  if(id==='financials'){
+    var fs=loadFinancialsSettings();
+    body+='<div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:14px">TFS / Azure DevOps Connection</div>';
+    body+='<div class="modal-slot"><label class="slot-label">Server URL</label>';
+    body+='<input class="slot-input" id="fs_server" placeholder="https://yourserver.example.com" value="'+esc(fs.server||'')+'"/></div>';
+    body+='<div class="modal-slot"><label class="slot-label">Collection</label>';
+    body+='<input class="slot-input" id="fs_collection" placeholder="DefaultCollection" value="'+esc(fs.collection||'DefaultCollection')+'"/></div>';
+    body+='<div class="modal-slot"><label class="slot-label">Project</label>';
+    body+='<input class="slot-input" id="fs_project" placeholder="YourProject" value="'+esc(fs.project||'')+'"/></div>';
+    body+='<div class="modal-slot"><label class="slot-label">Domain\\User</label>';
+    body+='<input class="slot-input" id="fs_user" placeholder="DOMAIN\\username" value="'+esc(fs.user||'')+'"/></div>';
+    var tfsTokenName=Vault.getByType('tfs');
+    body+='<div class="info-box">🔑 <strong>Password:</strong> ';
+    if(tfsTokenName){body+='Using vault token <strong>'+esc(tfsTokenName)+'</strong>';}
+    else{body+='No TFS token in vault — add one via the Token Vault above.';}
+    body+='</div>';
+    body+='<div id="settingsSaveMsg" style="font-size:12px;margin-top:8px;min-height:16px"></div>';
+    actions='<button class="btn-cancel" onclick="closeSettings()">Cancel</button>';
+    actions+='<button class="btn-launch amber" onclick="saveFinancialsSettingsFromForm()">Save Settings</button>';
+
+  } else {
+    // GitHub tiles — show token status and profile note
+    var asgn=loadAssignments()[id]||{};
+    body+='<div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:12px">Token Assignments</div>';
+    cfg.required.forEach(function(type){
+      var name=asgn[type];
+      body+='<div style="display:flex;align-items:center;gap:9px;margin-bottom:9px;padding:9px 12px;background:#f8faff;border-radius:9px;border:1px solid #e0e7ff">';
+      body+='<span class="vtok-badge '+type+'">'+esc((TYPE_LABELS[type]||type).split(' ')[0])+'</span>';
+      if(name){
+        body+='<span style="font-size:13px;font-weight:600;color:#1e1b4b;flex:1">'+esc(name)+'</span>';
+        body+='<span style="font-size:11px;color:#059669;font-weight:700">✓ assigned</span>';
+      } else {
+        body+='<span style="font-size:12px;color:#dc2626;flex:1">not assigned</span>';
+        body+='<span style="font-size:11px;color:#9ca3af">unlock vault to assign</span>';
+      }
+      body+='</div>';
+    });
+    body+='<div class="info-box" style="margin-top:14px">📁 <strong>Project profiles</strong> are configured within the dashboard — click the tile to open and use the project selector or ⚙ settings inside the dashboard.</div>';
+    actions='<button class="btn-cancel" onclick="closeSettings()">Close</button>';
+    actions+='<a href="'+esc(cfg.href)+'" class="btn-launch" style="text-decoration:none">Open Dashboard ↗</a>';
+  }
+
+  document.getElementById('settingsBody').innerHTML=body;
+  document.getElementById('settingsActions').innerHTML=actions;
+  document.getElementById('settingsModal').style.display='flex';
+}
+
+function closeSettings(){
+  document.getElementById('settingsModal').style.display='none';
 }
 
 // ── Vault widget UI ───────────────────────────────────────────────────────────
@@ -363,17 +499,13 @@ function lockVaultWidget(){
 function renderVaultTokenList(){
   var tokens=Vault.list();
   var el=document.getElementById('vaultTokenList');
-  if(!tokens.length){
-    el.innerHTML='<div style="font-size:13px;color:#9ca3af">No tokens yet. Add one below.</div>';
-    return;
-  }
+  if(!tokens.length){el.innerHTML='<div style="font-size:13px;color:#9ca3af">No tokens yet. Add one below.</div>';return;}
   var h='';
   tokens.forEach(function(t){
     var cls=t.type||'untagged';
-    var typeLabel=t.type?(TYPE_LABELS[t.type]||t.type):'untagged';
+    // Show only name — no type label in the list
     h+='<div class="vtok '+cls+'">';
     h+='<button class="btn-sm" style="font-size:11px;padding:2px 8px;border-color:#fca5a5;color:#dc2626" onclick="idxVaultDel(\''+esc(t.name)+'\')" title="Delete">🗑</button>';
-    if(t.type){h+='<span class="vtok-badge '+cls+'">'+esc(typeLabel)+'</span>';}
     h+='<span>'+esc(t.name)+'</span>';
     if(!t.type){h+='<span style="font-size:11px;color:#9ca3af;font-weight:400">untagged</span>';}
     h+='</div>';
@@ -381,15 +513,10 @@ function renderVaultTokenList(){
   el.innerHTML=h;
 }
 
-// Warn when selected type already exists in vault
 function onTypeSelectChange(){
   var type=document.getElementById('idxNewType').value;
   var warn=document.getElementById('idxTypeWarning');
-  if(type&&Vault.hasType(type)){
-    warn.style.display='block';
-  } else {
-    warn.style.display='none';
-  }
+  warn.style.display=(type&&Vault.hasType(type))?'block':'none';
 }
 
 async function idxVaultSave(){
@@ -402,7 +529,6 @@ async function idxVaultSave(){
   try{
     await Vault.upsertByType(name,tok,type);
     msg.style.color='#059669';
-    var replaced=type&&Vault.hasType(type);
     msg.textContent='"'+name+'" saved!'+(type?' Tagged as '+(TYPE_LABELS[type]||type)+'.':'');
     document.getElementById('idxNewName').value='';
     document.getElementById('idxNewType').value='';
@@ -412,7 +538,6 @@ async function idxVaultSave(){
       msg.textContent='';
       renderVaultTokenList();
       autoAssignFromVault();
-      // Update status count
       var active=Vault.list().filter(function(t){return t.type&&t.type!=='asana';});
       document.getElementById('vaultStatusText').textContent='Vault unlocked — '+active.length+' token'+(active.length!==1?'s':'')+' assigned to tiles';
     },800);
@@ -432,9 +557,8 @@ function idxVaultDel(name){
 var _toastTimer=null;
 function showToast(msg,type){
   var el=document.getElementById('toast');
-  el.textContent=msg;
-  el.className=type||'';
-  void el.offsetWidth; // reflow
+  el.textContent=msg;el.className=type||'';
+  void el.offsetWidth;
   el.classList.add('show');
   clearTimeout(_toastTimer);
   _toastTimer=setTimeout(function(){el.classList.remove('show');},3500);

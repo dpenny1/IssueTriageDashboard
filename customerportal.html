@@ -100,6 +100,7 @@ tr:hover td{background:#f9fafb}
     <div class="hdr-brand"><div class="hdr-logo">CP</div><div><h1>Customer Portal</h1></div></div>
     <div style="display:flex;gap:4px">
       <a href="index.html" class="hdr-act">Home</a>
+      <a href="http://localhost:8765/TFS-Triage-Dashboard.html" target="_blank" class="hdr-act">Financials</a>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
     </div>
   </div></div>
@@ -755,11 +756,38 @@ function renderMain(){
   content.innerHTML=openTable(applyFilters(src),emptyMsgs[tab]||'No issues found.',false);
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
-(function init(){
-  renderProfileDd();
-  checkSessionToken();
-  showEl('setup');
+// ── Session bootstrap ─────────────────────────────────────────────────────────
+(function(){
+  var gh=sessionStorage.getItem('cv_session_gh');
+  if(!gh){
+    document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;font-family:ui-sans-serif,system-ui,sans-serif"><div style="background:#fff;border-radius:14px;padding:40px 48px;box-shadow:0 2px 12px rgba(0,0,0,0.08);text-align:center;max-width:400px"><div style="font-size:2.5rem;margin-bottom:12px">🔒</div><div style="font-size:1.1rem;font-weight:700;color:#1e1b4b;margin-bottom:8px">Tokens required</div><div style="font-size:14px;color:#6b7280;margin-bottom:24px">Please unlock your vault on the hub page and assign your GitHub token before opening this dashboard.</div><a href="index.html" style="display:inline-block;background:#4338ca;color:#fff;border-radius:9px;padding:11px 28px;font-size:14px;font-weight:700;text-decoration:none">← Go to Hub</a></div></div>';
+    return;
+  }
+  S.ghToken=gh;
+  var profiles=loadProfiles();
+  if(!profiles.length||profiles.length>1){
+    // 0 profiles: need to set one up. >1: let user pick.
+    checkSessionToken();renderProfileDd();showEl('setup');
+    return;
+  }
+  // Exactly 1 profile — auto-load
+  var profile=profiles[0];
+  S.activeProfile=profile;
+  S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo;}):[profile.repo];
+  S.ignored=loadIgnored();
+  var cache=loadCache();
+  if(cache&&cache.issues){
+    S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
+    var age=Math.round((Date.now()-cache.savedAt)/60000);
+    populateFilters();showDash();buildTabs();renderMain();
+    setStatus('<span style="color:#f59e0b;font-size:13px;font-weight:700">⏳ Cached ('+age+'m ago) — refreshing...</span>');
+    bgRefresh();
+  } else {
+    showDash();setStatus('<span style="color:#fbbf24">⏳ Loading...</span>');showLoadingOverlay('Loading issues...');
+    Promise.all([loadLabelColors(),loadIssues()])
+      .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();hideLoadingOverlay();setStatus('<span style="color:#a5b4fc">✓ Loaded</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');})
+      .catch(function(e){hideLoadingOverlay();document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
+  }
 })();
 </script>
 </body>
