@@ -155,7 +155,7 @@ tr:hover td{background:#f9fafb}
     <div class="hdr-right">
       <nav class="hdr-nav">
         <a href="index.html">Home</a>
-        <a href="cis.html">CentralView</a>
+        <a href="cis.html">CIS</a>
         <a href="customerportal.html">Customer Portal</a>
         <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank">PM Tools</a>
       </nav>
@@ -576,13 +576,14 @@ function applyFilters(issues){
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 function renderStats(){
-  var open=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
+  var open=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
   var closed=S.closedIssues.length;
   var taskItems=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
+  var csColor='#'+(S.labelColors['cs task item']||'16a34a');
   var stats=[
     {n:open,l:'Open Issues',c:'#4338ca',tab:'all'},
-    {n:taskItems,l:'CS Task Items',c:'#16a34a',tab:'taskitem'},
-    {n:closed,l:'Closed (30d)',c:'#059669',tab:'closed'},
+    {n:taskItems,l:'CS Task Items',c:csColor,tab:'taskitem'},
+    {n:closed,l:'Recently Closed',c:'#059669',tab:'closed'},
     {n:S.ignored.length,l:'Ignored',c:'#6b7280',tab:'ignored'}
   ];
   var h='';
@@ -605,8 +606,8 @@ var TAB_DEFS=[
 ];
 
 function tabCount(id){
-  if(id==='all')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
-  if(id==='new')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&ageDays(i.createdAt)<3;}).length;
+  if(id==='all')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
+  if(id==='new')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&ageDays(i.createdAt)<3&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
   if(id==='taskitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
   if(id==='bylabel')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
   if(id==='closed')return S.closedIssues.length;
@@ -789,7 +790,7 @@ function renderMain(){
     return;
   }
 
-  var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
+  var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
   if(tab==='new')src=src.filter(function(i){return ageDays(i.createdAt)<3;});
 
   var filtered=applyFilters(src);
