@@ -38,7 +38,6 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .ttok-chip{font-size:10px;padding:2px 8px;border-radius:999px;font-weight:700;line-height:1.6;white-space:nowrap}
 .ttok-set{background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe}
 .ttok-set.amber{background:#fef3c7;color:#92400e;border-color:#fde68a}
-.ttok-set.green{background:#dcfce7;color:#15803d;border-color:#86efac}
 .ttok-unset{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
 
 /* Vault widget */
@@ -206,17 +205,6 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="tile-tokens" id="tile-tokens-customerportal"></div>
     </div>
 
-    <div class="card" style="border-top-color:#16a34a" id="tile-cstaskitems"
-         onclick="openTile('cstaskitems')" role="button" tabindex="0"
-         onkeydown="if(event.key==='Enter'||event.key===' ')openTile('cstaskitems')">
-      <button class="card-gear" onclick="openSettings('cstaskitems',event)" title="CS Task Items settings">⚙</button>
-      <div class="card-icon">✅</div>
-      <div class="card-name">CS Task Items</div>
-      <div class="card-desc">Issues with CS Task Item label</div>
-      <span class="card-badge" style="background:#dcfce7;color:#15803d">Live</span>
-      <div class="tile-tokens" id="tile-tokens-cstaskitems"></div>
-    </div>
-
   </div>
 </div>
 
@@ -271,7 +259,6 @@ var TILE_CONFIG={
   cis:{href:'cis.html',icon:'🛡️',name:'CIS',accentClass:'',required:['gh','zh']},
   powersearch:{href:'powersearch.html',icon:'🔍',name:'Power Search',accentClass:'',required:['gh','zh']},
   customerportal:{href:'customerportal.html',icon:'🌐',name:'Customer Portal',accentClass:'',required:['gh','zh']},
-  cstaskitems:{href:'powersearch.html',icon:'✅',name:'CS Task Items',accentClass:'green',required:['gh','zh'],preLabel:'CS Task Item'}
 };
 var TYPE_LABELS={gh:'GitHub',zh:'ZenHub',tfs:'TFS (Password)',asana:'Asana'};
 
@@ -401,9 +388,7 @@ async function launchTile(id){
     }
     // Build destination URL
     var href=cfg.href;
-    if(cfg.preLabel){
-      href=cfg.href+'#cv_label='+encodeURIComponent(cfg.preLabel);
-    } else if(id==='financials'){
+    if(id==='financials'){
       var fs=loadFinancialsSettings();
       var h='#cv_auto=1';
       if(fs.server)h+='&cv_server='+encodeURIComponent(fs.server);
@@ -466,7 +451,7 @@ function openSettings(id,event){
       body+='</div>';
     });
     body+='<div class="info-box" style="margin-top:14px">📁 <strong>Project profiles</strong> are configured within the dashboard — click the tile to open and use the project selector or ⚙ settings inside the dashboard.</div>';
-    var openHref=cfg.preLabel?cfg.href+'#cv_label='+encodeURIComponent(cfg.preLabel):cfg.href;
+    var openHref=cfg.href;
     actions='<button class="btn-cancel" onclick="closeSettings()">Close</button>';
     actions+='<a href="'+esc(openHref)+'" class="btn-launch" style="text-decoration:none">Open Dashboard ↗</a>';
   }

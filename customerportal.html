@@ -172,6 +172,7 @@ tr:hover td{background:#f9fafb}
       <select id="filterLabel" onchange="renderMain()"><option value="">All labels</option></select>
       <select id="filterRepo" onchange="renderMain()"><option value="">All repos</option></select>
       <select id="filterAssignee" onchange="renderMain()"><option value="">All assignees</option></select>
+      <select id="filterPipeline" onchange="renderMain()"><option value="">All pipelines</option></select>
       <button onclick="clearFilters()" style="font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;text-decoration:underline;font-weight:600">Clear</button>
     </div>
     <div id="dashErr" style="display:none;margin-bottom:12px"></div>
@@ -188,7 +189,8 @@ var S={
   activeProfile:null,
   sortState:{col:'age',dir:1},
   autoRefreshTimer:null,
-  preFilterLabel:''
+  preFilterLabel:'',
+  zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},repoWorkspaceMap:{},zhConnected:false
 };
 var STORAGE_KEY='cp_issues_cache_v1',PROFILES_KEY='cp_profiles_v1',IGNORED_KEY='cp_ignored_v1';
 
@@ -332,6 +334,9 @@ function onProfileSel(){
   if(!p)return;
   S.activeProfile=p;
   document.getElementById('reposInput').value=p.type==='group'?(p.repos||[]).map(function(r){return r.repo;}).join(','):p.repo;
+  S.repoWorkspaceMap={};
+  if(p.type==='group'){(p.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(p.repos&&p.repos[0])S.zhWorkspace=p.repos[0].zhWorkspace||'';}
+  else if(p.zhWorkspace){S.zhWorkspace=p.zhWorkspace;}
 }
 
 // ── Config screen ─────────────────────────────────────────────────────────────
@@ -356,23 +361,25 @@ function renderCfg(){
   h+='<div id="cfgS">';
   h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Display name</label><input type="text" id="pName" placeholder="e.g. Customer Portal" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
   h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">GitHub repo (owner/repo)</label><input type="text" id="pRepo" placeholder="e.g. myorg/customer-portal" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
+  h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">ZenHub Workspace ID <span style="font-size:12px;font-weight:400;color:#9ca3af">(optional)</span></label><input type="text" id="pWorkspace" placeholder="e.g. 5e1b3c..." style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
   h+='<div id="pErr" style="display:none;margin-top:8px"></div><div style="margin-top:14px"><button class="btn-p" onclick="saveNewProfile()">Add project</button></div></div>';
   h+='<div id="cfgG" style="display:none">';
   h+='<div class="fg"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:4px">Group name</label><input type="text" id="gName" placeholder="e.g. All Portal Repos" style="width:100%;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none"/></div>';
   h+='<div style="font-size:13px;font-weight:600;color:#374151;margin:12px 0 8px">Repos in group</div><div id="gRepoList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>';
-  h+='<div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap"><div style="flex:1"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Repo (owner/repo)</label><input type="text" id="gRI" placeholder="myorg/repo" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/></div>';
+  h+='<div style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap"><div style="flex:2"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">Repo (owner/repo)</label><input type="text" id="gRI" placeholder="myorg/repo" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/></div>';
+  h+='<div style="flex:1"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:3px">ZH Workspace ID</label><input type="text" id="gWI" placeholder="optional" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;outline:none"/></div>';
   h+='<button class="btn-sm" onclick="addGRepo()" style="align-self:flex-end">+ Add</button></div>';
   h+='<div id="gErr" style="display:none;margin-top:8px"></div><div style="margin-top:14px"><button class="btn-p" onclick="saveGroup()">Save group</button></div></div></div>';
   document.getElementById('cfgList').innerHTML=h;window._gr=[];
 }
 function showCfgTab(t){document.getElementById('cfgS').style.display=t==='s'?'block':'none';document.getElementById('cfgG').style.display=t==='g'?'block':'none';document.getElementById('ctS').style.cssText=t==='s'?'background:#4338ca;color:#fff;border-color:#4338ca':'';document.getElementById('ctG').style.cssText=t==='g'?'background:#4338ca;color:#fff;border-color:#4338ca':'';}
-function addGRepo(){var r=document.getElementById('gRI').value.trim();if(!r){showErr('gErr','Repo required.');}else{if(!window._gr)window._gr=[];window._gr.push({repo:r});document.getElementById('gRI').value='';renderGRepos();}}
-function renderGRepos(){var el=document.getElementById('gRepoList');if(!el)return;if(!window._gr||!window._gr.length){el.innerHTML='<div style="font-size:12px;color:#9ca3af">No repos added yet.</div>';}else{el.innerHTML=window._gr.map(function(r,i){return '<div style="display:flex;align-items:center;gap:8px;background:#f5f3ff;border:1px solid #e5e7eb;border-radius:7px;padding:7px 10px;font-size:12px"><span style="flex:1;font-weight:600">'+esc(r.repo)+'</span><button class="btn-d" style="padding:2px 8px;font-size:11px" onclick="remGRepo('+i+')">✕</button></div>';}).join('');}}
+function addGRepo(){var r=document.getElementById('gRI').value.trim(),w=document.getElementById('gWI')?document.getElementById('gWI').value.trim():'';if(!r){showErr('gErr','Repo required.');}else{if(!window._gr)window._gr=[];window._gr.push({repo:r,zhWorkspace:w});document.getElementById('gRI').value='';if(document.getElementById('gWI'))document.getElementById('gWI').value='';renderGRepos();}}
+function renderGRepos(){var el=document.getElementById('gRepoList');if(!el)return;if(!window._gr||!window._gr.length){el.innerHTML='<div style="font-size:12px;color:#9ca3af">No repos added yet.</div>';}else{el.innerHTML=window._gr.map(function(r,i){return '<div style="display:flex;align-items:center;gap:8px;background:#f5f3ff;border:1px solid #e5e7eb;border-radius:7px;padding:7px 10px;font-size:12px"><span style="flex:1;font-weight:600">'+esc(r.repo)+'</span>'+(r.zhWorkspace?'<span style="font-size:11px;color:#6b7280">ws: '+esc(r.zhWorkspace)+'</span>':'')+'<button class="btn-d" style="padding:2px 8px;font-size:11px" onclick="remGRepo('+i+')">✕</button></div>';}).join('');}}
 function remGRepo(i){window._gr.splice(i,1);renderGRepos();}
 function saveGroup(){var n=document.getElementById('gName').value.trim();if(!n){showErr('gErr','Name required.');}else if(!window._gr||!window._gr.length){showErr('gErr','Add at least one repo.');}else{var p=loadProfiles();p.push({id:'cp_'+Date.now(),name:n,type:'group',repos:window._gr.slice()});saveProfiles(p);window._gr=[];renderCfg();}}
-function saveNewProfile(){var n=document.getElementById('pName').value.trim(),r=document.getElementById('pRepo').value.trim();if(!n||!r){showErr('pErr','Name and repo required.');}else{var p=loadProfiles();p.push({id:'cp_'+Date.now(),name:n,repo:r,type:'single'});saveProfiles(p);renderCfg();}}
+function saveNewProfile(){var n=document.getElementById('pName').value.trim(),r=document.getElementById('pRepo').value.trim(),w=(document.getElementById('pWorkspace')&&document.getElementById('pWorkspace').value.trim())||'';if(!n||!r){showErr('pErr','Name and repo required.');}else{var p=loadProfiles();p.push({id:'cp_'+Date.now(),name:n,repo:r,zhWorkspace:w,type:'single'});saveProfiles(p);renderCfg();}}
 function delProfile(id){if(!confirm('Delete this project?'))return;saveProfiles(loadProfiles().filter(function(p){return p.id!==id;}));renderCfg();}
-function editProfile(id){var p=loadProfiles(),pr=p.find(function(x){return x.id===id;});if(!pr)return;var n=prompt('Display name:',pr.name);if(n===null)return;n=n.trim();if(!n){alert('Name required.');return;}if(pr.type==='group'){pr.name=n;}else{var r=prompt('Repo (owner/repo):',pr.repo);if(r===null)return;r=r.trim();if(!r){alert('Repo required.');return;}pr.name=n;pr.repo=r;}saveProfiles(p);renderCfg();}
+function editProfile(id){var p=loadProfiles(),pr=p.find(function(x){return x.id===id;});if(!pr)return;var n=prompt('Display name:',pr.name);if(n===null)return;n=n.trim();if(!n){alert('Name required.');return;}if(pr.type==='group'){pr.name=n;}else{var r=prompt('Repo (owner/repo):',pr.repo);if(r===null)return;r=r.trim();if(!r){alert('Repo required.');return;}var w=prompt('ZenHub Workspace ID (leave blank to clear):',pr.zhWorkspace||'');if(w===null)return;pr.name=n;pr.repo=r;pr.zhWorkspace=w.trim();}saveProfiles(p);renderCfg();}
 
 // ── API helpers ───────────────────────────────────────────────────────────────
 async function ghFetch(path){
@@ -380,6 +387,8 @@ async function ghFetch(path){
   if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);
   return r.json();
 }
+async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{headers:{'X-Authentication-Token':S.zhToken}});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
+
 async function ghFetchAll(path,maxPages){
   maxPages=maxPages||10;var results=[],per=100;
   for(var page=1;page<=maxPages;page++){
@@ -391,6 +400,9 @@ async function ghFetchAll(path,maxPages){
   }
   return results;
 }
+
+async function loadZHData(){S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){setStatus('<span style="color:#fca5a5">✕ ZenHub failed for '+esc(repo)+': '+esc(e.message)+'</span>');}}S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});}
+function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
 
 async function loadLabelColors(){
   for(var i=0;i<S.repos.length;i++){
@@ -415,7 +427,7 @@ async function loadIssues(){
         labels:iss.labels.map(function(l){return l.name;}),
         assignees:iss.assignees.map(function(a){return a.login;}),
         createdAt:iss.created_at,url:iss.html_url,state:'open',
-        milestone:iss.milestone?iss.milestone.title:null
+        milestone:iss.milestone?iss.milestone.title:null,pipeline:null
       });
     });
     var cd=await ghFetchAll('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&since='+since30,5);
@@ -464,6 +476,7 @@ async function connect(){
       await loadIssues();
       saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();
       setStatus('<span style="color:#a5b4fc">✓ Loaded</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
+      zhLoad();
     }catch(e){showErr('setupErr',e.message);}
     hideLoadingOverlay();
     btn.disabled=false;btn.innerHTML='▶ Load Dashboard';
@@ -473,10 +486,11 @@ async function connect(){
 async function bgRefresh(){
   showLoadingOverlay('Refreshing...');
   try{
-    S.labelColors={};S.labelNames={};
+    S.labelColors={};S.labelNames={};S.zhIssueMap={};S.zhPipelines={};S.repoIds={};S.zhConnected=false;
     await loadLabelColors();await loadIssues();
     saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();
     setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
+    zhLoad();
   }catch(e){setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');}
   hideLoadingOverlay();
 }
@@ -484,12 +498,14 @@ async function bgRefresh(){
 async function doRefresh(){
   var btn=document.getElementById('refreshBtn');btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
   try{localStorage.removeItem(STORAGE_KEY);}catch(e){}
+  S.zhIssueMap={};S.zhPipelines={};S.repoIds={};S.zhConnected=false;
   showLoadingOverlay('Refreshing...');
   try{
     S.labelColors={};S.labelNames={};
     await loadLabelColors();await loadIssues();
     saveCache();populateFilters();buildTabs();renderMain();
-    setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
+    if(S.zhToken&&S.zhWorkspace)zhLoad();
+    else setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
   }catch(e){showErr('dashErr',e.message);}
   hideLoadingOverlay();
   btn.disabled=false;btn.innerHTML='↻ Refresh';
@@ -499,11 +515,12 @@ function startAutoRefresh(){if(S.autoRefreshTimer)clearInterval(S.autoRefreshTim
 
 // ── Filters ───────────────────────────────────────────────────────────────────
 function populateFilters(){
-  var labels={},repos={},assignees={};
+  var labels={},repos={},assignees={},pipelines={};
   S.issues.concat(S.closedIssues).forEach(function(iss){
     iss.labels.forEach(function(l){labels[l]=1;});
     repos[iss.repo]=1;
     iss.assignees.forEach(function(a){assignees[a]=1;});
+    if(iss.pipeline)pipelines[iss.pipeline.pipelineName]=1;
   });
   var fl=document.getElementById('filterLabel');
   var cur=fl.value||(S.preFilterLabel||'');
@@ -522,6 +539,12 @@ function populateFilters(){
   fa.innerHTML='<option value="">All assignees</option><option value="_unassigned">Unassigned</option>';
   Object.keys(assignees).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}).forEach(function(a){fa.innerHTML+='<option value="'+esc(a)+'">'+esc(a)+'</option>';});
   if(curA)fa.value=curA;
+
+  var fp=document.getElementById('filterPipeline');
+  var curP=fp.value;
+  fp.innerHTML='<option value="">All pipelines</option>';
+  Object.keys(pipelines).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}).forEach(function(p){fp.innerHTML+='<option value="'+esc(p)+'">'+esc(p)+'</option>';});
+  if(curP)fp.value=curP;
 }
 
 function clearFilters(){
@@ -529,6 +552,7 @@ function clearFilters(){
   document.getElementById('filterLabel').value='';
   document.getElementById('filterRepo').value='';
   document.getElementById('filterAssignee').value='';
+  document.getElementById('filterPipeline').value='';
   renderMain();
 }
 
@@ -537,11 +561,13 @@ function applyFilters(issues){
   var lbl=document.getElementById('filterLabel').value;
   var repo=document.getElementById('filterRepo').value;
   var asgn=document.getElementById('filterAssignee').value;
+  var pip=document.getElementById('filterPipeline').value;
   return issues.filter(function(iss){
     if(q&&!(iss.title.toLowerCase().includes(q)||String(iss.id).includes(q)||iss.assignees.join(' ').toLowerCase().includes(q)||iss.labels.join(' ').toLowerCase().includes(q)))return false;
     if(lbl&&!iss.labels.some(function(l){return l===lbl;}))return false;
     if(repo&&iss.repo!==repo)return false;
     if(asgn){if(asgn==='_unassigned'&&iss.assignees.length>0)return false;else if(asgn!=='_unassigned'&&!iss.assignees.includes(asgn))return false;}
+    if(pip&&!(iss.pipeline&&iss.pipeline.pipelineName===pip))return false;
     return true;
   });
 }
@@ -640,8 +666,10 @@ function issueRow(iss,showClosed,showRestore){
     var closedAge=ageDays(iss.closedAt);
     h+='<td style="white-space:nowrap;font-size:12px;color:#6b7280">'+closedAge+'d ago</td>';
     h+='<td style="white-space:nowrap;font-size:12px;color:#6b7280">'+esc(iss.closedBy||'—')+'</td>';
+    if(S.zhToken)h+='<td style="font-size:12px;color:#6b7280;white-space:nowrap">'+(iss.pipeline?esc(iss.pipeline.pipelineName):'<span style="color:#d1d5db">—</span>')+'</td>';
   } else {
     h+='<td style="white-space:nowrap"><span class="'+cls+'">'+age+'d</span></td>';
+    if(S.zhToken)h+='<td style="font-size:12px;color:#6b7280;white-space:nowrap">'+(iss.pipeline?esc(iss.pipeline.pipelineName):'<span style="color:#d1d5db">—</span>')+'</td>';
     if(showRestore)h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';
     else h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
   }
@@ -659,6 +687,7 @@ function openTable(issues,emptyMsg,showRestore){
   if(multiRepo)h+='<th onclick="thClick(\'repo\')"'+thCls('repo')+'>Repo'+thArrow('repo')+'</th>';
   h+='<th onclick="thClick(\'assignee\')"'+thCls('assignee')+'>Assignee'+thArrow('assignee')+'</th>';
   h+='<th onclick="thClick(\'age\')"'+thCls('age')+'>Age'+thArrow('age')+'</th>';
+  if(S.zhToken)h+='<th>Pipeline</th>';
   h+='<th></th>';
   h+='</tr></thead><tbody>';
   sortIssues(issues).forEach(function(iss){h+=issueRow(iss,false,showRestore);});
@@ -677,6 +706,7 @@ function closedTable(issues){
   h+='<th onclick="thClick(\'assignee\')"'+thCls('assignee')+'>Assignee'+thArrow('assignee')+'</th>';
   h+='<th onclick="thClick(\'closed\')"'+thCls('closed')+'>Closed'+thArrow('closed')+'</th>';
   h+='<th>By</th>';
+  if(S.zhToken)h+='<th>Pipeline</th>';
   h+='</tr></thead><tbody>';
   var savedSort=JSON.parse(JSON.stringify(S.sortState));S.sortState={col:'closed',dir:1};
   sortIssues(issues).forEach(function(iss){h+=issueRow(iss,true);});
@@ -702,7 +732,9 @@ function byLabelView(issues){
     h+='<span class="gt" style="color:'+tfb(c)+'">'+esc(display)+'<span class="gc">'+grpIssues.length+'</span></span></div>';
     h+='<div class="tw2"><table><thead><tr><th>No.</th><th>Title</th>';
     if(S.repos.length>1)h+='<th>Repo</th>';
-    h+='<th>Assignee</th><th>Age</th><th></th></tr></thead><tbody>';
+    h+='<th>Assignee</th><th>Age</th>';
+    if(S.zhToken)h+='<th>Pipeline</th>';
+    h+='<th></th></tr></thead><tbody>';
     grpIssues.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);}).forEach(function(iss){h+=issueRow(iss,false,false);});
     h+='</tbody></table></div></div>';
   });
@@ -711,7 +743,9 @@ function byLabelView(issues){
     h+='<span class="gt">Unlabeled<span class="gc">'+unlabeled.length+'</span></span></div>';
     h+='<div class="tw2"><table><thead><tr><th>No.</th><th>Title</th>';
     if(S.repos.length>1)h+='<th>Repo</th>';
-    h+='<th>Assignee</th><th>Age</th><th></th></tr></thead><tbody>';
+    h+='<th>Assignee</th><th>Age</th>';
+    if(S.zhToken)h+='<th>Pipeline</th>';
+    h+='<th></th></tr></thead><tbody>';
     unlabeled.forEach(function(iss){h+=issueRow(iss,false,false);});
     h+='</tbody></table></div></div>';
   }
@@ -752,6 +786,8 @@ function renderMain(){
   var _h=location.hash.slice(1);
   if(_h){var _p={};_h.split('&').forEach(function(kv){var i=kv.indexOf('=');if(i>0)_p[kv.slice(0,i)]=decodeURIComponent(kv.slice(i+1));});if(_p.cv_label)S.preFilterLabel=_p.cv_label;history.replaceState(null,'',location.pathname);}
   var gh=sessionStorage.getItem('cv_session_gh');
+  var _zh=sessionStorage.getItem('cv_session_zh');
+  if(_zh)S.zhToken=_zh;
   if(!gh){
     document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;font-family:ui-sans-serif,system-ui,sans-serif"><div style="background:#fff;border-radius:14px;padding:40px 48px;box-shadow:0 2px 12px rgba(0,0,0,0.08);text-align:center;max-width:400px"><div style="font-size:2.5rem;margin-bottom:12px">🔒</div><div style="font-size:1.1rem;font-weight:700;color:#1e1b4b;margin-bottom:8px">Tokens required</div><div style="font-size:14px;color:#6b7280;margin-bottom:24px">Please unlock your vault on the hub page and assign your GitHub token before opening this dashboard.</div><a href="index.html" style="display:inline-block;background:#4338ca;color:#fff;border-radius:9px;padding:11px 28px;font-size:14px;font-weight:700;text-decoration:none">← Go to Hub</a></div></div>';
     return;
@@ -767,6 +803,9 @@ function renderMain(){
   var profile=profiles[0];
   S.activeProfile=profile;
   S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo;}):[profile.repo];
+  S.repoWorkspaceMap={};
+  if(profile.type==='group'){(profile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(profile.repos&&profile.repos[0])S.zhWorkspace=profile.repos[0].zhWorkspace||'';}
+  else if(profile.zhWorkspace){S.zhWorkspace=profile.zhWorkspace;}
   var dtEl=document.getElementById('dashTitle');
   if(dtEl)dtEl.textContent='CentralView GitHub Issue Triage — Customer Portal';
   S.ignored=loadIgnored();
@@ -780,7 +819,7 @@ function renderMain(){
   } else {
     showDash();setStatus('<span style="color:#fbbf24">⏳ Loading...</span>');showLoadingOverlay('Loading issues...');
     Promise.all([loadLabelColors(),loadIssues()])
-      .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();hideLoadingOverlay();setStatus('<span style="color:#a5b4fc">✓ Loaded</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');})
+      .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();hideLoadingOverlay();setStatus('<span style="color:#a5b4fc">✓ Loaded</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');zhLoad();})
       .catch(function(e){hideLoadingOverlay();document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
   }
 })();
