@@ -153,8 +153,8 @@ tr:hover td{background:#f9fafb}
     <div class="hdr-right">
       <nav class="hdr-nav">
         <a href="index.html">Home</a>
-        <a href="cis.html" target="_blank">CentralView</a>
-        <a href="powersearch.html" target="_blank">Power Search</a>
+        <a href="cis.html">CentralView</a>
+        <a href="powersearch.html">Power Search</a>
         <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank">PM Tools</a>
       </nav>
       <div class="hdr-sep"></div>
@@ -187,7 +187,8 @@ var S={
   labelColors:{},labelNames:{},
   activeProfile:null,
   sortState:{col:'age',dir:1},
-  autoRefreshTimer:null
+  autoRefreshTimer:null,
+  preFilterLabel:''
 };
 var STORAGE_KEY='cp_issues_cache_v1',PROFILES_KEY='cp_profiles_v1',IGNORED_KEY='cp_ignored_v1';
 
@@ -433,8 +434,7 @@ async function loadIssues(){
   }
   S.issues=open;
   S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
-  var title='🌐 '+(S.activeProfile?S.activeProfile.name+' ':' ')+'Customer Portal';
-  document.getElementById('dashTitle').textContent=title;
+  document.getElementById('dashTitle').textContent='CentralView GitHub Issue Triage — Customer Portal';
   document.getElementById('dashMeta').textContent=S.repos.join(', ')+' — '+open.length+' open issues';
 }
 
@@ -506,7 +506,7 @@ function populateFilters(){
     iss.assignees.forEach(function(a){assignees[a]=1;});
   });
   var fl=document.getElementById('filterLabel');
-  var cur=fl.value;
+  var cur=fl.value||(S.preFilterLabel||'');
   fl.innerHTML='<option value="">All labels</option>';
   Object.keys(labels).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}).forEach(function(l){fl.innerHTML+='<option value="'+esc(l)+'">'+esc(S.labelNames[l.toLowerCase()]||l)+'</option>';});
   if(cur)fl.value=cur;
@@ -550,12 +550,8 @@ function applyFilters(issues){
 function renderStats(){
   var open=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
   var closed=S.closedIssues.length;
-  var overdue=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&ageDays(i.createdAt)>7;}).length;
-  var unassigned=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.assignees.length===0;}).length;
   var stats=[
     {n:open,l:'Open Issues',c:'#4338ca',tab:'all'},
-    {n:overdue,l:'Overdue (>7d)',c:'#dc2626',tab:'overdue'},
-    {n:unassigned,l:'Unassigned',c:'#d97706',tab:'unassigned'},
     {n:closed,l:'Closed (30d)',c:'#059669',tab:'closed'},
     {n:S.ignored.length,l:'Ignored',c:'#6b7280',tab:'ignored'}
   ];
@@ -572,8 +568,6 @@ function renderStats(){
 var TAB_DEFS=[
   {id:'all',label:'All Open',color:'#4338ca'},
   {id:'new',label:'New (<3d)',color:'#0ea5e9'},
-  {id:'overdue',label:'Overdue (>7d)',color:'#dc2626'},
-  {id:'unassigned',label:'Unassigned',color:'#d97706'},
   {id:'bylabel',label:'By Label',color:'#7c3aed'},
   {id:'closed',label:'Recently Closed',color:'#059669'},
   {id:'ignored',label:'Ignored',color:'#6b7280'}
@@ -582,8 +576,6 @@ var TAB_DEFS=[
 function tabCount(id){
   if(id==='all')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
   if(id==='new')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&ageDays(i.createdAt)<3;}).length;
-  if(id==='overdue')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&ageDays(i.createdAt)>7;}).length;
-  if(id==='unassigned')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.assignees.length===0;}).length;
   if(id==='bylabel')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
   if(id==='closed')return S.closedIssues.length;
   if(id==='ignored')return S.ignored.length;
@@ -749,15 +741,16 @@ function renderMain(){
 
   var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
   if(tab==='new')src=src.filter(function(i){return ageDays(i.createdAt)<3;});
-  else if(tab==='overdue')src=src.filter(function(i){return ageDays(i.createdAt)>7;});
-  else if(tab==='unassigned')src=src.filter(function(i){return i.assignees.length===0;});
 
-  var emptyMsgs={all:'No open issues — all clear!',new:'No issues opened in the last 3 days.',overdue:'No overdue issues — great!',unassigned:'All issues are assigned!'};
+  var emptyMsgs={all:'No open issues — all clear!',new:'No issues opened in the last 3 days.'};
   content.innerHTML=openTable(applyFilters(src),emptyMsgs[tab]||'No issues found.',false);
 }
 
 // ── Session bootstrap ─────────────────────────────────────────────────────────
 (function(){
+  // Read pre-filter label from hub hash (e.g. #cv_label=CS+Task+Item)
+  var _h=location.hash.slice(1);
+  if(_h){var _p={};_h.split('&').forEach(function(kv){var i=kv.indexOf('=');if(i>0)_p[kv.slice(0,i)]=decodeURIComponent(kv.slice(i+1));});if(_p.cv_label)S.preFilterLabel=_p.cv_label;history.replaceState(null,'',location.pathname);}
   var gh=sessionStorage.getItem('cv_session_gh');
   if(!gh){
     document.body.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#f9fafb;font-family:ui-sans-serif,system-ui,sans-serif"><div style="background:#fff;border-radius:14px;padding:40px 48px;box-shadow:0 2px 12px rgba(0,0,0,0.08);text-align:center;max-width:400px"><div style="font-size:2.5rem;margin-bottom:12px">🔒</div><div style="font-size:1.1rem;font-weight:700;color:#1e1b4b;margin-bottom:8px">Tokens required</div><div style="font-size:14px;color:#6b7280;margin-bottom:24px">Please unlock your vault on the hub page and assign your GitHub token before opening this dashboard.</div><a href="index.html" style="display:inline-block;background:#4338ca;color:#fff;border-radius:9px;padding:11px 28px;font-size:14px;font-weight:700;text-decoration:none">← Go to Hub</a></div></div>';
@@ -774,6 +767,8 @@ function renderMain(){
   var profile=profiles[0];
   S.activeProfile=profile;
   S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo;}):[profile.repo];
+  var dtEl=document.getElementById('dashTitle');
+  if(dtEl)dtEl.textContent='CentralView GitHub Issue Triage — Customer Portal';
   S.ignored=loadIgnored();
   var cache=loadCache();
   if(cache&&cache.issues){
