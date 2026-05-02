@@ -33,6 +33,7 @@ a{color:#4338ca;text-decoration:none}a:hover{text-decoration:underline}
 .btn-d{padding:6px 12px;font-size:12px;border:1px solid #fca5a5;background:#fff;color:#dc2626;border-radius:7px;cursor:pointer;font-weight:600}
 .btn-ig{padding:4px 9px;font-size:11px;border:1px solid #e5e7eb;background:#fff;color:#9ca3af;border-radius:6px;cursor:pointer}
 .ps{font-size:11px;padding:3px 7px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#374151;cursor:pointer}
+.lbl-edit-panel{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-top:6px}
 .sw{max-width:560px;margin:24px auto}
 .sc{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:24px 28px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
 .sc h2{font-size:1rem;font-weight:700;color:#1e1b4b;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e5e7eb}
@@ -139,7 +140,11 @@ tr:hover td{background:#f9fafb}
 <div id="cfgScr">
   <div class="hdr"><div class="hdr-in">
     <div class="hdr-brand"><div class="hdr-logo">CP</div><div><h1>Customer Portal</h1></div></div>
-    <button class="hdr-act" onclick="backToSetup()">← Back</button>
+    <div class="hdr-right">
+      <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
+      <div class="hdr-sep"></div>
+      <button class="hdr-act" onclick="backToSetup()">← Back</button>
+    </div>
   </div></div>
   <div class="main" style="max-width:620px;margin:0 auto"><div id="cfgList"></div></div>
 </div>
@@ -159,8 +164,9 @@ tr:hover td{background:#f9fafb}
         <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank">PM Tools</a>
       </nav>
       <div class="hdr-sep"></div>
-      <button class="hdr-act" id="refreshBtn" onclick="doRefresh()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>Refresh</button>
-      <button class="hdr-act" onclick="showCfg()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
+      <button class="hdr-act" id="refreshBtn" onclick="doRefresh()" title="Refresh"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+      <button class="hdr-act" onclick="showDiagModal()" title="Diagnostics" style="font-size:15px;padding:4px 8px">🩺</button>
+      <button class="hdr-act" onclick="showCfg()" title="Settings"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       <div class="hdr-sep"></div>
       <span id="loadedAt" class="hdr-status"></span>
     </div>
@@ -196,7 +202,15 @@ var S={
 };
 var STORAGE_KEY='cp_issues_cache_v1',PROFILES_KEY='cp_profiles_v1',IGNORED_KEY='cp_ignored_v1',CP_WARN_DISMISSED_KEY='cp_warn_dismissed_v1';
 var CS_LABELS_CP=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
+var EPA_MILESTONE='Orbit One Enhancements Pending Approval';
 function hasCS(i){return i.labels.some(function(l){return CS_LABELS_CP.indexOf(l.toLowerCase())!==-1;});}
+function isEPA(i){return i.labels.some(function(l){return l.toLowerCase()==='enhancement pending approval';});}
+function isEnhancement(i){return !isEPA(i)&&i.labels.some(function(l){return l.toLowerCase()==='enhancement';});}
+function isExcludeFromNew(i){return hasCS(i)||isEPA(i)||isEnhancement(i);}
+// Warning: has cs item + enhancement pending approval but NOT in the EPA milestone
+function isEPAMilestoneMissing(i){if(!isEPA(i))return false;var hasCsItem=i.labels.some(function(l){return l.toLowerCase()==='cs item';});return hasCsItem&&i.milestone!==EPA_MILESTONE;}
+// Warning: in the EPA milestone but missing cs item OR enhancement pending approval label
+function isMilestoneOrphan(i){if(i.milestone!==EPA_MILESTONE)return false;var hasCsItem=i.labels.some(function(l){return l.toLowerCase()==='cs item';});return !isEPA(i)||!hasCsItem;}
 function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');}
 function isMissingParent(issue){if(!hasCS(issue))return false;if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;return !issue.parent;}
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
@@ -324,6 +338,13 @@ function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON
 function saveIgnored(){try{localStorage.setItem(IGNORED_KEY,JSON.stringify(S.ignored));}catch(e){}}
 function ignoreIssue(k){if(S.ignored.indexOf(k)===-1)S.ignored.push(k);saveIgnored();buildTabs();renderMain();}
 function unignoreIssue(k){S.ignored=S.ignored.filter(function(x){return x!==k;});saveIgnored();buildTabs();renderMain();}
+// ── Label editing ─────────────────────────────────────────────────────────────
+function lsort(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}
+var _openLabelPanel=null;
+function toggleLabelEdit(issueId,repo){var key=issueId+'_'+repo;var panelId='lblpanel_'+key;if(_openLabelPanel&&_openLabelPanel!==panelId){var old=document.getElementById(_openLabelPanel);if(old)old.style.display='none';}var panel=document.getElementById(panelId);if(!panel)return;var isOpen=panel.style.display==='block';panel.style.display=isOpen?'none':'block';_openLabelPanel=isOpen?null:panelId;if(!isOpen)renderLabelEditPanel(issueId,repo);}
+function renderLabelEditPanel(issueId,repo){var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;})||S.closedIssues.find(function(i){return i.id===issueId&&i.repo===repo;});var panel=document.getElementById('lblpanel_'+issueId+'_'+repo);if(!issue||!panel)return;var allLabels=Object.keys(S.labelColors).sort(lsort),current=issue.labels.map(function(l){return l.toLowerCase();});var h='<div class="lbl-edit-panel"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Edit Labels — #'+issueId+'</div>';h+='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">';if(issue.labels.length){issue.labels.forEach(function(l){var c=S.labelColors[l.toLowerCase()]||'e5e7eb';var display=S.labelNames[l.toLowerCase()]||l;h+='<span style="display:inline-flex;align-items:center;gap:4px;background:#'+c+';color:'+tfb(c)+';padding:3px 8px;border-radius:999px;font-size:11px;font-weight:600">'+esc(display)+'<button onclick="removeLbl('+issueId+',\''+esc(repo)+'\',\''+esc(l)+'\')" style="background:none;border:none;cursor:pointer;color:inherit;font-size:11px;padding:0;opacity:0.7">✕</button></span>';});}else h+='<span style="font-size:12px;color:#9ca3af">No labels</span>';h+='</div><div style="display:flex;gap:6px;align-items:center"><select id="lblAddSel_'+issueId+'_'+esc(repo)+'" style="flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none"><option value="">— Add a label —</option>';allLabels.forEach(function(l){if(current.indexOf(l)===-1){var display=S.labelNames[l]||l;h+='<option value="'+esc(l)+'">'+esc(display)+'</option>';}});h+='</select><button class="btn-sm" onclick="addLbl('+issueId+',\''+esc(repo)+'\')">＋ Add</button></div></div>';panel.innerHTML=h;}
+async function addLbl(issueId,repo){var sel=document.getElementById('lblAddSel_'+issueId+'_'+repo);var labelKey=sel?sel.value:'';if(!labelKey)return;var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;})||S.closedIssues.find(function(i){return i.id===issueId&&i.repo===repo;});if(!issue)return;var displayName=S.labelNames[labelKey]||labelKey;var newLabels=issue.labels.concat([displayName]);try{await ghPatch('/repos/'+repo+'/issues/'+issueId,{labels:newLabels});issue.labels=newLabels;renderMain();setTimeout(function(){var p=document.getElementById('lblpanel_'+issueId+'_'+repo);if(p&&p.style.display==='block')renderLabelEditPanel(issueId,repo);},80);}catch(e){alert('Failed: '+e.message);}}
+async function removeLbl(issueId,repo,label){var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;})||S.closedIssues.find(function(i){return i.id===issueId&&i.repo===repo;});if(!issue)return;var newLabels=issue.labels.filter(function(l){return l.toLowerCase()!==label.toLowerCase();});try{await ghPatch('/repos/'+repo+'/issues/'+issueId,{labels:newLabels});issue.labels=newLabels;renderMain();setTimeout(function(){var p=document.getElementById('lblpanel_'+issueId+'_'+repo);if(p&&p.style.display==='block')renderLabelEditPanel(issueId,repo);},80);}catch(e){alert('Failed: '+e.message);}}
 function showErr(id,msg){var el=document.getElementById(id);el.className='err';el.textContent=msg;el.style.display='block';}
 function hideErr(id){document.getElementById(id).style.display='none';}
 function showEl(id){document.getElementById(id).style.display='block';}
@@ -397,6 +418,7 @@ async function ghFetch(path){
   if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);
   return r.json();
 }
+async function ghPatch(path,body){var r=await fetch('https://api.github.com'+path,{method:'PATCH',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);return r.json();}
 async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{headers:{'X-Authentication-Token':S.zhToken}});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
 async function zhPost(path,data){var r=await fetch('https://api.zenhub.com'+path,{method:'POST',headers:{'X-Authentication-Token':S.zhToken,'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
 async function loadSubIssueParents(){var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});await Promise.all(parents.map(async function(p){try{var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child&&!child.parent)child.parent={issueNumber:p.id};});}}catch(e){};}));}
@@ -527,7 +549,7 @@ async function doRefresh(){
     else setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
   }catch(e){showErr('dashErr',e.message);}
   hideLoadingOverlay();
-  btn.disabled=false;btn.innerHTML='↻ Refresh';
+  btn.disabled=false;btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>';
 }
 
 function startAutoRefresh(){if(S.autoRefreshTimer)clearInterval(S.autoRefreshTimer);S.autoRefreshTimer=setInterval(doRefresh,20*60*1000);}
@@ -593,10 +615,15 @@ function applyFilters(issues){
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 function renderStats(){
-  var open=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
+  var notIgnored=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
+  var newIssues=notIgnored.filter(function(i){return !isExcludeFromNew(i);}).length;
+  var epaCount=notIgnored.filter(isEPA).length;
+  var enhCount=notIgnored.filter(isEnhancement).length;
   var closed=S.closedIssues.length;
   var stats=[
-    {n:open,l:'Open Issues',c:'#4338ca',tab:'all'},
+    {n:newIssues,l:'New Issues',c:'#4338ca',tab:'all'},
+    {n:epaCount,l:'Enh. Pending Approval',c:'#7c3aed',tab:'epa'},
+    {n:enhCount,l:'Enhancement',c:'#d97706',tab:'enhancement'},
     {n:closed,l:'Recently Closed',c:'#059669',tab:'closed'},
     {n:S.ignored.length,l:'Ignored',c:'#6b7280',tab:'ignored'}
   ];
@@ -611,7 +638,9 @@ function renderStats(){
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 var TAB_DEFS=[
-  {id:'all',label:'All Open',color:'#4338ca'},
+  {id:'all',label:'New Issues',color:'#4338ca'},
+  {id:'epa',label:'Enh. Pending Approval',color:'#7c3aed'},
+  {id:'enhancement',label:'Enhancement',color:'#d97706'},
   {id:'new',label:'New (<3d)',color:'#0ea5e9'},
   {id:'bylabel',label:'By Label',color:'#7c3aed'},
   {id:'closed',label:'Recently Closed',color:'#059669'},
@@ -619,9 +648,12 @@ var TAB_DEFS=[
 ];
 
 function tabCount(id){
-  if(id==='all')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
-  if(id==='new')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&ageDays(i.createdAt)<3;}).length;
-  if(id==='bylabel')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
+  var notIgnored=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
+  if(id==='all')return notIgnored.filter(function(i){return !isExcludeFromNew(i);}).length;
+  if(id==='epa')return notIgnored.filter(isEPA).length;
+  if(id==='enhancement')return notIgnored.filter(isEnhancement).length;
+  if(id==='new')return notIgnored.filter(function(i){return !isExcludeFromNew(i)&&ageDays(i.createdAt)<3;}).length;
+  if(id==='bylabel')return notIgnored.length;
   if(id==='closed')return S.closedIssues.length;
   if(id==='ignored')return S.ignored.length;
   return 0;
@@ -677,13 +709,17 @@ function issueRow(iss,showClosed,showRestore){
   // Compute inline warnings for open issues
   var warnings=[];
   if(!showClosed&&S.warnDismissed.indexOf(ikey)===-1){
-    if(isMissingParent(iss))warnings.push('⚠ Has CS label but no parent');
     if(isNIP(iss))warnings.push('⚠ Still in New Issues pipeline');
+    if(isEPAMilestoneMissing(iss))warnings.push('⚠ Has cs item + enhancement pending approval labels but not in '+EPA_MILESTONE+' milestone');
+    if(isMilestoneOrphan(iss))warnings.push('⚠ In '+EPA_MILESTONE+' milestone but missing cs item or enhancement pending approval label');
   }
   var h='<tr'+(warnings.length?' style="background:#fff5f5"':'')+'>';
   h+='<td><a href="'+esc(iss.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+iss.id+'</a></td>';
   h+='<td style="max-width:380px"><div style="font-weight:600;line-height:1.4"><a href="'+esc(iss.url)+'" target="_blank" style="color:#1a1a1a;text-decoration:none" onmouseover="this.style.color=\'#4338ca\'" onmouseout="this.style.color=\'#1a1a1a\'">'+esc(iss.title)+'</a>'+(!showClosed?parentLink(iss):'')+'</div>';
-  if(lbls)h+='<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">'+lbls+'</div>';
+  h+='<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;align-items:center">';
+  if(lbls)h+=lbls;
+  h+='<button onclick="toggleLabelEdit('+iss.id+',\''+esc(iss.repo)+'\')" title="Edit labels" style="background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;color:#9ca3af;border-radius:4px;line-height:1" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">✏️</button>';
+  h+='</div><div id="lblpanel_'+iss.id+'_'+esc(iss.repo)+'" style="display:none"></div>';
   if(warnings.length){
     h+='<div style="margin-top:4px">';
     warnings.forEach(function(w){h+='<div style="margin-top:2px"><span class="badge" style="background:#fee2e2;color:#991b1b">'+esc(w)+'</span> <button onclick="dismissWarning(\''+ikey+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:#9ca3af;padding:0 3px" title="Dismiss warning">✕ Dismiss</button></div>';});
@@ -803,15 +839,25 @@ function renderMain(){
     content.innerHTML=closedTable(applyFilters(S.closedIssues));
     return;
   }
+  if(tab==='epa'){
+    var epaSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isEPA(i);});
+    content.innerHTML=openTable(applyFilters(epaSrc),'No enhancement pending approval items.',false);
+    return;
+  }
+  if(tab==='enhancement'){
+    var enhSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isEnhancement(i);});
+    content.innerHTML=openTable(applyFilters(enhSrc),'No enhancement items.',false);
+    return;
+  }
   if(tab==='bylabel'){
     content.innerHTML=byLabelView(applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;})));
     return;
   }
 
-  var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
+  var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isExcludeFromNew(i);});
   if(tab==='new')src=src.filter(function(i){return ageDays(i.createdAt)<3;});
 
-  var emptyMsgs={all:'No open issues — all clear!',new:'No issues opened in the last 3 days.'};
+  var emptyMsgs={all:'No new issues — all clear!',new:'No issues opened in the last 3 days.'};
   content.innerHTML=openTable(applyFilters(src),emptyMsgs[tab]||'No issues found.',false);
 }
 
@@ -859,6 +905,82 @@ function renderMain(){
       .catch(function(e){hideLoadingOverlay();document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
   }
 })();
+
+// ── Diagnostics modal ─────────────────────────────────────────────────────────
+function showDiagModal(){
+  var sel=document.getElementById('diagRepoSel');
+  sel.innerHTML='';
+  (S.repos.length?S.repos:['(no repos loaded)']).forEach(function(r){var o=document.createElement('option');o.value=r;o.textContent=r;sel.appendChild(o);});
+  document.getElementById('diagResult').innerHTML='';
+  document.getElementById('diagIssueNum').value='';
+  document.getElementById('diagModal').style.display='flex';
+  setTimeout(function(){document.getElementById('diagIssueNum').focus();},80);
+}
+function hideDiagModal(){document.getElementById('diagModal').style.display='none';}
+async function runDiag(){
+  var numVal=parseInt(document.getElementById('diagIssueNum').value,10);
+  var repo=document.getElementById('diagRepoSel').value;
+  var out=document.getElementById('diagResult');
+  if(!numVal||numVal<1){out.innerHTML='<div class="err">Please enter a valid issue number.</div>';return;}
+  if(!repo){out.innerHTML='<div class="err">No repo selected — load the dashboard first.</div>';return;}
+  out.innerHTML='<div style="font-size:13px;color:#6b7280;padding:10px 0">⏳ Checking issue #'+numVal+'…</div>';
+  var steps=[];
+  function pass(msg){steps.push({ok:true,msg:msg});}
+  function fail(msg){steps.push({ok:false,msg:msg});}
+  function info(msg){steps.push({ok:null,msg:msg});}
+  var iss=S.issues.find(function(i){return i.id===numVal&&i.repo===repo;});
+  var closedIss=S.closedIssues.find(function(i){return i.id===numVal&&i.repo===repo;});
+  if(!iss&&!closedIss){
+    info('Issue #'+numVal+' is <strong>not in the current loaded data</strong>. Fetching live from GitHub…');
+    try{var live=await ghFetch('/repos/'+repo+'/issues/'+numVal);if(live.pull_request){fail('This is a <strong>pull request</strong>, not an issue — excluded from all views.');}else{info('GitHub reports: <strong>'+live.state+'</strong>. Labels: '+(live.labels&&live.labels.length?live.labels.map(function(l){return '<code>'+esc(l.name)+'</code>';}).join(', '):'<em>none</em>'));if(live.state==='open')fail('Open on GitHub but not loaded — data may be stale. Try refreshing.');else info('Closed issues load from the last 30 days.');}
+    }catch(e){fail('Could not fetch from GitHub: '+esc(e.message));}
+    renderDiag(steps,out);return;
+  }
+  var i=iss||closedIss;
+  var ikey=i.id+'_'+i.repo;
+  info('Found in <strong>'+(iss?'open':'closed')+'</strong> issues. Labels: '+(i.labels.length?i.labels.map(function(l){return '<code>'+esc(l)+'</code>';}).join(', '):'<em>none</em>'));
+  if(i.milestone)info('Milestone: <strong>'+esc(i.milestone)+'</strong>');
+  if(i.pipeline)info('Pipeline: <strong>'+esc(i.pipeline.pipelineName)+'</strong>');
+  if(iss){
+    var ignored=S.ignored.indexOf(ikey)!==-1;
+    if(ignored){fail('This issue is <strong>ignored</strong> — does not appear in any active tab. Use Restore to bring it back.');}
+    else{
+      var inNewIssues=!isExcludeFromNew(i);
+      var inEpa=isEPA(i);
+      var inEnh=isEnhancement(i);
+      if(inNewIssues){pass('Appears in <strong>New Issues</strong> tab.');if(ageDays(i.createdAt)<3)pass('Age '+Math.round(ageDays(i.createdAt)*10)/10+'d — also in <strong>New (&lt;3d)</strong> tab.');else fail('Age '+Math.round(ageDays(i.createdAt))+'d — <strong>not</strong> in New (&lt;3d) tab.');}
+      if(inEpa)pass('Has <code>enhancement pending approval</code> label — appears in <strong>Enh. Pending Approval</strong> tab.');
+      if(inEnh)pass('Has <code>enhancement</code> label — appears in <strong>Enhancement</strong> tab.');
+      if(!inNewIssues&&!inEpa&&!inEnh){var csLabels=i.labels.filter(function(l){return CS_LABELS_CP.indexOf(l.toLowerCase())!==-1;});if(csLabels.length)info('Has CS label(s) '+csLabels.map(function(l){return '<code>'+esc(l)+'</code>';}).join(', ')+' — excluded from New Issues but not in EPA or Enhancement tabs.');}
+      if(isNIP(i))fail('⚠ Still in <strong>New Issues</strong> pipeline — expected to be moved.');
+      if(isEPAMilestoneMissing(i))fail('⚠ Has <code>cs item</code> + <code>enhancement pending approval</code> labels but NOT in <strong>'+esc(EPA_MILESTONE)+'</strong> milestone.');
+      if(isMilestoneOrphan(i))fail('⚠ In <strong>'+esc(EPA_MILESTONE)+'</strong> milestone but missing <code>cs item</code> or <code>enhancement pending approval</code> label.');
+      if(S.warnDismissed.indexOf(ikey)!==-1)info('Warning badge is currently <strong>dismissed</strong> for this issue.');
+    }
+  } else {info('Closed issue — appears only in the <strong>Recently Closed</strong> tab.');}
+  renderDiag(steps,out);
+}
+function renderDiag(steps,out){
+  var h='<div style="display:flex;flex-direction:column;gap:6px">';
+  steps.forEach(function(s){var bg=s.ok===true?'#ecfdf5':s.ok===false?'#fef2f2':'#f1f5f9';var border=s.ok===true?'#a7f3d0':s.ok===false?'#fca5a5':'#e2e8f0';var icon=s.ok===true?'✅':s.ok===false?'❌':'ℹ️';h+='<div style="display:flex;align-items:flex-start;gap:8px;background:'+bg+';border:1px solid '+border+';border-radius:8px;padding:9px 12px;font-size:13px"><span style="flex-shrink:0;margin-top:1px">'+icon+'</span><span>'+s.msg+'</span></div>';});
+  h+='</div>';out.innerHTML=h;
+}
 </script>
+
+<div class="modal-overlay" id="diagModal">
+  <div class="modal-box" style="max-width:640px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-size:15px;font-weight:700;color:#1e1b4b">🩺 Customer Portal — Issue Diagnostics</span>
+      <button class="btn-sm" onclick="hideDiagModal()">✕ Close</button>
+    </div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:14px">Enter an issue number to inspect its state, labels, and which tabs it appears in.</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+      <input type="number" id="diagIssueNum" placeholder="Issue #" min="1" style="width:130px;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;outline:none" onkeydown="if(event.key==='Enter')runDiag()"/>
+      <select id="diagRepoSel" style="flex:1;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;outline:none;color:#374151"></select>
+      <button class="btn-p" onclick="runDiag()" style="white-space:nowrap">Run Check</button>
+    </div>
+    <div id="diagResult"></div>
+  </div>
+</div>
 </body>
 </html>
