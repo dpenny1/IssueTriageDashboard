@@ -211,8 +211,11 @@ function isExcludeFromNew(i){return hasCS(i)||isEPA(i)||isEnhancement(i);}
 function isEPAMilestoneMissing(i){if(!isEPA(i))return false;var hasCsItem=i.labels.some(function(l){return l.toLowerCase()==='cs item';});return hasCsItem&&i.milestone!==EPA_MILESTONE;}
 // Warning: in the EPA milestone but missing cs item OR enhancement pending approval label
 function isMilestoneOrphan(i){if(i.milestone!==EPA_MILESTONE)return false;var hasCsItem=i.labels.some(function(l){return l.toLowerCase()==='cs item';});return !isEPA(i)||!hasCsItem;}
+function isCsOther(i){return hasCS(i)&&!isEPA(i)&&!isEnhancement(i);}
 function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');}
 function isMissingParent(issue){if(!hasCS(issue))return false;if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;return !issue.parent;}
+function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;return isNIP(i)||isEPAMilestoneMissing(i)||isMilestoneOrphan(i);}
+function exceptionCount(issues){return issues.filter(issueHasException).length;}
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
 function loadWarnDismissed(){try{var v=localStorage.getItem(CP_WARN_DISMISSED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveWarnDismissed(){try{localStorage.setItem(CP_WARN_DISMISSED_KEY,JSON.stringify(S.warnDismissed));}catch(e){}}
@@ -616,21 +619,25 @@ function applyFilters(issues){
 // ── Stats ─────────────────────────────────────────────────────────────────────
 function renderStats(){
   var notIgnored=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
-  var newIssues=notIgnored.filter(function(i){return !isExcludeFromNew(i);}).length;
-  var epaCount=notIgnored.filter(isEPA).length;
-  var enhCount=notIgnored.filter(isEnhancement).length;
-  var closed=S.closedIssues.length;
+  var newSrc=notIgnored.filter(function(i){return !isExcludeFromNew(i);});
+  var epaSrc=notIgnored.filter(isEPA);
+  var enhSrc=notIgnored.filter(isEnhancement);
+  var csOtherSrc=notIgnored.filter(isCsOther);
   var stats=[
-    {n:newIssues,l:'New Issues',c:'#4338ca',tab:'all'},
-    {n:epaCount,l:'Enh. Pending Approval',c:'#7c3aed',tab:'epa'},
-    {n:enhCount,l:'Enhancement',c:'#d97706',tab:'enhancement'},
-    {n:closed,l:'Recently Closed',c:'#059669',tab:'closed'},
-    {n:S.ignored.length,l:'Ignored',c:'#6b7280',tab:'ignored'}
+    {n:newSrc.length,exc:exceptionCount(newSrc),l:'New Issues',c:'#4338ca',tab:'all'},
+    {n:epaSrc.length,exc:exceptionCount(epaSrc),l:'Enh. Pending Approval',c:'#7c3aed',tab:'epa'},
+    {n:enhSrc.length,exc:exceptionCount(enhSrc),l:'Enhancement',c:'#d97706',tab:'enhancement'},
+    {n:csOtherSrc.length,exc:exceptionCount(csOtherSrc),l:'CS Items',c:'#0891b2',tab:'csother'},
+    {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#059669',tab:'closed'},
+    {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'}
   ];
   var h='';
   stats.forEach(function(s){
     h+='<div class="sc2" style="border-top-color:'+s.c+'" onclick="switchTab(\''+s.tab+'\')">';
+    h+='<div style="display:flex;align-items:flex-start;justify-content:center;gap:5px">';
     h+='<div class="sn" style="color:'+s.c+'">'+s.n+'</div>';
+    if(s.exc>0)h+='<span style="background:#dc2626;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:2px 6px;margin-top:7px;line-height:1.4;white-space:nowrap">'+s.exc+'</span>';
+    h+='</div>';
     h+='<div class="sl">'+s.l+'</div></div>';
   });
   document.getElementById('statGrid').innerHTML=h;
@@ -641,6 +648,7 @@ var TAB_DEFS=[
   {id:'all',label:'New Issues',color:'#4338ca'},
   {id:'epa',label:'Enh. Pending Approval',color:'#7c3aed'},
   {id:'enhancement',label:'Enhancement',color:'#d97706'},
+  {id:'csother',label:'CS Items',color:'#0891b2'},
   {id:'new',label:'New (<3d)',color:'#0ea5e9'},
   {id:'bylabel',label:'By Label',color:'#7c3aed'},
   {id:'closed',label:'Recently Closed',color:'#059669'},
@@ -652,6 +660,7 @@ function tabCount(id){
   if(id==='all')return notIgnored.filter(function(i){return !isExcludeFromNew(i);}).length;
   if(id==='epa')return notIgnored.filter(isEPA).length;
   if(id==='enhancement')return notIgnored.filter(isEnhancement).length;
+  if(id==='csother')return notIgnored.filter(isCsOther).length;
   if(id==='new')return notIgnored.filter(function(i){return !isExcludeFromNew(i)&&ageDays(i.createdAt)<3;}).length;
   if(id==='bylabel')return notIgnored.length;
   if(id==='closed')return S.closedIssues.length;
@@ -849,6 +858,11 @@ function renderMain(){
     content.innerHTML=openTable(applyFilters(enhSrc),'No enhancement items.',false);
     return;
   }
+  if(tab==='csother'){
+    var csOtherSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isCsOther(i);});
+    content.innerHTML=openTable(applyFilters(csOtherSrc),'No CS items found.',false);
+    return;
+  }
   if(tab==='bylabel'){
     content.innerHTML=byLabelView(applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;})));
     return;
@@ -951,7 +965,9 @@ async function runDiag(){
       if(inNewIssues){pass('Appears in <strong>New Issues</strong> tab.');if(ageDays(i.createdAt)<3)pass('Age '+Math.round(ageDays(i.createdAt)*10)/10+'d — also in <strong>New (&lt;3d)</strong> tab.');else fail('Age '+Math.round(ageDays(i.createdAt))+'d — <strong>not</strong> in New (&lt;3d) tab.');}
       if(inEpa)pass('Has <code>enhancement pending approval</code> label — appears in <strong>Enh. Pending Approval</strong> tab.');
       if(inEnh)pass('Has <code>enhancement</code> label — appears in <strong>Enhancement</strong> tab.');
-      if(!inNewIssues&&!inEpa&&!inEnh){var csLabels=i.labels.filter(function(l){return CS_LABELS_CP.indexOf(l.toLowerCase())!==-1;});if(csLabels.length)info('Has CS label(s) '+csLabels.map(function(l){return '<code>'+esc(l)+'</code>';}).join(', ')+' — excluded from New Issues but not in EPA or Enhancement tabs.');}
+      var inCsOther=isCsOther(i);
+      if(inCsOther)pass('Has CS label(s) — appears in <strong>CS Items</strong> tab.');
+      if(!inNewIssues&&!inEpa&&!inEnh&&!inCsOther){info('Not found in any active tab — issue may have no recognized labels.');}
       if(isNIP(i))fail('⚠ Still in <strong>New Issues</strong> pipeline — expected to be moved.');
       if(isEPAMilestoneMissing(i))fail('⚠ Has <code>cs item</code> + <code>enhancement pending approval</code> labels but NOT in <strong>'+esc(EPA_MILESTONE)+'</strong> milestone.');
       if(isMilestoneOrphan(i))fail('⚠ In <strong>'+esc(EPA_MILESTONE)+'</strong> milestone but missing <code>cs item</code> or <code>enhancement pending approval</code> label.');

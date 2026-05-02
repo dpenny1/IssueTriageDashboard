@@ -728,21 +728,37 @@ function sortIssues(list,tab){
 }
 function mkTh(col,label){var active=S.sortState.col===col;return '<th class="'+(active?'sorted':'')+'" onclick="doSort(\''+col+'\')">'+label+' <span class="si">'+(active?(S.sortState.dir===1?'▲':'▼'):'▲')+'</span></th>';}
 function doSort(col){if(S.sortState.col===col)S.sortState.dir*=-1;else{S.sortState.col=col;S.sortState.dir=1;}renderMain();}
+function cisExcCount(issues,tabId){
+  // testing tile: open CS in testing issues that should already be closed
+  if(tabId==='testing')return issues.filter(function(i){return i.state==='open';}).length;
+  // exceptions tile number IS the exception count — no extra badge needed
+  if(tabId==='exceptions'||tabId==='closed'||tabId==='ignored'||tabId==='report')return 0;
+  // all other open-issue tiles: count issues still stuck in the New Issues pipeline
+  return issues.filter(function(i){return i.state==='open'&&isNIP(i);}).length;
+}
 function renderStats(){
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i);});
-  var tN=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length+S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
+  var openTesting=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
+  var closedTesting=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
+  var newItemsSrc=base.filter(function(i){return !hasCS(i);});
+  var prodSrc=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});});
+  var uatSrc=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});
+  var failedSrc=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='failed testing';});});
+  var csItemsSrc=base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});});
+  var testingSrc=openTesting.concat(closedTesting);
+  var taskSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
   var stats=[
-    {n:base.filter(function(i){return !hasCS(i);}).length,tab:'newitems'},
-    {n:getExceptions().length+getClosedExceptions().length,tab:'exceptions'},
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length,tab:'prod'},
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length,tab:'uat'},
-    {n:base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='failed testing';});}).length,tab:'failedtesting'},
-    {n:base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});}).length,tab:'csitems'},
-    {n:tN,tab:'testing'},
-    {n:S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length,tab:'taskitem'},
-    {n:S.closedIssues.length,tab:'closed'},
-    {n:S.ignored.length,tab:'ignored'},
-    {n:'',tab:'report',mismatch:true}
+    {n:newItemsSrc.length,exc:cisExcCount(newItemsSrc,'newitems'),tab:'newitems'},
+    {n:getExceptions().length+getClosedExceptions().length,exc:0,tab:'exceptions'},
+    {n:prodSrc.length,exc:cisExcCount(prodSrc,'prod'),tab:'prod'},
+    {n:uatSrc.length,exc:cisExcCount(uatSrc,'uat'),tab:'uat'},
+    {n:failedSrc.length,exc:cisExcCount(failedSrc,'failedtesting'),tab:'failedtesting'},
+    {n:csItemsSrc.length,exc:cisExcCount(csItemsSrc,'csitems'),tab:'csitems'},
+    {n:testingSrc.length,exc:cisExcCount(testingSrc,'testing'),tab:'testing'},
+    {n:taskSrc.length,exc:cisExcCount(taskSrc,'taskitem'),tab:'taskitem'},
+    {n:S.closedIssues.length,exc:0,tab:'closed'},
+    {n:S.ignored.length,exc:0,tab:'ignored'},
+    {n:'',exc:0,tab:'report',mismatch:true}
   ];
   var h='';
   stats.forEach(function(s){
@@ -754,7 +770,12 @@ function renderStats(){
       h+='<div class="sn" style="color:'+c+';font-size:2rem;position:relative;display:inline-block">📋';
       if(_scanResults!==null&&_scanResults.length>0)h+='<span style="position:absolute;top:-6px;right:-14px;background:#dc2626;color:#fff;font-size:11px;font-weight:800;padding:1px 6px;border-radius:999px;min-width:18px;text-align:center">'+_scanResults.length+'</span>';
       h+='</div>';
-    } else {h+='<div class="sn" style="color:'+c+'">'+s.n+'</div>';}
+    } else {
+      h+='<div style="display:flex;align-items:flex-start;justify-content:center;gap:5px">';
+      h+='<div class="sn" style="color:'+c+'">'+s.n+'</div>';
+      if(s.exc>0)h+='<span style="background:#dc2626;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:2px 6px;margin-top:7px;line-height:1.4;white-space:nowrap">'+s.exc+'</span>';
+      h+='</div>';
+    }
     h+='<div class="sl">'+esc(l)+'</div></div>';
   });
   document.getElementById('statGrid').innerHTML=h;
