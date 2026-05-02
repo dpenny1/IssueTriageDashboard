@@ -32,6 +32,7 @@ a{color:#4338ca;text-decoration:none}a:hover{text-decoration:underline}
 .btn-p:disabled{background:#a5b4fc;cursor:not-allowed}
 .btn-d{padding:6px 12px;font-size:12px;border:1px solid #fca5a5;background:#fff;color:#dc2626;border-radius:7px;cursor:pointer;font-weight:600}
 .btn-ig{padding:4px 9px;font-size:11px;border:1px solid #e5e7eb;background:#fff;color:#9ca3af;border-radius:6px;cursor:pointer}
+.ps{font-size:11px;padding:3px 7px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#374151;cursor:pointer}
 .sw{max-width:560px;margin:24px auto}
 .sc{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:24px 28px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
 .sc h2{font-size:1rem;font-weight:700;color:#1e1b4b;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #e5e7eb}
@@ -192,9 +193,18 @@ var S={
   sortState:{col:'age',dir:1},
   autoRefreshTimer:null,
   preFilterLabel:'',
-  zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},repoWorkspaceMap:{},zhConnected:false
+  zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},repoWorkspaceMap:{},zhConnected:false,
+  warnDismissed:[]
 };
-var STORAGE_KEY='ps_issues_cache_v1',PROFILES_KEY='ps_profiles_v1',IGNORED_KEY='ps_ignored_v1';
+var STORAGE_KEY='ps_issues_cache_v1',PROFILES_KEY='ps_profiles_v1',IGNORED_KEY='ps_ignored_v1',PS_WARN_DISMISSED_KEY='ps_warn_dismissed_v1';
+var CS_LABELS_PS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
+function hasCS(i){return i.labels.some(function(l){return CS_LABELS_PS.indexOf(l.toLowerCase())!==-1;});}
+function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');}
+function isMissingParent(issue){if(!hasCS(issue))return false;if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;return !issue.parent;}
+function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
+function loadWarnDismissed(){try{var v=localStorage.getItem(PS_WARN_DISMISSED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+function saveWarnDismissed(){try{localStorage.setItem(PS_WARN_DISMISSED_KEY,JSON.stringify(S.warnDismissed));}catch(e){}}
+function dismissWarning(k){if(S.warnDismissed.indexOf(k)===-1)S.warnDismissed.push(k);saveWarnDismissed();renderMain();}
 
 // ── Loading overlay ───────────────────────────────────────────────────────────
 function showLoadingOverlay(msg){var o=document.getElementById('loadingOverlay');if(o)o.style.display='flex';var m=document.getElementById('loMsg');if(m)m.textContent=msg||'Loading...';}
@@ -310,7 +320,7 @@ function tfb(h){return lum(h)>0.45?'#1a1a1a':'#ffffff';}
 function lblBadge(n){var key=n.toLowerCase();var c=S.labelColors[key]||'e5e7eb';var display=S.labelNames[key]||n;return '<span class="badge" style="background:#'+c+';color:'+tfb(c)+'">'+esc(display)+'</span>';}
 function loadProfiles(){try{var v=localStorage.getItem(PROFILES_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveProfiles(p){try{localStorage.setItem(PROFILES_KEY,JSON.stringify(p));}catch(e){}}
-function saveCache(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({issues:S.issues,closedIssues:S.closedIssues,labelColors:S.labelColors,labelNames:S.labelNames,savedAt:Date.now()}));}catch(e){}}
+function saveCache(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({issues:S.issues,closedIssues:S.closedIssues,labelColors:S.labelColors,labelNames:S.labelNames,savedAt:Date.now(),parentsLoaded:true}));}catch(e){}}
 function loadCache(){try{var v=localStorage.getItem(STORAGE_KEY);return v?JSON.parse(v):null;}catch(e){return null;}}
 function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveIgnored(){try{localStorage.setItem(IGNORED_KEY,JSON.stringify(S.ignored));}catch(e){}}
@@ -390,6 +400,9 @@ async function ghFetch(path){
   return r.json();
 }
 async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{headers:{'X-Authentication-Token':S.zhToken}});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
+async function zhPost(path,data){var r=await fetch('https://api.zenhub.com'+path,{method:'POST',headers:{'X-Authentication-Token':S.zhToken,'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
+async function loadSubIssueParents(){var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});await Promise.all(parents.map(async function(p){try{var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child&&!child.parent)child.parent={issueNumber:p.id};});}}catch(e){};}));}
+async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed to move pipeline: '+e.message);}}
 
 async function ghFetchAll(path,maxPages){
   maxPages=maxPages||10;var results=[],per=100;
@@ -424,12 +437,17 @@ async function loadIssues(){
     var od=await ghFetchAll('/repos/'+repo+'/issues?state=open',15);
     od.forEach(function(iss){
       if(iss.pull_request)return;
+      var bodyParent=null;if(iss.body){var _pm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(_pm)bodyParent={issueNumber:parseInt(_pm[1])};}
       open.push({
         id:iss.number,repo:repo,title:iss.title,
+        body:iss.body||'',
         labels:iss.labels.map(function(l){return l.name;}),
         assignees:iss.assignees.map(function(a){return a.login;}),
         createdAt:iss.created_at,url:iss.html_url,state:'open',
-        milestone:iss.milestone?iss.milestone.title:null,pipeline:null
+        milestone:iss.milestone?iss.milestone.title:null,
+        subIssuesTotal:(iss.sub_issues_summary&&iss.sub_issues_summary.total)||0,
+        parent:bodyParent,
+        pipeline:null
       });
     });
     var cd=await ghFetchAll('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&since='+since30,5);
@@ -461,10 +479,10 @@ async function connect(){
   if(!rp){showErr('setupErr','Please select a project.');return;}
   S.ghToken=tok;
   S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
-  S.ignored=loadIgnored();
+  S.ignored=loadIgnored();S.warnDismissed=loadWarnDismissed();
   var btn=document.getElementById('connectBtn');btn.disabled=true;btn.innerHTML='<span class="spin spd"></span>Loading...';
   var cache=loadCache();
-  if(cache&&cache.issues){
+  if(cache&&cache.issues&&cache.parentsLoaded){
     S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
     var age=Math.round((Date.now()-cache.savedAt)/60000);
     populateFilters();showDash();buildTabs();renderMain();
@@ -476,6 +494,7 @@ async function connect(){
     try{
       await loadLabelColors();
       await loadIssues();
+      await loadSubIssueParents();
       saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();
       setStatus('<span style="color:#a5b4fc">✓ Loaded</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
       zhLoad();
@@ -489,7 +508,7 @@ async function bgRefresh(){
   showLoadingOverlay('Refreshing...');
   try{
     S.labelColors={};S.labelNames={};S.zhIssueMap={};S.zhPipelines={};S.repoIds={};S.zhConnected=false;
-    await loadLabelColors();await loadIssues();
+    await loadLabelColors();await loadIssues();await loadSubIssueParents();
     saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();
     setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
     zhLoad();
@@ -504,7 +523,7 @@ async function doRefresh(){
   showLoadingOverlay('Refreshing...');
   try{
     S.labelColors={};S.labelNames={};
-    await loadLabelColors();await loadIssues();
+    await loadLabelColors();await loadIssues();await loadSubIssueParents();
     saveCache();populateFilters();buildTabs();renderMain();
     if(S.zhToken&&S.zhWorkspace)zhLoad();
     else setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
@@ -662,10 +681,21 @@ function issueRow(iss,showClosed,showRestore){
   var asgn=iss.assignees.length?iss.assignees.map(function(a){return '<span style="display:inline-flex;align-items:center;gap:3px"><img src="https://github.com/'+esc(a)+'.png?size=20" width="16" height="16" style="border-radius:50%;vertical-align:middle"/> '+esc(a)+'</span>';}).join(', '):'<span style="color:#9ca3af;font-style:italic">Unassigned</span>';
   var repoShort=iss.repo.split('/')[1]||iss.repo;
   var ikey=iss.id+'_'+iss.repo;
-  var h='<tr>';
+  // Compute inline warnings for open issues
+  var warnings=[];
+  if(!showClosed&&S.warnDismissed.indexOf(ikey)===-1){
+    if(isMissingParent(iss))warnings.push('⚠ Has CS label but no parent');
+    if(isNIP(iss))warnings.push('⚠ Still in New Issues pipeline');
+  }
+  var h='<tr'+(warnings.length?' style="background:#fff5f5"':'')+'>';
   h+='<td><a href="'+esc(iss.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+iss.id+'</a></td>';
-  h+='<td style="max-width:380px"><div style="font-weight:600;line-height:1.4"><a href="'+esc(iss.url)+'" target="_blank" style="color:#1a1a1a;text-decoration:none" onmouseover="this.style.color=\'#4338ca\'" onmouseout="this.style.color=\'#1a1a1a\'">'+esc(iss.title)+'</a></div>';
+  h+='<td style="max-width:380px"><div style="font-weight:600;line-height:1.4"><a href="'+esc(iss.url)+'" target="_blank" style="color:#1a1a1a;text-decoration:none" onmouseover="this.style.color=\'#4338ca\'" onmouseout="this.style.color=\'#1a1a1a\'">'+esc(iss.title)+'</a>'+(!showClosed?parentLink(iss):'')+'</div>';
   if(lbls)h+='<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">'+lbls+'</div>';
+  if(warnings.length){
+    h+='<div style="margin-top:4px">';
+    warnings.forEach(function(w){h+='<div style="margin-top:2px"><span class="badge" style="background:#fee2e2;color:#991b1b">'+esc(w)+'</span> <button onclick="dismissWarning(\''+ikey+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:#9ca3af;padding:0 3px" title="Dismiss warning">✕ Dismiss</button></div>';});
+    h+='</div>';
+  }
   h+='</td>';
   if(S.repos.length>1)h+='<td style="white-space:nowrap;color:#6b7280;font-size:12px">'+esc(repoShort)+'</td>';
   h+='<td>'+asgn+'</td>';
@@ -676,7 +706,12 @@ function issueRow(iss,showClosed,showRestore){
     if(S.zhToken)h+='<td style="font-size:12px;color:#6b7280;white-space:nowrap">'+(iss.pipeline?esc(iss.pipeline.pipelineName):'<span style="color:#d1d5db">—</span>')+'</td>';
   } else {
     h+='<td style="white-space:nowrap"><span class="'+cls+'">'+age+'d</span></td>';
-    if(S.zhToken)h+='<td style="font-size:12px;color:#6b7280;white-space:nowrap">'+(iss.pipeline?esc(iss.pipeline.pipelineName):'<span style="color:#d1d5db">—</span>')+'</td>';
+    if(S.zhToken){
+      var rp=S.zhPipelines[iss.repo]||[];var cur=iss.pipeline?iss.pipeline.pipelineId:'';var curN=iss.pipeline?iss.pipeline.pipelineName:'—';
+      var srp=rp.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+      if(srp.length){h+='<td><select class="ps" onchange="movePipeline('+iss.id+',\''+esc(iss.repo)+'\',this.value)"><option value="">'+esc(curN)+'</option>';srp.forEach(function(p){h+='<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>';});h+='</select></td>';}
+      else h+='<td style="font-size:12px;color:#6b7280;white-space:nowrap">'+(iss.pipeline?esc(curN):'<span style="color:#d1d5db">—</span>')+'</td>';
+    }
     if(showRestore)h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';
     else h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
   }
@@ -826,9 +861,9 @@ function renderMain(){
   else if(profile.zhWorkspace){S.zhWorkspace=profile.zhWorkspace;}
   var dtEl=document.getElementById('dashTitle');
   if(dtEl)dtEl.textContent='CentralView GitHub Issue Triage — Power Search';
-  S.ignored=loadIgnored();
+  S.ignored=loadIgnored();S.warnDismissed=loadWarnDismissed();
   var cache=loadCache();
-  if(cache&&cache.issues){
+  if(cache&&cache.issues&&cache.parentsLoaded){
     S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
     var age=Math.round((Date.now()-cache.savedAt)/60000);
     populateFilters();showDash();buildTabs();renderMain();
@@ -837,6 +872,7 @@ function renderMain(){
   } else {
     showDash();setStatus('<span style="color:#fbbf24">⏳ Loading...</span>');showLoadingOverlay('Loading issues...');
     Promise.all([loadLabelColors(),loadIssues()])
+      .then(function(){return loadSubIssueParents();})
       .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();hideLoadingOverlay();setStatus('<span style="color:#a5b4fc">✓ Loaded</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');zhLoad();})
       .catch(function(e){hideLoadingOverlay();document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
   }
