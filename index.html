@@ -471,13 +471,15 @@ function toggleVaultWidget(){
   body.style.display=body.style.display==='block'?'none':'block';
 }
 
-async function unlockVault(){
-  var pw=document.getElementById('vaultPwInput').value;
+async function unlockVault(pw){
+  var fromInput=!pw;
+  if(!pw)pw=document.getElementById('vaultPwInput').value;
   var err=document.getElementById('vaultPwErr');
   err.textContent='';
   if(!pw){err.textContent='Enter your master password.';return;}
   try{
     await Vault.unlock(pw);
+    sessionStorage.setItem('cv_vault_pw',pw);
     document.getElementById('vaultLockForm').style.display='none';
     document.getElementById('vaultUnlockedPanel').style.display='block';
     document.getElementById('vaultLockBtn').style.display='inline-flex';
@@ -487,12 +489,14 @@ async function unlockVault(){
     document.getElementById('vaultStatusText').textContent=vaultStatusMsg();
     renderVaultTokenList();
   }catch(e){
-    document.getElementById('vaultPwErr').textContent=e.message;
+    sessionStorage.removeItem('cv_vault_pw');
+    if(fromInput)document.getElementById('vaultPwErr').textContent=e.message;
   }
 }
 
 function lockVaultWidget(){
   Vault.lock();
+  sessionStorage.removeItem('cv_vault_pw');
   clearAssignments();
   document.getElementById('vaultLockForm').style.display='block';
   document.getElementById('vaultUnlockedPanel').style.display='none';
@@ -588,6 +592,10 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderTileChips();
+(function(){
+  var saved=sessionStorage.getItem('cv_vault_pw');
+  if(saved){unlockVault(saved);}
+})();
 </script>
 </body>
 </html>

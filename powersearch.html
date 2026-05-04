@@ -199,6 +199,7 @@ var S={
   sortState:{col:'age',dir:1},
   autoRefreshTimer:null,
   preFilterLabel:'',
+  milestones:{},
   zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},repoWorkspaceMap:{},zhConnected:false,
   warnDismissed:[]
 };
@@ -207,6 +208,11 @@ var CS_LABELS_PS=['cs tracking','uat patch','production patch','cs in testing','
 function hasCS(i){return i.labels.some(function(l){return CS_LABELS_PS.indexOf(l.toLowerCase())!==-1;});}
 function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');}
 function isMissingParent(issue){if(!hasCS(issue))return false;if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;return !issue.parent;}
+function isAssignedInNIP(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName==='New Issues');}
+function isAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues');}
+function isUnassignedNotOnDeck(i){return !!(S.zhToken&&(!i.assignees||i.assignees.length===0)&&i.pipeline&&i.pipeline.pipelineName!=='On Deck Priorities');}
+function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
+function exceptionCount(issues){return issues.filter(issueHasException).length;}
 function isCsItem(i){return i.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
 function loadWarnDismissed(){try{var v=localStorage.getItem(PS_WARN_DISMISSED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
@@ -416,7 +422,7 @@ async function ghFetch(path){
 }
 async function ghPatch(path,body){var r=await fetch('https://api.github.com'+path,{method:'PATCH',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);return r.json();}
 async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{headers:{'X-Authentication-Token':S.zhToken}});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
-async function zhPost(path,data){var r=await fetch('https://api.zenhub.com'+path,{method:'POST',headers:{'X-Authentication-Token':S.zhToken,'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
+async function zhPost(path,data){var r=await fetch('https://api.zenhub.com'+path,{method:'POST',headers:{'X-Authentication-Token':S.zhToken,'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);if(r.status===204||r.headers.get('content-length')==='0')return{};var t=await r.text();return t?JSON.parse(t):{};}
 async function loadSubIssueParents(){var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});await Promise.all(parents.map(async function(p){try{var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child&&!child.parent)child.parent={issueNumber:p.id};});}}catch(e){};}));}
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed to move pipeline: '+e.message);}}
 async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var notIgnored=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});var list;if(tab==='all')list=notIgnored.filter(function(i){return !i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});});else if(tab==='csitem')list=notIgnored.filter(isCsItem);else if(tab==='taskitem')list=notIgnored.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});else list=[];if(!list.length){sel.value='';}else if(!confirm('Move '+list.length+' issue(s) to this pipeline?')){sel.value='';}else{for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}}
@@ -618,16 +624,19 @@ function renderStats(){
   var csItemSrc=notIgnored.filter(isCsItem);
   var csColor='#'+(S.labelColors['cs task item']||'16a34a');
   var stats=[
-    {n:newSrc.length,l:'New Issues',c:'#4338ca',tab:'all'},
-    {n:csItemSrc.length,l:'CS Items',c:'#0891b2',tab:'csitem'},
-    {n:taskItems.length,l:'CS Task Items',c:csColor,tab:'taskitem'},
-    {n:S.closedIssues.length,l:'Recently Closed',c:'#059669',tab:'closed'},
-    {n:S.ignored.length,l:'Ignored',c:'#6b7280',tab:'ignored'}
+    {n:newSrc.length,exc:exceptionCount(newSrc),l:'New Issues',c:'#4338ca',tab:'all'},
+    {n:csItemSrc.length,exc:exceptionCount(csItemSrc),l:'CS Items',c:'#0891b2',tab:'csitem'},
+    {n:taskItems.length,exc:exceptionCount(taskItems),l:'CS Task Items',c:csColor,tab:'taskitem'},
+    {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#059669',tab:'closed'},
+    {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'}
   ];
   var h='';
   stats.forEach(function(s){
     h+='<div class="sc2" style="border-top-color:'+s.c+'" onclick="switchTab(\''+s.tab+'\')">';
+    h+='<div style="display:flex;align-items:flex-start;justify-content:center;gap:5px">';
     h+='<div class="sn" style="color:'+s.c+'">'+s.n+'</div>';
+    if(s.exc>0)h+='<span style="background:#dc2626;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:2px 6px;margin-top:7px;line-height:1.4;white-space:nowrap">'+s.exc+'</span>';
+    h+='</div>';
     h+='<div class="sl">'+s.l+'</div></div>';
   });
   document.getElementById('statGrid').innerHTML=h;
@@ -703,6 +712,9 @@ function issueRow(iss,showClosed,showRestore){
   if(!showClosed&&S.warnDismissed.indexOf(ikey)===-1){
     if(isMissingParent(iss))warnings.push('⚠ Has CS label but no parent');
     if(isNIP(iss))warnings.push('⚠ Still in New Issues pipeline');
+    if(isAssignedInNIP(iss))warnings.push('⚠ Assigned but still in New Issues pipeline');
+    if(isAssignedNotInProgress(iss))warnings.push('⚠ Assigned but not in In Progress pipeline');
+    if(isUnassignedNotOnDeck(iss))warnings.push('⚠ Unassigned but not in On Deck Priorities pipeline');
   }
   var h='<tr'+(warnings.length?' style="background:#fff5f5"':'')+'>';
   h+='<td><a href="'+esc(iss.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+iss.id+'</a></td>';
@@ -943,7 +955,10 @@ async function runDiag(){
       else if(isCsItemIssue){info('Has <code>cs item</code> label — appears in <strong>CS Items</strong> tab.');}
       else{pass('Appears in the <strong>New Issues</strong> tab.');}
       if(isMissingParent(i))fail('⚠ Has CS label but <strong>no parent issue</strong> found (body regex + sub-issues checked).');
-      if(isNIP(i))fail('⚠ Still in <strong>New Issues</strong> pipeline — expected to be moved.');
+      if(isAssignedInNIP(i))fail('⚠ Assigned but still in <strong>New Issues</strong> pipeline.');
+      if(isAssignedNotInProgress(i))fail('⚠ Assigned but not in <strong>In Progress</strong> pipeline.');
+      if(isUnassignedNotOnDeck(i))fail('⚠ Unassigned but not in <strong>On Deck Priorities</strong> pipeline.');
+      else if(isNIP(i))fail('⚠ Still in <strong>New Issues</strong> pipeline — expected to be moved.');
       if(S.warnDismissed.indexOf(ikey)!==-1)info('Warning badge is currently <strong>dismissed</strong> for this issue.');
     }
   } else {info('Closed issue — appears only in the <strong>Recently Closed</strong> tab.');}
