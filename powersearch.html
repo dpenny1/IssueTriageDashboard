@@ -210,7 +210,7 @@ function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='N
 function isMissingParent(issue){if(!hasCS(issue))return false;if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;return !issue.parent;}
 function isAssignedInNIP(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName==='New Issues');}
 function isAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues');}
-function isUnassignedNotOnDeck(i){return !!(S.zhToken&&(!i.assignees||i.assignees.length===0)&&i.pipeline&&i.pipeline.pipelineName!=='On Deck Priorities');}
+function isUnassignedNotOnDeck(i){return !!(S.zhToken&&(!i.assignees||i.assignees.length===0)&&i.pipeline&&i.pipeline.pipelineName!=='On Deck Priorities'&&i.pipeline.pipelineName!=='Product Backlog');}
 function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
 function exceptionCount(issues){return issues.filter(issueHasException).length;}
 function isCsItem(i){return i.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
