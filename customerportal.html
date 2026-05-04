@@ -871,16 +871,15 @@ function enhByPipelineView(issues){
   var others=Object.keys(groups).filter(function(k){return PRIORITY.indexOf(k)===-1;}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
   var orderedKeys=PRIORITY.filter(function(k){return !!groups[k];}).concat(others);
   var COLORS={'In Progress':'#059669','On Deck Priorities':'#d97706'};
-  // Top header with total count and bulk-move
-  var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)"><span class="gt">Enhancements <span class="gc">'+issues.length+'</span></span>';
-  if(S.zhToken&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\'enhancement\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
-  h+='</div></div>';
-  // Pipeline group sections
+  var h='';
+  // Pipeline group sections — bulk move lives in each group header
   function pipeSection(pname,grp){
     var sorted=grp.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
     var c=COLORS[pname]||'#6b7280';
     var s='<div style="margin-bottom:20px"><div class="gh" style="background:linear-gradient(90deg,'+c+','+c+'dd);border-radius:10px 10px 0 0">';
-    s+='<span class="gt" style="color:#fff">'+esc(pname)+'<span class="gc">'+sorted.length+'</span></span></div>';
+    s+='<span class="gt" style="color:#fff">'+esc(pname)+'<span class="gc">'+sorted.length+'</span></span>';
+    if(S.zhToken&&spipes.length){s+='<select class="ps" style="color:#374151" onchange="bulkMove(\'enhancement\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){s+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});s+='</select>';}
+    s+='</div>';
     s+='<div class="tw2"><table><thead><tr><th>No.</th><th>Title</th>';
     if(multiRepo)s+='<th>Repo</th>';
     s+='<th>Assignee</th><th>Age</th>';
