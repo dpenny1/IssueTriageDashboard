@@ -386,8 +386,8 @@ function renderCfg(){
       h+='<div style="display:flex;align-items:center;gap:8px"><div style="font-size:14px;font-weight:700;color:#1e1b4b">'+esc(p.name)+'</div>';
       if(p.type==='group')h+='<span class="badge" style="background:#e0e7ff;color:#1e1b4b">Group</span>';
       h+='</div>';
-      if(p.type==='group')(p.repos||[]).forEach(function(r){h+='<div style="font-size:12px;color:#6b7280;margin-top:3px">• '+esc(r.repo)+'</div>';});
-      else h+='<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(p.repo)+'</div>';
+      if(p.type==='group')(p.repos||[]).forEach(function(r){h+='<div style="font-size:12px;color:#6b7280;margin-top:3px">• '+esc(r.repo)+(r.zhWorkspace?' <span style="color:#9ca3af">(ws: '+esc(r.zhWorkspace)+')</span>':'')+'</div>';});
+      else h+='<div style="font-size:12px;color:#6b7280;margin-top:2px">'+esc(p.repo)+'</div><div style="font-size:11px;color:#9ca3af;margin-top:1px">ZenHub workspace: '+(p.zhWorkspace?'<span style="color:#059669;font-weight:600">'+esc(p.zhWorkspace)+'</span>':'<span style="color:#dc2626">not set — pipelines won\'t load</span>')+'</div>';
       h+='</div><button class="btn-sm" onclick="editProfile(\''+p.id+'\')">Edit</button> <button class="btn-d" onclick="delProfile(\''+p.id+'\')">Delete</button></div></div>';
     });
     h+='</div>';
@@ -416,7 +416,7 @@ function remGRepo(i){window._gr.splice(i,1);renderGRepos();}
 function saveGroup(){var n=document.getElementById('gName').value.trim();if(!n){showErr('gErr','Name required.');}else if(!window._gr||!window._gr.length){showErr('gErr','Add at least one repo.');}else{var p=loadProfiles();p.push({id:'cp_'+Date.now(),name:n,type:'group',repos:window._gr.slice()});saveProfiles(p);window._gr=[];renderCfg();}}
 function saveNewProfile(){var n=document.getElementById('pName').value.trim(),r=document.getElementById('pRepo').value.trim(),w=(document.getElementById('pWorkspace')&&document.getElementById('pWorkspace').value.trim())||'';if(!n||!r){showErr('pErr','Name and repo required.');}else{var p=loadProfiles();p.push({id:'cp_'+Date.now(),name:n,repo:r,zhWorkspace:w,type:'single'});saveProfiles(p);renderCfg();}}
 function delProfile(id){if(!confirm('Delete this project?'))return;saveProfiles(loadProfiles().filter(function(p){return p.id!==id;}));renderCfg();}
-function editProfile(id){var p=loadProfiles(),pr=p.find(function(x){return x.id===id;});if(!pr)return;var n=prompt('Display name:',pr.name);if(n===null)return;n=n.trim();if(!n){alert('Name required.');return;}if(pr.type==='group'){pr.name=n;}else{var r=prompt('Repo (owner/repo):',pr.repo);if(r===null)return;r=r.trim();if(!r){alert('Repo required.');return;}var w=prompt('ZenHub Workspace ID (leave blank to clear):',pr.zhWorkspace||'');if(w===null)return;pr.name=n;pr.repo=r;pr.zhWorkspace=w.trim();}saveProfiles(p);renderCfg();}
+function editProfile(id){var p=loadProfiles(),pr=p.find(function(x){return x.id===id;});if(!pr)return;var n=prompt('Display name:',pr.name);if(n===null)return;n=n.trim();if(!n){alert('Name required.');return;}if(pr.type==='group'){pr.name=n;}else{var r=prompt('Repo (owner/repo):',pr.repo);if(r===null)return;r=r.trim();if(!r){alert('Repo required.');return;}var w=prompt('ZenHub Workspace ID (leave blank to clear):',pr.zhWorkspace||'');if(w===null)return;pr.name=n;pr.repo=r;pr.zhWorkspace=w.trim();}saveProfiles(p);renderCfg();if(S.activeProfile&&S.activeProfile.id===id){if(pr.type!=='group'){S.zhWorkspace=pr.zhWorkspace||'';if(pr.repo)S.repoWorkspaceMap[pr.repo]=pr.zhWorkspace||'';}if(S.zhToken&&S.zhWorkspace){setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');zhLoad();}}}
 
 // ── API helpers ───────────────────────────────────────────────────────────────
 async function ghFetch(path){
