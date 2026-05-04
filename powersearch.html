@@ -760,8 +760,8 @@ function issueRow(iss,showClosed,showRestore){
 function openTable(issues,emptyMsg,showRestore,tab){
   if(!issues.length)return '<div class="es">'+esc(emptyMsg||'No issues found.')+'</div>';
   var multiRepo=S.repos.length>1;
-  var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
-  var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+  var pipeMap={};S.repos.forEach(function(r){(S.zhPipelines[r]||[]).forEach(function(p){if(!pipeMap[p.id])pipeMap[p.id]=p;});});
+  var spipes=Object.keys(pipeMap).map(function(k){return pipeMap[k];}).sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
   var tabLabels={all:'New Issues',taskitem:'CS Task Items',csitem:'CS Items',closed:'Recently Closed',ignored:'Ignored'};
   var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)"><span class="gt">'+(tabLabels[tab]||'Issues')+' <span class="gc">'+issues.length+'</span></span>';
   if(S.zhToken&&tab&&tab!=='closed'&&tab!=='ignored'&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\''+tab+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
@@ -836,6 +836,46 @@ function byLabelView(issues){
   return h;
 }
 
+// Pipeline-grouped view for CS Items tab.
+// On Deck Priorities first, In Progress second, then others alphabetically, no-pipeline last.
+// Pipeline names may vary across projects — only the two priority names get fixed colours.
+function csByPipelineGroupView(issues){
+  if(!issues.length)return '<div class="es">No CS item issues found.</div>';
+  var multiRepo=S.repos.length>1;
+  var pipeMap={};S.repos.forEach(function(r){(S.zhPipelines[r]||[]).forEach(function(p){if(!pipeMap[p.id])pipeMap[p.id]=p;});});
+  var spipes=Object.keys(pipeMap).map(function(k){return pipeMap[k];}).sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+  var groups={};var noPipeline=[];
+  issues.forEach(function(iss){
+    var pn=iss.pipeline?iss.pipeline.pipelineName:null;
+    if(!pn){noPipeline.push(iss);return;}
+    if(!groups[pn])groups[pn]=[];groups[pn].push(iss);
+  });
+  var PRIORITY=['On Deck Priorities','In Progress'];
+  var others=Object.keys(groups).filter(function(k){return PRIORITY.indexOf(k)===-1;}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+  var orderedKeys=PRIORITY.filter(function(k){return !!groups[k];}).concat(others);
+  var COLORS={'On Deck Priorities':'#d97706','In Progress':'#059669'};
+  var h='';
+  function pipeSection(pname,grp){
+    var sorted=grp.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+    var c=COLORS[pname]||'#6b7280';
+    var s='<div style="margin-bottom:20px"><div class="gh" style="background:linear-gradient(90deg,'+c+','+c+'dd);border-radius:10px 10px 0 0">';
+    s+='<span class="gt" style="color:#fff">'+esc(pname)+'<span class="gc">'+sorted.length+'</span></span>';
+    if(S.zhToken&&spipes.length){s+='<select class="ps" style="color:#374151" onchange="bulkMove(\'csitem\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){s+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});s+='</select>';}
+    s+='</div>';
+    s+='<div class="tw2"><table><thead><tr><th>No.</th><th>Title</th>';
+    if(multiRepo)s+='<th>Repo</th>';
+    s+='<th>Assignee</th><th>Age</th>';
+    if(S.zhToken)s+='<th>Pipeline</th>';
+    s+='<th></th></tr></thead><tbody>';
+    sorted.forEach(function(iss){s+=issueRow(iss,false,false);});
+    s+='</tbody></table></div></div>';
+    return s;
+  }
+  orderedKeys.forEach(function(pname){if(groups[pname]&&groups[pname].length)h+=pipeSection(pname,groups[pname]);});
+  if(noPipeline.length)h+=pipeSection('No Pipeline',noPipeline);
+  return h;
+}
+
 // ── Main render ───────────────────────────────────────────────────────────────
 function renderMain(){
   var tab=S.activeTab;
@@ -862,7 +902,7 @@ function renderMain(){
 
   if(tab==='csitem'){
     var filtered=applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isCsItem(i);}));
-    content.innerHTML=openTable(filtered,'No CS item issues found.',false,'csitem');
+    content.innerHTML=csByPipelineGroupView(filtered);
     return;
   }
 
