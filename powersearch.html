@@ -211,7 +211,9 @@ function isMissingParent(issue){if(!hasCS(issue))return false;if(issue.labels.so
 function isAssignedInNIP(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName==='New Issues');}
 function isAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues');}
 function isUnassignedNotOnDeck(i){return !!(S.zhToken&&(!i.assignees||i.assignees.length===0)&&i.pipeline&&i.pipeline.pipelineName!=='On Deck Priorities'&&i.pipeline.pipelineName!=='Product Backlog');}
-function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
+function isCsTaskItem(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
+function isCsTaskItemNotTracking(i){return !!(S.zhToken&&isCsTaskItem(i)&&i.pipeline&&i.pipeline.pipelineName!=='CS Tracking Issues');}
+function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
 function exceptionCount(issues){return issues.filter(issueHasException).length;}
 function isCsItem(i){return i.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
@@ -710,11 +712,15 @@ function issueRow(iss,showClosed,showRestore){
   // Compute inline warnings for open issues
   var warnings=[];
   if(!showClosed&&S.warnDismissed.indexOf(ikey)===-1){
-    if(isMissingParent(iss))warnings.push('⚠ Has CS label but no parent');
-    if(isNIP(iss))warnings.push('⚠ Still in New Issues pipeline');
-    if(isAssignedInNIP(iss))warnings.push('⚠ Assigned but still in New Issues pipeline');
-    if(isAssignedNotInProgress(iss))warnings.push('⚠ Assigned but not in In Progress pipeline');
-    if(isUnassignedNotOnDeck(iss))warnings.push('⚠ Unassigned but not in On Deck Priorities pipeline');
+    if(isCsTaskItem(iss)){
+      if(isCsTaskItemNotTracking(iss))warnings.push('⚠ CS Task Item not in CS Tracking Issues pipeline');
+    }else{
+      if(isMissingParent(iss))warnings.push('⚠ Has CS label but no parent');
+      if(isNIP(iss))warnings.push('⚠ Still in New Issues pipeline');
+      if(isAssignedInNIP(iss))warnings.push('⚠ Assigned but still in New Issues pipeline');
+      if(isAssignedNotInProgress(iss))warnings.push('⚠ Assigned but not in In Progress pipeline');
+      if(isUnassignedNotOnDeck(iss))warnings.push('⚠ Unassigned but not in On Deck Priorities pipeline');
+    }
   }
   var h='<tr'+(warnings.length?' style="background:#fff5f5"':'')+'>';
   h+='<td><a href="'+esc(iss.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+iss.id+'</a></td>';
@@ -949,16 +955,20 @@ async function runDiag(){
     var ignored=S.ignored.indexOf(ikey)!==-1;
     if(ignored){fail('This issue is <strong>ignored</strong> — it does not appear in any active tab. Use Restore to bring it back.');}
     else{
-      var isCsTask=i.labels.some(function(l){return l.toLowerCase()==='cs task item';});
+      var isCsTask=isCsTaskItem(i);
       var isCsItemIssue=isCsItem(i);
       if(isCsTask){info('Has <code>cs task item</code> label — appears in <strong>CS Task Items</strong> tab.');}
       else if(isCsItemIssue){info('Has <code>cs item</code> label — appears in <strong>CS Items</strong> tab.');}
       else{pass('Appears in the <strong>New Issues</strong> tab.');}
-      if(isMissingParent(i))fail('⚠ Has CS label but <strong>no parent issue</strong> found (body regex + sub-issues checked).');
-      if(isAssignedInNIP(i))fail('⚠ Assigned but still in <strong>New Issues</strong> pipeline.');
-      if(isAssignedNotInProgress(i))fail('⚠ Assigned but not in <strong>In Progress</strong> pipeline.');
-      if(isUnassignedNotOnDeck(i))fail('⚠ Unassigned but not in <strong>On Deck Priorities</strong> pipeline.');
-      else if(isNIP(i))fail('⚠ Still in <strong>New Issues</strong> pipeline — expected to be moved.');
+      if(isCsTask){
+        if(isCsTaskItemNotTracking(i))fail('⚠ CS Task Item not in <strong>CS Tracking Issues</strong> pipeline.');
+      }else{
+        if(isMissingParent(i))fail('⚠ Has CS label but <strong>no parent issue</strong> found (body regex + sub-issues checked).');
+        if(isAssignedInNIP(i))fail('⚠ Assigned but still in <strong>New Issues</strong> pipeline.');
+        if(isAssignedNotInProgress(i))fail('⚠ Assigned but not in <strong>In Progress</strong> pipeline.');
+        if(isUnassignedNotOnDeck(i))fail('⚠ Unassigned but not in <strong>On Deck Priorities</strong> pipeline.');
+        else if(isNIP(i))fail('⚠ Still in <strong>New Issues</strong> pipeline — expected to be moved.');
+      }
       if(S.warnDismissed.indexOf(ikey)!==-1)info('Warning badge is currently <strong>dismissed</strong> for this issue.');
     }
   } else {info('Closed issue — appears only in the <strong>Recently Closed</strong> tab.');}

@@ -217,7 +217,10 @@ function isMissingParent(issue){if(!hasCS(issue))return false;if(issue.labels.so
 function isAssignedInNIP(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName==='New Issues');}
 function isAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues');}
 function isUnassignedNotOnDeck(i){return !!(S.zhToken&&(!i.assignees||i.assignees.length===0)&&!isEPA(i)&&i.pipeline&&i.pipeline.pipelineName!=='On Deck Priorities');}
-function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;return isNIP(i)||isEPAMilestoneMissing(i)||isMilestoneOrphan(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
+function isCsTaskItem(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
+function isCsTaskItemNotTracking(i){return !!(S.zhToken&&isCsTaskItem(i)&&i.pipeline&&i.pipeline.pipelineName!=='CS Tracking Issues');}
+function isEPANotInNewIssues(i){return !!(S.zhToken&&isEPA(i)&&i.pipeline&&i.pipeline.pipelineName!=='New Issues');}
+function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);if(isEPA(i))return isEPANotInNewIssues(i)||isEPAMilestoneMissing(i)||isMilestoneOrphan(i);return isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
 function exceptionCount(issues){return issues.filter(issueHasException).length;}
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
 function loadWarnDismissed(){try{var v=localStorage.getItem(CP_WARN_DISMISSED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
@@ -721,12 +724,18 @@ function issueRow(iss,showClosed,showRestore,showMilestone){
   // Compute inline warnings for open issues
   var warnings=[];
   if(!showClosed&&S.warnDismissed.indexOf(ikey)===-1){
-    if(isNIP(iss))warnings.push('⚠ Still in New Issues pipeline');
-    if(isAssignedInNIP(iss))warnings.push('⚠ Assigned but still in New Issues pipeline');
-    if(isAssignedNotInProgress(iss))warnings.push('⚠ Assigned but not in In Progress pipeline');
-    if(isUnassignedNotOnDeck(iss))warnings.push('⚠ Unassigned but not in On Deck Priorities pipeline');
-    if(isEPAMilestoneMissing(iss))warnings.push('⚠ Has cs item + enhancement pending approval labels but not in '+EPA_MILESTONE+' milestone');
-    if(isMilestoneOrphan(iss))warnings.push('⚠ In '+EPA_MILESTONE+' milestone but missing cs item or enhancement pending approval label');
+    if(isCsTaskItem(iss)){
+      if(isCsTaskItemNotTracking(iss))warnings.push('⚠ CS Task Item not in CS Tracking Issues pipeline');
+    }else if(isEPA(iss)){
+      if(isEPANotInNewIssues(iss))warnings.push('⚠ Enhancement Pending Approval not in New Issues pipeline');
+      if(isEPAMilestoneMissing(iss))warnings.push('⚠ Has cs item + enhancement pending approval labels but not in '+EPA_MILESTONE+' milestone');
+      if(isMilestoneOrphan(iss))warnings.push('⚠ In '+EPA_MILESTONE+' milestone but missing cs item or enhancement pending approval label');
+    }else{
+      if(isNIP(iss))warnings.push('⚠ Still in New Issues pipeline');
+      if(isAssignedInNIP(iss))warnings.push('⚠ Assigned but still in New Issues pipeline');
+      if(isAssignedNotInProgress(iss))warnings.push('⚠ Assigned but not in In Progress pipeline');
+      if(isUnassignedNotOnDeck(iss))warnings.push('⚠ Unassigned but not in On Deck Priorities pipeline');
+    }
   }
   var h='<tr'+(warnings.length?' style="background:#fff5f5"':'')+'>';
   h+='<td><a href="'+esc(iss.url)+'" target="_blank" style="color:#4338ca;font-weight:600">#'+iss.id+'</a></td>';
@@ -967,18 +976,25 @@ async function runDiag(){
       var inNewIssues=!isExcludeFromNew(i);
       var inEpa=isEPA(i);
       var inEnh=isEnhancement(i);
+      var inCsTask=isCsTaskItem(i);
       if(inNewIssues){pass('Appears in <strong>New Issues</strong> tab.');}
       if(inEpa)pass('Has <code>enhancement pending approval</code> label — appears in <strong>Enh. Pending Approval</strong> tab.');
       if(inEnh)pass('Has <code>enhancement</code> label — appears in <strong>Enhancements</strong> tab.');
       var inCsOther=isCsOther(i);
       if(inCsOther)pass('Has CS label(s) — appears in <strong>CS Items</strong> tab.');
       if(!inNewIssues&&!inEpa&&!inEnh&&!inCsOther){info('Not found in any active tab — issue may have no recognized labels.');}
-      if(isNIP(i))fail('⚠ Still in <strong>New Issues</strong> pipeline — expected to be moved.');
-      if(isAssignedInNIP(i))fail('⚠ Assigned but still in <strong>New Issues</strong> pipeline.');
-      if(isAssignedNotInProgress(i))fail('⚠ Assigned but not in <strong>In Progress</strong> pipeline.');
-      if(isUnassignedNotOnDeck(i))fail('⚠ Unassigned but not in <strong>On Deck Priorities</strong> pipeline.');
-      if(isEPAMilestoneMissing(i))fail('⚠ Has <code>cs item</code> + <code>enhancement pending approval</code> labels but NOT in <strong>'+esc(EPA_MILESTONE)+'</strong> milestone.');
-      if(isMilestoneOrphan(i))fail('⚠ In <strong>'+esc(EPA_MILESTONE)+'</strong> milestone but missing <code>cs item</code> or <code>enhancement pending approval</code> label.');
+      if(inCsTask){
+        if(isCsTaskItemNotTracking(i))fail('⚠ CS Task Item not in <strong>CS Tracking Issues</strong> pipeline.');
+      }else if(inEpa){
+        if(isEPANotInNewIssues(i))fail('⚠ Enhancement Pending Approval not in <strong>New Issues</strong> pipeline — expected to stay here until approved.');
+        if(isEPAMilestoneMissing(i))fail('⚠ Has <code>cs item</code> + <code>enhancement pending approval</code> labels but NOT in <strong>'+esc(EPA_MILESTONE)+'</strong> milestone.');
+        if(isMilestoneOrphan(i))fail('⚠ In <strong>'+esc(EPA_MILESTONE)+'</strong> milestone but missing <code>cs item</code> or <code>enhancement pending approval</code> label.');
+      }else{
+        if(isNIP(i))fail('⚠ Still in <strong>New Issues</strong> pipeline — expected to be moved.');
+        if(isAssignedInNIP(i))fail('⚠ Assigned but still in <strong>New Issues</strong> pipeline.');
+        if(isAssignedNotInProgress(i))fail('⚠ Assigned but not in <strong>In Progress</strong> pipeline.');
+        if(isUnassignedNotOnDeck(i))fail('⚠ Unassigned but not in <strong>On Deck Priorities</strong> pipeline.');
+      }
       if(S.warnDismissed.indexOf(ikey)!==-1)info('Warning badge is currently <strong>dismissed</strong> for this issue.');
     }
   } else {info('Closed issue — appears only in the <strong>Recently Closed</strong> tab.');}
