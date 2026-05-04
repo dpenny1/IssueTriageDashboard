@@ -216,7 +216,7 @@ function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='N
 function isMissingParent(issue){if(!hasCS(issue))return false;if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;return !issue.parent;}
 function isAssignedInNIP(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName==='New Issues');}
 function isAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues');}
-function isUnassignedNotOnDeck(i){return !!(S.zhToken&&(!i.assignees||i.assignees.length===0)&&i.pipeline&&i.pipeline.pipelineName!=='On Deck Priorities');}
+function isUnassignedNotOnDeck(i){return !!(S.zhToken&&(!i.assignees||i.assignees.length===0)&&!isEPA(i)&&i.pipeline&&i.pipeline.pipelineName!=='On Deck Priorities');}
 function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;return isNIP(i)||isEPAMilestoneMissing(i)||isMilestoneOrphan(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
 function exceptionCount(issues){return issues.filter(issueHasException).length;}
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
