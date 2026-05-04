@@ -793,7 +793,7 @@ function closedTable(issues){
   if(S.zhToken)h+='<th>Pipeline</th>';
   h+='</tr></thead><tbody>';
   var prev=S.sortState;S.sortState={col:'closed',dir:1};
-  sortIssues(issues).forEach(function(iss){h+=issueRow(iss,true);});
+  sortIssues(issues).forEach(function(iss){h+=issueRow(iss,true,false);});
   S.sortState=prev;
   h+='</tbody></table></div></div>';
   return h;

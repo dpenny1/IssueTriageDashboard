@@ -854,8 +854,10 @@ function byLabelView(issues){
   return h;
 }
 
-function enhByPipelineView(issues){
-  if(!issues.length)return '<div class="es">No enhancement items.</div>';
+// Shared pipeline-grouped view used by Enhancements and CS Items tabs.
+// On Deck Priorities first, In Progress second, then others alphabetically, no-pipeline last.
+function byPipelineGroupView(issues,tab,emptyMsg){
+  if(!issues.length)return '<div class="es">'+esc(emptyMsg||'No issues found.')+'</div>';
   var multiRepo=S.repos.length>1;
   var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
   var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
@@ -866,19 +868,19 @@ function enhByPipelineView(issues){
     if(!pn){noPipeline.push(iss);return;}
     if(!groups[pn])groups[pn]=[];groups[pn].push(iss);
   });
-  // In Progress first, On Deck Priorities second, then others alphabetically, no-pipeline last
-  var PRIORITY=['In Progress','On Deck Priorities'];
+  // On Deck Priorities first, In Progress second, then others alphabetically, no-pipeline last
+  var PRIORITY=['On Deck Priorities','In Progress'];
   var others=Object.keys(groups).filter(function(k){return PRIORITY.indexOf(k)===-1;}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
   var orderedKeys=PRIORITY.filter(function(k){return !!groups[k];}).concat(others);
-  var COLORS={'In Progress':'#059669','On Deck Priorities':'#d97706'};
+  var COLORS={'On Deck Priorities':'#d97706','In Progress':'#059669'};
   var h='';
-  // Pipeline group sections — bulk move lives in each group header
+  // Pipeline group sections — bulk move lives in each group header, no top banner
   function pipeSection(pname,grp){
     var sorted=grp.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
     var c=COLORS[pname]||'#6b7280';
     var s='<div style="margin-bottom:20px"><div class="gh" style="background:linear-gradient(90deg,'+c+','+c+'dd);border-radius:10px 10px 0 0">';
     s+='<span class="gt" style="color:#fff">'+esc(pname)+'<span class="gc">'+sorted.length+'</span></span>';
-    if(S.zhToken&&spipes.length){s+='<select class="ps" style="color:#374151" onchange="bulkMove(\'enhancement\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){s+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});s+='</select>';}
+    if(S.zhToken&&spipes.length){s+='<select class="ps" style="color:#374151" onchange="bulkMove(\''+tab+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){s+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});s+='</select>';}
     s+='</div>';
     s+='<div class="tw2"><table><thead><tr><th>No.</th><th>Title</th>';
     if(multiRepo)s+='<th>Repo</th>';
@@ -917,12 +919,12 @@ function renderMain(){
   }
   if(tab==='enhancement'){
     var enhSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isEnhancement(i);});
-    content.innerHTML=enhByPipelineView(applyFilters(enhSrc));
+    content.innerHTML=byPipelineGroupView(applyFilters(enhSrc),'enhancement','No enhancement items.');
     return;
   }
   if(tab==='csother'){
     var csOtherSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isCsOther(i);});
-    content.innerHTML=openTable(applyFilters(csOtherSrc),'No CS items found.',false,'csother',true);
+    content.innerHTML=byPipelineGroupView(applyFilters(csOtherSrc),'csother','No CS items found.');
     return;
   }
   var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isExcludeFromNew(i);});
