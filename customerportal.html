@@ -426,6 +426,7 @@ async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{head
 async function zhPost(path,data){var r=await fetch('https://api.zenhub.com'+path,{method:'POST',headers:{'X-Authentication-Token':S.zhToken,'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
 async function loadSubIssueParents(){var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});await Promise.all(parents.map(async function(p){try{var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child&&!child.parent)child.parent={issueNumber:p.id};});}}catch(e){};}));}
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed to move pipeline: '+e.message);}}
+async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var notIgnored=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});var list;if(tab==='all')list=notIgnored.filter(function(i){return !isExcludeFromNew(i);});else if(tab==='epa')list=notIgnored.filter(isEPA);else if(tab==='enhancement')list=notIgnored.filter(isEnhancement);else if(tab==='csother')list=notIgnored.filter(isCsOther);else list=[];if(!list.length){sel.value='';}else if(!confirm('Move '+list.length+' issue(s) to this pipeline?')){sel.value='';}else{for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}}
 
 async function ghFetchAll(path,maxPages){
   maxPages=maxPages||10;var results=[],per=100;
@@ -649,8 +650,6 @@ var TAB_DEFS=[
   {id:'epa',label:'Enh. Pending Approval',color:'#7c3aed'},
   {id:'enhancement',label:'Enhancement',color:'#d97706'},
   {id:'csother',label:'CS Items',color:'#0891b2'},
-  {id:'new',label:'New (<3d)',color:'#0ea5e9'},
-  {id:'bylabel',label:'By Label',color:'#7c3aed'},
   {id:'closed',label:'Recently Closed',color:'#059669'},
   {id:'ignored',label:'Ignored',color:'#6b7280'}
 ];
@@ -661,8 +660,6 @@ function tabCount(id){
   if(id==='epa')return notIgnored.filter(isEPA).length;
   if(id==='enhancement')return notIgnored.filter(isEnhancement).length;
   if(id==='csother')return notIgnored.filter(isCsOther).length;
-  if(id==='new')return notIgnored.filter(function(i){return !isExcludeFromNew(i)&&ageDays(i.createdAt)<3;}).length;
-  if(id==='bylabel')return notIgnored.length;
   if(id==='closed')return S.closedIssues.length;
   if(id==='ignored')return S.ignored.length;
   return 0;
@@ -708,7 +705,7 @@ function thArrow(col){if(S.sortState.col!==col)return '<span class="si">↕</spa
 function thCls(col){return S.sortState.col===col?' class="sorted"':'';}
 
 // ── Issue row renderer ────────────────────────────────────────────────────────
-function issueRow(iss,showClosed,showRestore){
+function issueRow(iss,showClosed,showRestore,showMilestone){
   var age=ageDays(iss.createdAt);
   var cls=ageCls(age);
   var lbls=iss.labels.slice(0,4).map(lblBadge).join(' ');
@@ -750,6 +747,7 @@ function issueRow(iss,showClosed,showRestore){
       if(srp.length){h+='<td><select class="ps" onchange="movePipeline('+iss.id+',\''+esc(iss.repo)+'\',this.value)"><option value="">'+esc(curN)+'</option>';srp.forEach(function(p){h+='<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>';});h+='</select></td>';}
       else h+='<td style="font-size:12px;color:#6b7280;white-space:nowrap">'+(iss.pipeline?esc(curN):'<span style="color:#d1d5db">—</span>')+'</td>';
     }
+    if(showMilestone)h+='<td style="font-size:12px;color:#6b7280;white-space:nowrap">'+(iss.milestone?esc(iss.milestone):'<span style="color:#d1d5db">—</span>')+'</td>';
     if(showRestore)h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';
     else h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
   }
@@ -757,10 +755,15 @@ function issueRow(iss,showClosed,showRestore){
   return h;
 }
 
-function openTable(issues,emptyMsg,showRestore){
+function openTable(issues,emptyMsg,showRestore,tab,showMilestone){
   if(!issues.length)return '<div class="es">'+esc(emptyMsg||'No issues found.')+'</div>';
   var multiRepo=S.repos.length>1;
-  var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)"><span class="gt">Issues <span class="gc">'+issues.length+'</span></span></div>';
+  var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
+  var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+  var tabLabels={all:'New Issues',epa:'Enh. Pending Approval',enhancement:'Enhancement',csother:'CS Items',closed:'Recently Closed',ignored:'Ignored'};
+  var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)"><span class="gt">'+(tabLabels[tab]||'Issues')+' <span class="gc">'+issues.length+'</span></span>';
+  if(S.zhToken&&tab&&tab!=='closed'&&tab!=='ignored'&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\''+tab+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
+  h+='</div>';
   h+='<div class="tw2"><table><thead><tr>';
   h+='<th onclick="thClick(\'id\')"'+thCls('id')+'>No.'+thArrow('id')+'</th>';
   h+='<th onclick="thClick(\'title\')"'+thCls('title')+'>Title'+thArrow('title')+'</th>';
@@ -768,9 +771,10 @@ function openTable(issues,emptyMsg,showRestore){
   h+='<th onclick="thClick(\'assignee\')"'+thCls('assignee')+'>Assignee'+thArrow('assignee')+'</th>';
   h+='<th onclick="thClick(\'age\')"'+thCls('age')+'>Age'+thArrow('age')+'</th>';
   if(S.zhToken)h+='<th>Pipeline</th>';
+  if(showMilestone)h+='<th>Milestone</th>';
   h+='<th></th>';
   h+='</tr></thead><tbody>';
-  sortIssues(issues).forEach(function(iss){h+=issueRow(iss,false,showRestore);});
+  sortIssues(issues).forEach(function(iss){h+=issueRow(iss,false,showRestore,showMilestone);});
   h+='</tbody></table></div></div>';
   return h;
 }
@@ -840,7 +844,7 @@ function renderMain(){
 
   if(tab==='ignored'){
     var filtered=applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;}));
-    content.innerHTML=openTable(filtered,'No ignored issues.',true);
+    content.innerHTML=openTable(filtered,'No ignored issues.',true,'ignored',false);
     return;
   }
 
@@ -850,29 +854,21 @@ function renderMain(){
   }
   if(tab==='epa'){
     var epaSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isEPA(i);});
-    content.innerHTML=openTable(applyFilters(epaSrc),'No enhancement pending approval items.',false);
+    content.innerHTML=openTable(applyFilters(epaSrc),'No enhancement pending approval items.',false,'epa',true);
     return;
   }
   if(tab==='enhancement'){
     var enhSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isEnhancement(i);});
-    content.innerHTML=openTable(applyFilters(enhSrc),'No enhancement items.',false);
+    content.innerHTML=openTable(applyFilters(enhSrc),'No enhancement items.',false,'enhancement',true);
     return;
   }
   if(tab==='csother'){
     var csOtherSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isCsOther(i);});
-    content.innerHTML=openTable(applyFilters(csOtherSrc),'No CS items found.',false);
+    content.innerHTML=openTable(applyFilters(csOtherSrc),'No CS items found.',false,'csother',true);
     return;
   }
-  if(tab==='bylabel'){
-    content.innerHTML=byLabelView(applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;})));
-    return;
-  }
-
   var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isExcludeFromNew(i);});
-  if(tab==='new')src=src.filter(function(i){return ageDays(i.createdAt)<3;});
-
-  var emptyMsgs={all:'No new issues — all clear!',new:'No issues opened in the last 3 days.'};
-  content.innerHTML=openTable(applyFilters(src),emptyMsgs[tab]||'No issues found.',false);
+  content.innerHTML=openTable(applyFilters(src),'No new issues — all clear!',false,'all',true);
 }
 
 // ── Session bootstrap ─────────────────────────────────────────────────────────
@@ -962,7 +958,7 @@ async function runDiag(){
       var inNewIssues=!isExcludeFromNew(i);
       var inEpa=isEPA(i);
       var inEnh=isEnhancement(i);
-      if(inNewIssues){pass('Appears in <strong>New Issues</strong> tab.');if(ageDays(i.createdAt)<3)pass('Age '+Math.round(ageDays(i.createdAt)*10)/10+'d — also in <strong>New (&lt;3d)</strong> tab.');else fail('Age '+Math.round(ageDays(i.createdAt))+'d — <strong>not</strong> in New (&lt;3d) tab.');}
+      if(inNewIssues){pass('Appears in <strong>New Issues</strong> tab.');}
       if(inEpa)pass('Has <code>enhancement pending approval</code> label — appears in <strong>Enh. Pending Approval</strong> tab.');
       if(inEnh)pass('Has <code>enhancement</code> label — appears in <strong>Enhancement</strong> tab.');
       var inCsOther=isCsOther(i);

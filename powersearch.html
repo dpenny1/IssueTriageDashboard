@@ -207,6 +207,7 @@ var CS_LABELS_PS=['cs tracking','uat patch','production patch','cs in testing','
 function hasCS(i){return i.labels.some(function(l){return CS_LABELS_PS.indexOf(l.toLowerCase())!==-1;});}
 function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');}
 function isMissingParent(issue){if(!hasCS(issue))return false;if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;return !issue.parent;}
+function isCsItem(i){return i.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
 function loadWarnDismissed(){try{var v=localStorage.getItem(PS_WARN_DISMISSED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveWarnDismissed(){try{localStorage.setItem(PS_WARN_DISMISSED_KEY,JSON.stringify(S.warnDismissed));}catch(e){}}
@@ -417,6 +418,7 @@ async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{head
 async function zhPost(path,data){var r=await fetch('https://api.zenhub.com'+path,{method:'POST',headers:{'X-Authentication-Token':S.zhToken,'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
 async function loadSubIssueParents(){var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});await Promise.all(parents.map(async function(p){try{var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child&&!child.parent)child.parent={issueNumber:p.id};});}}catch(e){};}));}
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed to move pipeline: '+e.message);}}
+async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var notIgnored=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});var list;if(tab==='all')list=notIgnored.filter(function(i){return !i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});});else if(tab==='csitem')list=notIgnored.filter(isCsItem);else if(tab==='taskitem')list=notIgnored.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});else list=[];if(!list.length){sel.value='';}else if(!confirm('Move '+list.length+' issue(s) to this pipeline?')){sel.value='';}else{for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}}
 
 async function ghFetchAll(path,maxPages){
   maxPages=maxPages||10;var results=[],per=100;
@@ -609,14 +611,16 @@ function applyFilters(issues){
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 function renderStats(){
-  var open=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
-  var closed=S.closedIssues.length;
-  var taskItems=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
+  var notIgnored=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
+  var newSrc=notIgnored.filter(function(i){return !i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});});
+  var taskItems=notIgnored.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
+  var csItemSrc=notIgnored.filter(isCsItem);
   var csColor='#'+(S.labelColors['cs task item']||'16a34a');
   var stats=[
-    {n:open,l:'Open Issues',c:'#4338ca',tab:'all'},
-    {n:taskItems,l:'CS Task Items',c:csColor,tab:'taskitem'},
-    {n:closed,l:'Recently Closed',c:'#059669',tab:'closed'},
+    {n:newSrc.length,l:'New Issues',c:'#4338ca',tab:'all'},
+    {n:taskItems.length,l:'CS Task Items',c:csColor,tab:'taskitem'},
+    {n:csItemSrc.length,l:'CS Items',c:'#0891b2',tab:'csitem'},
+    {n:S.closedIssues.length,l:'Recently Closed',c:'#059669',tab:'closed'},
     {n:S.ignored.length,l:'Ignored',c:'#6b7280',tab:'ignored'}
   ];
   var h='';
@@ -630,19 +634,17 @@ function renderStats(){
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 var TAB_DEFS=[
-  {id:'all',label:'All Open',color:'#4338ca'},
-  {id:'new',label:'New (<3d)',color:'#0ea5e9'},
+  {id:'all',label:'New Issues',color:'#4338ca'},
   {id:'taskitem',label:'CS Task Items',color:'#16a34a'},
-  {id:'bylabel',label:'By Label',color:'#7c3aed'},
+  {id:'csitem',label:'CS Items',color:'#0891b2'},
   {id:'closed',label:'Recently Closed',color:'#059669'},
   {id:'ignored',label:'Ignored',color:'#6b7280'}
 ];
 
 function tabCount(id){
-  if(id==='all')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
-  if(id==='new')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&ageDays(i.createdAt)<3&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
+  if(id==='all')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});}).length;
   if(id==='taskitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
-  if(id==='bylabel')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}).length;
+  if(id==='csitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isCsItem(i);}).length;
   if(id==='closed')return S.closedIssues.length;
   if(id==='ignored')return S.ignored.length;
   return 0;
@@ -732,16 +734,19 @@ function issueRow(iss,showClosed,showRestore){
     if(showRestore)h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';
     else h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
   }
-  if(iss.milestone)h+='<td style="font-size:12px;color:#6b7280">'+esc(iss.milestone)+'</td>';
   h+='</tr>';
   return h;
 }
 
-function openTable(issues,emptyMsg,showRestore){
+function openTable(issues,emptyMsg,showRestore,tab){
   if(!issues.length)return '<div class="es">'+esc(emptyMsg||'No issues found.')+'</div>';
   var multiRepo=S.repos.length>1;
-  var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)"><span class="gt">Issues <span class="gc">'+issues.length+'</span></span></div>';
-  h+='<div class="tw2"><table><thead><tr>';
+  var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
+  var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+  var tabLabels={all:'New Issues',taskitem:'CS Task Items',csitem:'CS Items',closed:'Recently Closed',ignored:'Ignored'};
+  var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)"><span class="gt">'+(tabLabels[tab]||'Issues')+' <span class="gc">'+issues.length+'</span></span>';
+  if(S.zhToken&&tab&&tab!=='closed'&&tab!=='ignored'&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\''+tab+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
+  h+='</div><div class="tw2"><table><thead><tr>';
   h+='<th onclick="thClick(\'id\')"'+thCls('id')+'>No.'+thArrow('id')+'</th>';
   h+='<th onclick="thClick(\'title\')"'+thCls('title')+'>Title'+thArrow('title')+'</th>';
   if(multiRepo)h+='<th onclick="thClick(\'repo\')"'+thCls('repo')+'>Repo'+thArrow('repo')+'</th>';
@@ -820,7 +825,7 @@ function renderMain(){
 
   if(tab==='ignored'){
     var filtered=applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)!==-1;}));
-    content.innerHTML=openTable(filtered,'No ignored issues.',true);
+    content.innerHTML=openTable(filtered,'No ignored issues.',true,'ignored');
     return;
   }
 
@@ -832,22 +837,18 @@ function renderMain(){
 
   if(tab==='taskitem'){
     var filtered=applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item'});}));
-    content.innerHTML=openTable(filtered,'No CS Task Item issues found.',false);
+    content.innerHTML=openTable(filtered,'No CS Task Item issues found.',false,'taskitem');
     return;
   }
 
-  if(tab==='bylabel'){
-    var filtered=applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;}));
-    content.innerHTML=byLabelView(filtered);
+  if(tab==='csitem'){
+    var filtered=applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isCsItem(i);}));
+    content.innerHTML=openTable(filtered,'No CS item issues found.',false,'csitem');
     return;
   }
 
-  var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
-  if(tab==='new')src=src.filter(function(i){return ageDays(i.createdAt)<3;});
-
-  var filtered=applyFilters(src);
-  var emptyMsgs={all:'No open issues — all clear!',new:'No issues opened in the last 3 days.'};
-  content.innerHTML=openTable(filtered,emptyMsgs[tab]||'No issues found.',false);
+  var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});});
+  content.innerHTML=openTable(applyFilters(src),'No new issues — all clear!',false,'all');
 }
 
 // ── Session bootstrap ─────────────────────────────────────────────────────────
@@ -936,8 +937,10 @@ async function runDiag(){
     if(ignored){fail('This issue is <strong>ignored</strong> — it does not appear in any active tab. Use Restore to bring it back.');}
     else{
       var isCsTask=i.labels.some(function(l){return l.toLowerCase()==='cs task item';});
-      if(isCsTask){info('Has <code>cs task item</code> label — <strong>excluded from All and New tabs</strong>.');}
-      else{pass('Appears in the <strong>All</strong> tab.');if(ageDays(i.createdAt)<3)pass('Age '+Math.round(ageDays(i.createdAt)*10)/10+'d — also in <strong>New (&lt;3d)</strong> tab.');else fail('Age '+Math.round(ageDays(i.createdAt))+'d — <strong>not</strong> in New (&lt;3d) tab.');}
+      var isCsItemIssue=isCsItem(i);
+      if(isCsTask){info('Has <code>cs task item</code> label — appears in <strong>CS Task Items</strong> tab.');}
+      else if(isCsItemIssue){info('Has <code>cs item</code> label — appears in <strong>CS Items</strong> tab.');}
+      else{pass('Appears in the <strong>New Issues</strong> tab.');}
       if(isMissingParent(i))fail('⚠ Has CS label but <strong>no parent issue</strong> found (body regex + sub-issues checked).');
       if(isNIP(i))fail('⚠ Still in <strong>New Issues</strong> pipeline — expected to be moved.');
       if(S.warnDismissed.indexOf(ikey)!==-1)info('Warning badge is currently <strong>dismissed</strong> for this issue.');
