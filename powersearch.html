@@ -325,6 +325,7 @@ function ageCls(d){return d<3?'ao':d<7?'aw':'ab';}
 function lum(h){h=(h||'cccccc').replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];var r=parseInt(h.substr(0,2),16)/255,g=parseInt(h.substr(2,2),16)/255,b=parseInt(h.substr(4,2),16)/255;return 0.2126*r+0.7152*g+0.0722*b;}
 function tfb(h){return lum(h)>0.45?'#1a1a1a':'#ffffff';}
 function lblBadge(n){var key=n.toLowerCase();var c=S.labelColors[key]||'e5e7eb';var display=S.labelNames[key]||n;return '<span class="badge" style="background:#'+c+';color:'+tfb(c)+'">'+esc(display)+'</span>';}
+function sortLbls(labels){var csI=labels.filter(function(l){return l.toLowerCase()==='cs item';});var rest=labels.filter(function(l){return l.toLowerCase()!=='cs item';});return csI.concat(rest);}
 function loadProfiles(){try{var v=localStorage.getItem(PROFILES_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveProfiles(p){try{localStorage.setItem(PROFILES_KEY,JSON.stringify(p));}catch(e){}}
 function saveCache(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({issues:S.issues,closedIssues:S.closedIssues,labelColors:S.labelColors,labelNames:S.labelNames,savedAt:Date.now(),parentsLoaded:true}));}catch(e){}}
@@ -433,7 +434,7 @@ async function ghFetchAll(path,maxPages){
 }
 
 async function loadZHData(){S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){setStatus('<span style="color:#fca5a5">✕ ZenHub failed for '+esc(repo)+': '+esc(e.message)+'</span>');}}S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});}
-function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
+function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;saveCache();populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
 
 async function loadLabelColors(){
   for(var i=0;i<S.repos.length;i++){
@@ -618,8 +619,8 @@ function renderStats(){
   var csColor='#'+(S.labelColors['cs task item']||'16a34a');
   var stats=[
     {n:newSrc.length,l:'New Issues',c:'#4338ca',tab:'all'},
-    {n:taskItems.length,l:'CS Task Items',c:csColor,tab:'taskitem'},
     {n:csItemSrc.length,l:'CS Items',c:'#0891b2',tab:'csitem'},
+    {n:taskItems.length,l:'CS Task Items',c:csColor,tab:'taskitem'},
     {n:S.closedIssues.length,l:'Recently Closed',c:'#059669',tab:'closed'},
     {n:S.ignored.length,l:'Ignored',c:'#6b7280',tab:'ignored'}
   ];
@@ -635,8 +636,8 @@ function renderStats(){
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 var TAB_DEFS=[
   {id:'all',label:'New Issues',color:'#4338ca'},
-  {id:'taskitem',label:'CS Task Items',color:'#16a34a'},
   {id:'csitem',label:'CS Items',color:'#0891b2'},
+  {id:'taskitem',label:'CS Task Items',color:'#16a34a'},
   {id:'closed',label:'Recently Closed',color:'#059669'},
   {id:'ignored',label:'Ignored',color:'#6b7280'}
 ];
@@ -693,7 +694,7 @@ function thCls(col){return S.sortState.col===col?' class="sorted"':'';}
 function issueRow(iss,showClosed,showRestore){
   var age=ageDays(iss.createdAt);
   var cls=ageCls(age);
-  var lbls=iss.labels.slice(0,4).map(lblBadge).join(' ');
+  var lbls=sortLbls(iss.labels).slice(0,4).map(lblBadge).join(' ');
   var asgn=iss.assignees.length?iss.assignees.map(function(a){return '<span style="display:inline-flex;align-items:center;gap:3px"><img src="https://github.com/'+esc(a)+'.png?size=20" width="16" height="16" style="border-radius:50%;vertical-align:middle"/> '+esc(a)+'</span>';}).join(', '):'<span style="color:#9ca3af;font-style:italic">Unassigned</span>';
   var repoShort=iss.repo.split('/')[1]||iss.repo;
   var ikey=iss.id+'_'+iss.repo;

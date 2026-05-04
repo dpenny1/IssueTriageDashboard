@@ -197,7 +197,7 @@ var S={
   sortState:{col:'age',dir:1},
   autoRefreshTimer:null,
   preFilterLabel:'',
-  zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},repoWorkspaceMap:{},zhConnected:false,
+  zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},repoWorkspaceMap:{},zhConnected:false,milestones:{},
   warnDismissed:[]
 };
 var STORAGE_KEY='cp_issues_cache_v1',PROFILES_KEY='cp_profiles_v1',IGNORED_KEY='cp_ignored_v1',CP_WARN_DISMISSED_KEY='cp_warn_dismissed_v1';
@@ -333,6 +333,9 @@ function ageCls(d){return d<3?'ao':d<7?'aw':'ab';}
 function lum(h){h=(h||'cccccc').replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];var r=parseInt(h.substr(0,2),16)/255,g=parseInt(h.substr(2,2),16)/255,b=parseInt(h.substr(4,2),16)/255;return 0.2126*r+0.7152*g+0.0722*b;}
 function tfb(h){return lum(h)>0.45?'#1a1a1a':'#ffffff';}
 function lblBadge(n){var key=n.toLowerCase();var c=S.labelColors[key]||'e5e7eb';var display=S.labelNames[key]||n;return '<span class="badge" style="background:#'+c+';color:'+tfb(c)+'">'+esc(display)+'</span>';}
+function sortLbls(labels){var csI=labels.filter(function(l){return l.toLowerCase()==='cs item';});var rest=labels.filter(function(l){return l.toLowerCase()!=='cs item';});return csI.concat(rest);}
+async function loadMilestones(){for(var i=0;i<S.repos.length;i++){try{var ms=await ghFetch('/repos/'+S.repos[i]+'/milestones?state=open&per_page=100');S.milestones[S.repos[i]]=ms.map(function(m){return {id:m.number,title:m.title};});}catch(e){}}}
+async function setMilestone(issueId,repo,milestoneId){try{await ghPatch('/repos/'+repo+'/issues/'+issueId,{milestone:milestoneId===''?null:parseInt(milestoneId,10)});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){if(!milestoneId){issue.milestone=null;}else{var ms=(S.milestones[repo]||[]).find(function(m){return String(m.id)===String(milestoneId);});if(ms)issue.milestone=ms.title;}}renderMain();}catch(e){alert('Failed to update milestone: '+e.message);}}
 function loadProfiles(){try{var v=localStorage.getItem(PROFILES_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveProfiles(p){try{localStorage.setItem(PROFILES_KEY,JSON.stringify(p));}catch(e){}}
 function saveCache(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({issues:S.issues,closedIssues:S.closedIssues,labelColors:S.labelColors,labelNames:S.labelNames,savedAt:Date.now(),parentsLoaded:true}));}catch(e){}}
@@ -441,7 +444,7 @@ async function ghFetchAll(path,maxPages){
 }
 
 async function loadZHData(){S.zhIssueMap={};S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){setStatus('<span style="color:#fca5a5">✕ ZenHub failed for '+esc(repo)+': '+esc(e.message)+'</span>');}}S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m)i.pipeline=m;});}
-function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
+function zhLoad(){if(!S.zhToken||!S.zhWorkspace)return;S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(){S.zhConnected=true;saveCache();populateFilters();renderMain();setStatus('<span style="color:#6ee7b7">✓ ZenHub connected</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
 
 async function loadLabelColors(){
   for(var i=0;i<S.repos.length;i++){
@@ -532,7 +535,7 @@ async function bgRefresh(){
   showLoadingOverlay('Refreshing...');
   try{
     S.labelColors={};S.labelNames={};S.zhIssueMap={};S.zhPipelines={};S.repoIds={};S.zhConnected=false;
-    await loadLabelColors();await loadIssues();await loadSubIssueParents();
+    await loadLabelColors();await loadMilestones();await loadIssues();await loadSubIssueParents();
     saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();
     setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
     zhLoad();
@@ -547,7 +550,7 @@ async function doRefresh(){
   showLoadingOverlay('Refreshing...');
   try{
     S.labelColors={};S.labelNames={};
-    await loadLabelColors();await loadIssues();await loadSubIssueParents();
+    await loadLabelColors();await loadMilestones();await loadIssues();await loadSubIssueParents();
     saveCache();populateFilters();buildTabs();renderMain();
     if(S.zhToken&&S.zhWorkspace)zhLoad();
     else setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
@@ -626,9 +629,9 @@ function renderStats(){
   var csOtherSrc=notIgnored.filter(isCsOther);
   var stats=[
     {n:newSrc.length,exc:exceptionCount(newSrc),l:'New Issues',c:'#4338ca',tab:'all'},
-    {n:epaSrc.length,exc:exceptionCount(epaSrc),l:'Enh. Pending Approval',c:'#7c3aed',tab:'epa'},
-    {n:enhSrc.length,exc:exceptionCount(enhSrc),l:'Enhancement',c:'#d97706',tab:'enhancement'},
     {n:csOtherSrc.length,exc:exceptionCount(csOtherSrc),l:'CS Items',c:'#0891b2',tab:'csother'},
+    {n:enhSrc.length,exc:exceptionCount(enhSrc),l:'Enhancements',c:'#d97706',tab:'enhancement'},
+    {n:epaSrc.length,exc:exceptionCount(epaSrc),l:'Enh. Pending Approval',c:'#7c3aed',tab:'epa'},
     {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#059669',tab:'closed'},
     {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'}
   ];
@@ -647,9 +650,9 @@ function renderStats(){
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 var TAB_DEFS=[
   {id:'all',label:'New Issues',color:'#4338ca'},
-  {id:'epa',label:'Enh. Pending Approval',color:'#7c3aed'},
-  {id:'enhancement',label:'Enhancement',color:'#d97706'},
   {id:'csother',label:'CS Items',color:'#0891b2'},
+  {id:'enhancement',label:'Enhancements',color:'#d97706'},
+  {id:'epa',label:'Enh. Pending Approval',color:'#7c3aed'},
   {id:'closed',label:'Recently Closed',color:'#059669'},
   {id:'ignored',label:'Ignored',color:'#6b7280'}
 ];
@@ -708,7 +711,7 @@ function thCls(col){return S.sortState.col===col?' class="sorted"':'';}
 function issueRow(iss,showClosed,showRestore,showMilestone){
   var age=ageDays(iss.createdAt);
   var cls=ageCls(age);
-  var lbls=iss.labels.slice(0,4).map(lblBadge).join(' ');
+  var lbls=sortLbls(iss.labels).slice(0,4).map(lblBadge).join(' ');
   var asgn=iss.assignees.length?iss.assignees.map(function(a){return '<span style="display:inline-flex;align-items:center;gap:3px"><img src="https://github.com/'+esc(a)+'.png?size=20" width="16" height="16" style="border-radius:50%;vertical-align:middle"/> '+esc(a)+'</span>';}).join(', '):'<span style="color:#9ca3af;font-style:italic">Unassigned</span>';
   var repoShort=iss.repo.split('/')[1]||iss.repo;
   var ikey=iss.id+'_'+iss.repo;
@@ -747,7 +750,7 @@ function issueRow(iss,showClosed,showRestore,showMilestone){
       if(srp.length){h+='<td><select class="ps" onchange="movePipeline('+iss.id+',\''+esc(iss.repo)+'\',this.value)"><option value="">'+esc(curN)+'</option>';srp.forEach(function(p){h+='<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>';});h+='</select></td>';}
       else h+='<td style="font-size:12px;color:#6b7280;white-space:nowrap">'+(iss.pipeline?esc(curN):'<span style="color:#d1d5db">—</span>')+'</td>';
     }
-    if(showMilestone)h+='<td style="font-size:12px;color:#6b7280;white-space:nowrap">'+(iss.milestone?esc(iss.milestone):'<span style="color:#d1d5db">—</span>')+'</td>';
+    if(showMilestone){var rms=S.milestones[iss.repo]||[];var curMs=iss.milestone||'';if(rms.length){h+='<td><select class="ps" onchange="setMilestone('+iss.id+',\''+esc(iss.repo)+'\',this.value)"><option value="">'+(curMs?esc(curMs):'— No milestone —')+'</option><option value="" style="color:#9ca3af">— Clear —</option>';rms.forEach(function(m){h+='<option value="'+m.id+'"'+(curMs===m.title?' selected':'')+'>'+esc(m.title)+'</option>';});h+='</select></td>';}else{h+='<td style="font-size:12px;color:#6b7280;white-space:nowrap">'+(curMs?esc(curMs):'<span style="color:#d1d5db">—</span>')+'</td>';}}
     if(showRestore)h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';
     else h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
   }
@@ -760,7 +763,7 @@ function openTable(issues,emptyMsg,showRestore,tab,showMilestone){
   var multiRepo=S.repos.length>1;
   var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
   var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
-  var tabLabels={all:'New Issues',epa:'Enh. Pending Approval',enhancement:'Enhancement',csother:'CS Items',closed:'Recently Closed',ignored:'Ignored'};
+  var tabLabels={all:'New Issues',epa:'Enh. Pending Approval',enhancement:'Enhancements',csother:'CS Items',closed:'Recently Closed',ignored:'Ignored'};
   var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)"><span class="gt">'+(tabLabels[tab]||'Issues')+' <span class="gc">'+issues.length+'</span></span>';
   if(S.zhToken&&tab&&tab!=='closed'&&tab!=='ignored'&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\''+tab+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
   h+='</div>';
@@ -909,7 +912,7 @@ function renderMain(){
     bgRefresh();
   } else {
     showDash();setStatus('<span style="color:#fbbf24">⏳ Loading...</span>');showLoadingOverlay('Loading issues...');
-    Promise.all([loadLabelColors(),loadIssues()])
+    Promise.all([loadLabelColors(),loadIssues(),loadMilestones()])
       .then(function(){return loadSubIssueParents();})
       .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();hideLoadingOverlay();setStatus('<span style="color:#a5b4fc">✓ Loaded</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');zhLoad();})
       .catch(function(e){hideLoadingOverlay();document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
@@ -960,7 +963,7 @@ async function runDiag(){
       var inEnh=isEnhancement(i);
       if(inNewIssues){pass('Appears in <strong>New Issues</strong> tab.');}
       if(inEpa)pass('Has <code>enhancement pending approval</code> label — appears in <strong>Enh. Pending Approval</strong> tab.');
-      if(inEnh)pass('Has <code>enhancement</code> label — appears in <strong>Enhancement</strong> tab.');
+      if(inEnh)pass('Has <code>enhancement</code> label — appears in <strong>Enhancements</strong> tab.');
       var inCsOther=isCsOther(i);
       if(inCsOther)pass('Has CS label(s) — appears in <strong>CS Items</strong> tab.');
       if(!inNewIssues&&!inEpa&&!inEnh&&!inCsOther){info('Not found in any active tab — issue may have no recognized labels.');}
