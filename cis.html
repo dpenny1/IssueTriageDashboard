@@ -936,9 +936,13 @@ function renderCSItemsByPipeline(issues,def){
   var multiRepo=S.repos.length>1;
   var pipeMap={};S.repos.forEach(function(r){(S.zhPipelines[r]||[]).forEach(function(p){if(!pipeMap[p.id])pipeMap[p.id]=p;});});
   var spipes=Object.keys(pipeMap).map(function(k){return pipeMap[k];}).sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
-  // Split exceptions from normal issues
-  var excIssues=issues.filter(isException);
-  var normIssues=issues.filter(function(i){return !isException(i);});
+  // Split exceptions from normal issues.
+  // isNIP is checked explicitly here because isException() returns false for issues
+  // with a parent, even if they're in New Issues — but for CS Items, New Issues is
+  // always an exception regardless of parent status.
+  function isCsItemExc(i){return isException(i)||isNIP(i);}
+  var excIssues=issues.filter(isCsItemExc);
+  var normIssues=issues.filter(function(i){return !isCsItemExc(i);});
   // Group normal issues by pipeline — On Deck Priorities first, In Progress second, others alpha
   var groups={};var noPipeline=[];
   normIssues.forEach(function(i){var pn=i.pipeline?i.pipeline.pipelineName:null;if(!pn){noPipeline.push(i);return;}if(!groups[pn])groups[pn]=[];groups[pn].push(i);});
