@@ -673,8 +673,8 @@ function isException(issue){
   if(isExempt(issue))return false;
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
   if(findAutoCheckedParents(issue.id).length>0&&issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';}))return true;
-  // Assigned issues must be In Progress — checked before parent so it's always enforced
-  if(issue.assignees&&issue.assignees.length>0&&issue.pipeline&&issue.pipeline.pipelineName!=='In Progress')return true;
+  // Assigned issues in New Issues or On Deck Priorities are exceptions — checked before parent so it's always enforced
+  if(issue.assignees&&issue.assignees.length>0&&issue.pipeline&&(issue.pipeline.pipelineName==='New Issues'||issue.pipeline.pipelineName==='On Deck Priorities'))return true;
   if(issue.parent)return false;
   if(isNIP(issue))return true;
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id))return true;
@@ -890,10 +890,10 @@ function renderExcReason(issue){
     });
     return parts.join('<div style="margin-top:4px"></div>');
   }
-  if(issue.assignees&&issue.assignees.length>0&&issue.pipeline&&issue.pipeline.pipelineName!=='In Progress')parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Assigned issue in "'+esc(issue.pipeline.pipelineName)+'" — must be moved to In Progress</span>');
+  if(issue.assignees&&issue.assignees.length>0&&issue.pipeline&&(issue.pipeline.pipelineName==='New Issues'||issue.pipeline.pipelineName==='On Deck Priorities'))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Assigned to '+esc(issue.assignees.join(', '))+' but in "'+esc(issue.pipeline.pipelineName)+'" — must be moved to In Progress</span>');
   if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id))parts.push('<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not in any tracking issue</span>');
-  if(!parts.length){var _csLbls=issue.labels.filter(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});var _pn=issue.pipeline?issue.pipeline.pipelineName:'No pipeline';parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ CS-labeled ('+esc(_csLbls.join(', '))+') in "'+esc(_pn)+'" — no parent issue</span>');}
+  if(!parts.length)parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Has CS label but no parent</span>');
   return parts.join('<div style="margin-top:4px"></div>');
 }
 
@@ -967,7 +967,7 @@ function renderCSItemsByPipeline(issues,def){
       // Build exception reason badges
       var warnings=[];
       if(exc){
-        if(issue.assignees&&issue.assignees.length>0&&issue.pipeline&&issue.pipeline.pipelineName!=='In Progress')warnings.push('⚠ Assigned issue in "'+issue.pipeline.pipelineName+'" — must be moved to In Progress');
+        if(issue.assignees&&issue.assignees.length>0&&issue.pipeline&&(issue.pipeline.pipelineName==='New Issues'||issue.pipeline.pipelineName==='On Deck Priorities'))warnings.push('⚠ Assigned issue in "'+issue.pipeline.pipelineName+'" — must be moved to In Progress');
         if(isNIP(issue))warnings.push('⚠ Still in New Issues pipeline');
         if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&notInTracking)warnings.push('⚠ CS Item not in any tracking issue');
         if(findAutoCheckedParents(issue.id).length>0&&issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';}))warnings.push('⚠ CS In Testing item is auto-checked in a tracking issue');
