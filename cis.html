@@ -890,7 +890,7 @@ function renderExcReason(issue){
     });
     return parts.join('<div style="margin-top:4px"></div>');
   }
-  if(issue.assignees&&issue.assignees.length>0&&issue.pipeline&&(issue.pipeline.pipelineName==='New Issues'||issue.pipeline.pipelineName==='On Deck Priorities'))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Assigned to '+esc(issue.assignees.join(', '))+' but in "'+esc(issue.pipeline.pipelineName)+'" — must be moved to In Progress</span>');
+  if(issue.assignees&&issue.assignees.length>0&&issue.pipeline&&(issue.pipeline.pipelineName==='New Issues'||issue.pipeline.pipelineName==='On Deck Priorities'))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Assigned issue in "'+esc(issue.pipeline.pipelineName)+'" — must be moved to In Progress</span>');
   if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id))parts.push('<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not in any tracking issue</span>');
   if(!parts.length)parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Has CS label but no parent</span>');
@@ -950,13 +950,13 @@ function renderCSItemsByPipeline(issues,def){
   function isCsItemExc(i){return isException(i)||isNIP(i);}
   var excIssues=issues.filter(isCsItemExc);
   var normIssues=issues.filter(function(i){return !isCsItemExc(i);});
-  // Group normal issues by pipeline — On Deck Priorities first, In Progress second, others alpha
+  // Group normal issues by pipeline — ordered: In Progress, Telecom, On Deck Priorities, Icebox, then others alpha
   var groups={};var noPipeline=[];
   normIssues.forEach(function(i){var pn=i.pipeline?i.pipeline.pipelineName:null;if(!pn){noPipeline.push(i);return;}if(!groups[pn])groups[pn]=[];groups[pn].push(i);});
-  var PRIORITY=['On Deck Priorities','In Progress'];
+  var PRIORITY=['In Progress','Telecom','On Deck Priorities','Icebox'];
   var others=Object.keys(groups).filter(function(k){return PRIORITY.indexOf(k)===-1;}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
   var orderedKeys=PRIORITY.filter(function(k){return !!groups[k];}).concat(others);
-  var COLORS={'On Deck Priorities':'#d97706','In Progress':'#059669'};
+  var COLORS={'In Progress':'#059669','Telecom':'#0891b2','On Deck Priorities':'#d97706','Icebox':'#6b7280'};
   function pipeRows(grp){
     var sorted=grp.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
     var s='';
