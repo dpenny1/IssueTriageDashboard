@@ -873,11 +873,18 @@ function byPipelineGroupView(issues,tab,emptyMsg){
   var others=Object.keys(groups).filter(function(k){return PRIORITY.indexOf(k)===-1;}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
   var orderedKeys=PRIORITY.filter(function(k){return !!groups[k];}).concat(others);
   var COLORS={'On Deck Priorities':'#d97706','In Progress':'#059669'};
+  // Split exceptions out — they get their own panel at the top
+  var excIssues=issues.filter(issueHasException);
+  var normIssues=issues.filter(function(i){return !issueHasException(i);});
+  // Re-group using only normal issues
+  var normGroups={};var normNoPipe=[];
+  normIssues.forEach(function(iss){var pn=iss.pipeline?iss.pipeline.pipelineName:null;if(!pn){normNoPipe.push(iss);return;}if(!normGroups[pn])normGroups[pn]=[];normGroups[pn].push(iss);});
+  var normOthers=Object.keys(normGroups).filter(function(k){return PRIORITY.indexOf(k)===-1;}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+  var normKeys=PRIORITY.filter(function(k){return !!normGroups[k];}).concat(normOthers);
   var h='';
-  // Pipeline group sections — bulk move lives in each group header, no top banner
-  function pipeSection(pname,grp){
+  function pipeSection(pname,grp,c){
+    c=c||COLORS[pname]||'#6b7280';
     var sorted=grp.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
-    var c=COLORS[pname]||'#6b7280';
     var s='<div style="margin-bottom:20px"><div class="gh" style="background:linear-gradient(90deg,'+c+','+c+'dd);border-radius:10px 10px 0 0">';
     s+='<span class="gt" style="color:#fff">'+esc(pname)+'<span class="gc">'+sorted.length+'</span></span>';
     if(S.zhToken&&spipes.length){s+='<select class="ps" style="color:#374151" onchange="bulkMove(\''+tab+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){s+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});s+='</select>';}
@@ -891,8 +898,11 @@ function byPipelineGroupView(issues,tab,emptyMsg){
     s+='</tbody></table></div></div>';
     return s;
   }
-  orderedKeys.forEach(function(pname){if(groups[pname]&&groups[pname].length)h+=pipeSection(pname,groups[pname]);});
-  if(noPipeline.length)h+=pipeSection('No Pipeline',noPipeline);
+  // Exceptions panel first
+  if(excIssues.length)h+=pipeSection('Exceptions',excIssues,'#dc2626');
+  // Pipeline groups from non-exception issues
+  normKeys.forEach(function(pname){if(normGroups[pname]&&normGroups[pname].length)h+=pipeSection(pname,normGroups[pname]);});
+  if(normNoPipe.length)h+=pipeSection('No Pipeline',normNoPipe);
   return h;
 }
 

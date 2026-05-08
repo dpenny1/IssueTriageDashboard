@@ -894,8 +894,8 @@ function renderExcReason(issue){
 function renderTable(issues,tab,def){
   var isClosed=tab==='closed',isIgnored=tab==='ignored',isTesting=tab==='testing',isExc=tab==='exceptions',isFailedTesting=tab==='failedtesting';
   var color=def?tabColor(def):'#374151',label=def?def.label:tab;
-  var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
-  var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+  var pipeMap={};S.repos.forEach(function(r){(S.zhPipelines[r]||[]).forEach(function(p){if(!pipeMap[p.id])pipeMap[p.id]=p;});});
+  var spipes=Object.keys(pipeMap).map(function(k){return pipeMap[k];}).sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
   var h='<div class="gh" style="background:'+color+'"><span class="gt">'+esc(label)+'<span class="gc">'+issues.length+'</span></span>';
   if(S.zhToken&&!isClosed&&!isIgnored&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\''+tab+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
   h+='</div><div class="tw2"><table><thead><tr>'+mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th>';
@@ -930,6 +930,62 @@ function renderTable(issues,tab,def){
   return h+'</tbody></table></div>';
 }
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed: '+e.message);}}
+// ── CS Items pipeline-grouped view (replaces tab-based renderCSItemsGrouped) ──
+function renderCSItemsByPipeline(issues,def){
+  if(!issues.length)return '<div class="es">No CS item issues found.</div>';
+  var multiRepo=S.repos.length>1;
+  var pipeMap={};S.repos.forEach(function(r){(S.zhPipelines[r]||[]).forEach(function(p){if(!pipeMap[p.id])pipeMap[p.id]=p;});});
+  var spipes=Object.keys(pipeMap).map(function(k){return pipeMap[k];}).sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+  // Split exceptions from normal issues
+  var excIssues=issues.filter(isException);
+  var normIssues=issues.filter(function(i){return !isException(i);});
+  // Group normal issues by pipeline — On Deck Priorities first, In Progress second, others alpha
+  var groups={};var noPipeline=[];
+  normIssues.forEach(function(i){var pn=i.pipeline?i.pipeline.pipelineName:null;if(!pn){noPipeline.push(i);return;}if(!groups[pn])groups[pn]=[];groups[pn].push(i);});
+  var PRIORITY=['On Deck Priorities','In Progress'];
+  var others=Object.keys(groups).filter(function(k){return PRIORITY.indexOf(k)===-1;}).sort(function(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());});
+  var orderedKeys=PRIORITY.filter(function(k){return !!groups[k];}).concat(others);
+  var COLORS={'On Deck Priorities':'#d97706','In Progress':'#059669'};
+  function pipeRows(grp){
+    var sorted=grp.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+    var s='';
+    sorted.forEach(function(issue){
+      var ikey=issue.id+'_'+issue.repo,days=ageDays(issue.createdAt);
+      var notInTracking=!isReferencedInTracking(issue.id);
+      s+='<tr'+(notInTracking?' style="background:#fffbeb"':'')+'>';
+      s+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
+      s+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>'+parentLink(issue)+(notInTracking?'<div style="margin-top:3px"><span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not in any tracking issue</span></div>':'')+'</td>';
+      s+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';sortLbls(issue.labels).forEach(function(l){s+=lblBadge(l);});
+      s+='<button onclick="toggleLabelEdit('+issue.id+',\''+esc(issue.repo)+'\')" title="Edit labels" style="background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;color:#9ca3af;border-radius:4px;line-height:1" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">✏️</button>';
+      s+='</div><div id="lblpanel_'+issue.id+'_'+esc(issue.repo)+'" style="display:none"></div></td>';
+      if(multiRepo)s+='<td style="font-size:12px;color:#6b7280">'+esc(issue.repo.split('/')[1])+'</td>';
+      s+='<td style="font-size:12px;color:#6b7280">'+esc(issue.assignees.join(', ')||'—')+'</td>';
+      if(S.zhToken){var rp=S.zhPipelines[issue.repo]||[],cur=issue.pipeline?issue.pipeline.pipelineId:'',curN=issue.pipeline?issue.pipeline.pipelineName:'—';var srp=rp.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});if(srp.length){s+='<td><select class="ps" onchange="movePipeline('+issue.id+',\''+esc(issue.repo)+'\',this.value)"><option value="">'+esc(curN)+'</option>';srp.forEach(function(p){s+='<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>';});s+='</select></td>';}else s+='<td style="font-size:12px;color:#6b7280">'+esc(curN)+'</td>';}
+      s+='<td><span class="'+ageCls(days)+'">'+days+'d</span></td>';
+      s+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td></tr>';
+    });
+    return s;
+  }
+  function pipeSection(pname,grp,c){
+    c=c||COLORS[pname]||'#6b7280';
+    var s='<div style="margin-bottom:20px"><div class="gh" style="background:linear-gradient(90deg,'+c+','+c+'dd);border-radius:10px 10px 0 0">';
+    s+='<span class="gt" style="color:#fff">'+esc(pname)+'<span class="gc">'+grp.length+'</span></span>';
+    if(S.zhToken&&spipes.length){s+='<select class="ps" style="color:#374151" onchange="bulkMove(\'csitems\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){s+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});s+='</select>';}
+    s+='</div><div class="tw2" style="border-top:none;border-radius:0 0 10px 10px"><table><thead><tr>'+mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th>';
+    if(multiRepo)s+=mkTh('repo','Repo');
+    s+='<th>Assignee</th>';
+    if(S.zhToken)s+='<th>Pipeline</th>';
+    s+=mkTh('age','Age')+'<th></th></tr></thead><tbody>';
+    s+=pipeRows(grp);
+    s+='</tbody></table></div></div>';
+    return s;
+  }
+  var h='';
+  if(excIssues.length)h+=pipeSection('Exceptions',excIssues,'#dc2626');
+  orderedKeys.forEach(function(pn){if(groups[pn]&&groups[pn].length)h+=pipeSection(pn,groups[pn]);});
+  if(noPipeline.length)h+=pipeSection('No Pipeline',noPipeline);
+  return h;
+}
 var _csItemsPipeline=null;
 function pipelineOrder(name){var n=(name||'').trim();if(n==='On Deck Priorities')return 0;if(n==='In Progress')return 1;if(n==='Icebox')return 3;return 2;}
 function renderOnDeckBanner(issues){
@@ -987,8 +1043,8 @@ function renderExceptionsView(){
   return renderExcOpenTable(openExc,color)+'<div style="margin-top:24px"></div>'+renderExcClosedTable(closedExc);
 }
 function renderExcOpenTable(issues,color){
-  var pipes=S.repos.length?S.zhPipelines[S.repos[0]]||[]:[];
-  var spipes=pipes.slice().sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
+  var pipeMap={};S.repos.forEach(function(r){(S.zhPipelines[r]||[]).forEach(function(p){if(!pipeMap[p.id])pipeMap[p.id]=p;});});
+  var spipes=Object.keys(pipeMap).map(function(k){return pipeMap[k];}).sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
   var h='<div class="gh" style="background:'+color+'"><span class="gt">Open Exceptions<span class="gc">'+issues.length+'</span></span>';
   if(S.zhToken&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\'exceptions\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
   h+='</div><div class="tw2"><table><thead><tr>'+mkTh('id','#')+mkTh('title','Title')+'<th>Labels</th>';
@@ -1034,15 +1090,15 @@ function renderExcClosedTable(issues){
   });
   return h+'</tbody></table></div>';
 }
-async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list;if(tab==='csitems'&&_csItemsPipeline){list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.pipeline&&i.pipeline.pipelineName===_csItemsPipeline;});}else{list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});}if(!list.length){sel.value='';}else if(!confirm('Move '+list.length+' issues?')){sel.value='';}else{for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}}
+async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTabIssues(tab).filter(function(i){return i.state==='open'&&S.ignored.indexOf(i.id+'_'+i.repo)===-1;});if(!list.length){sel.value='';}else if(!confirm('Move '+list.length+' issues?')){sel.value='';}else{for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}}
 function renderMain(){
   renderStats();buildTabs();hideErr('dashErr');
   if(S.activeTab==='report'){renderReport();}
   else if(S.activeTab==='global'){renderGlobalSearch();}
-  else if(S.activeTab==='csitems'&&S.zhToken&&!document.getElementById('filterPipeline').value){
+  else if(S.activeTab==='csitems'&&S.zhToken){
     var csIssues=applyFilters(getTabIssues('csitems'));
     var def=TAB_DEFS.find(function(d){return d.id==='csitems';});
-    document.getElementById('mainContent').innerHTML=renderOnDeckBanner(csIssues)+renderCSItemsGrouped(csIssues,def);
+    document.getElementById('mainContent').innerHTML=renderCSItemsByPipeline(csIssues,def);
   } else if(S.activeTab==='exceptions'){
     document.getElementById('mainContent').innerHTML=renderExceptionsView();
   } else {
