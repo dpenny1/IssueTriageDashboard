@@ -956,9 +956,22 @@ function renderCSItemsByPipeline(issues,def){
     sorted.forEach(function(issue){
       var ikey=issue.id+'_'+issue.repo,days=ageDays(issue.createdAt);
       var notInTracking=!isReferencedInTracking(issue.id);
-      s+='<tr'+(notInTracking?' style="background:#fffbeb"':'')+'>';
+      var exc=isCsItemExc(issue);
+      // Build exception reason badges
+      var warnings=[];
+      if(exc){
+        if(isNIP(issue))warnings.push('⚠ Still in New Issues pipeline');
+        if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&notInTracking)warnings.push('⚠ CS Item not in any tracking issue');
+        if(findAutoCheckedParents(issue.id).length>0&&issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';}))warnings.push('⚠ CS In Testing item is auto-checked in a tracking issue');
+        if(warnings.length===0)warnings.push('⚠ CS-labeled issue requires triage');
+      }
+      var rowBg=exc?' style="background:#fff5f5"':(notInTracking?' style="background:#fffbeb"':'');
+      s+='<tr'+rowBg+'>';
       s+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
-      s+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>'+parentLink(issue)+(notInTracking?'<div style="margin-top:3px"><span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not in any tracking issue</span></div>':'')+'</td>';
+      s+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>'+parentLink(issue);
+      if(warnings.length){s+='<div style="margin-top:3px">';warnings.forEach(function(w){s+='<span class="badge" style="background:#fee2e2;color:#991b1b">'+esc(w)+'</span> ';});s+='</div>';}
+      else if(notInTracking){s+='<div style="margin-top:3px"><span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not in any tracking issue</span></div>';}
+      s+='</td>';
       s+='<td><div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center">';sortLbls(issue.labels).forEach(function(l){s+=lblBadge(l);});
       s+='<button onclick="toggleLabelEdit('+issue.id+',\''+esc(issue.repo)+'\')" title="Edit labels" style="background:none;border:none;cursor:pointer;font-size:12px;padding:1px 4px;color:#9ca3af;border-radius:4px;line-height:1" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'none\'">✏️</button>';
       s+='</div><div id="lblpanel_'+issue.id+'_'+esc(issue.repo)+'" style="display:none"></div></td>';

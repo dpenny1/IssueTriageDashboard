@@ -210,7 +210,7 @@ function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='N
 function isMissingParent(issue){if(!hasCS(issue))return false;if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;return !issue.parent;}
 function isAssignedInNIP(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName==='New Issues');}
 function isAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues');}
-function isUnassignedNotOnDeck(i){return !!(S.zhToken&&(!i.assignees||i.assignees.length===0)&&i.pipeline&&i.pipeline.pipelineName!=='On Deck Priorities'&&i.pipeline.pipelineName!=='Product Backlog');}
+function isUnassignedNotOnDeck(i){return !!(S.zhToken&&(!i.assignees||i.assignees.length===0)&&i.pipeline&&i.pipeline.pipelineName!=='Product Backlog');}
 function isCsTaskItem(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
 function isCsTaskItemNotTracking(i){return !!(S.zhToken&&isCsTaskItem(i)&&i.pipeline&&i.pipeline.pipelineName!=='CS Tracking Issues');}
 function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
@@ -719,7 +719,7 @@ function issueRow(iss,showClosed,showRestore){
       if(isNIP(iss))warnings.push('⚠ Still in New Issues pipeline');
       if(isAssignedInNIP(iss))warnings.push('⚠ Assigned but still in New Issues pipeline');
       if(isAssignedNotInProgress(iss))warnings.push('⚠ Assigned but not in In Progress pipeline');
-      if(isUnassignedNotOnDeck(iss))warnings.push('⚠ Unassigned but not in On Deck Priorities pipeline');
+      if(isUnassignedNotOnDeck(iss))warnings.push('⚠ Unassigned but not in Product Backlog pipeline');
     }
   }
   var h='<tr'+(warnings.length?' style="background:#fff5f5"':'')+'>';
@@ -1014,7 +1014,7 @@ async function runDiag(){
         if(isMissingParent(i))fail('⚠ Has CS label but <strong>no parent issue</strong> found (body regex + sub-issues checked).');
         if(isAssignedInNIP(i))fail('⚠ Assigned but still in <strong>New Issues</strong> pipeline.');
         if(isAssignedNotInProgress(i))fail('⚠ Assigned but not in <strong>In Progress</strong> pipeline.');
-        if(isUnassignedNotOnDeck(i))fail('⚠ Unassigned but not in <strong>On Deck Priorities</strong> pipeline.');
+        if(isUnassignedNotOnDeck(i))fail('⚠ Unassigned but not in <strong>Product Backlog</strong> pipeline.');
         else if(isNIP(i))fail('⚠ Still in <strong>New Issues</strong> pipeline — expected to be moved.');
       }
       if(S.warnDismissed.indexOf(ikey)!==-1)info('Warning badge is currently <strong>dismissed</strong> for this issue.');
