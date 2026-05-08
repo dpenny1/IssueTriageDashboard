@@ -674,6 +674,8 @@ function isException(issue){
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs task item';}))return false;
   if(findAutoCheckedParents(issue.id).length>0&&issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';}))return true;
   if(issue.parent)return false;
+  // Assigned issues must be in "In Progress" — any other pipeline is a process violation
+  if(issue.assignees&&issue.assignees.length>0&&issue.pipeline&&issue.pipeline.pipelineName!=='In Progress')return true;
   if(isNIP(issue))return true;
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id))return true;
   if(hasCS(issue))return true;
@@ -733,8 +735,8 @@ function cisExcCount(issues,tabId){
   if(tabId==='testing')return issues.filter(function(i){return i.state==='open';}).length;
   // exceptions tile number IS the exception count — no extra badge needed
   if(tabId==='exceptions'||tabId==='closed'||tabId==='ignored'||tabId==='report')return 0;
-  // all other open-issue tiles: count issues still stuck in the New Issues pipeline
-  return issues.filter(function(i){return i.state==='open'&&isNIP(i);}).length;
+  // all other open-issue tiles: count open issues that are exceptions (NIP or assigned wrong pipeline)
+  return issues.filter(function(i){return i.state==='open'&&isException(i);}).length;
 }
 function renderStats(){
   var base=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isException(i);});
@@ -744,7 +746,9 @@ function renderStats(){
   var prodSrc=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});});
   var uatSrc=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});
   var failedSrc=base.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='failed testing';});});
-  var csItemsSrc=base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});});
+  // Include CS-labeled exceptions (e.g. assigned but not In Progress) so the tile count matches the tab
+  var csItemsExc=S.issues.filter(function(i){var ikey=i.id+'_'+i.repo;return S.ignored.indexOf(ikey)===-1&&isException(i)&&i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';});});
+  var csItemsSrc=base.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item';});}).concat(csItemsExc);
   var testingSrc=openTesting.concat(closedTesting);
   var taskSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
   var stats=[
@@ -884,6 +888,7 @@ function renderExcReason(issue){
     });
     return parts.join('<div style="margin-top:4px"></div>');
   }
+  if(issue.assignees&&issue.assignees.length>0&&issue.pipeline&&issue.pipeline.pipelineName!=='In Progress')parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Assigned to '+esc(issue.assignees.join(', '))+' but in "'+esc(issue.pipeline.pipelineName)+'" — must be moved to In Progress</span>');
   if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id))parts.push('<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not in any tracking issue</span>');
   if(!parts.length)parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Has CS label but no parent</span>');
@@ -1013,7 +1018,7 @@ function renderOnDeckBanner(issues){
   h+='<span style="font-size:12px;padding:2px 9px;border-radius:999px;background:#e0e7ff;color:#3730a3;font-weight:700">'+onDeck.length+' total</span>';
   if(assigned.length)h+='<span style="font-size:12px;padding:2px 9px;border-radius:999px;background:#d1fae5;color:#065f46;font-weight:700">'+assigned.length+' assigned</span>';
   h+='</div>';
-  if(assigned.length){h+='<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Assigned:</div><div style="display:flex;flex-wrap:wrap;gap:6px">';assigned.forEach(function(i){h+='<a href="'+esc(i.url)+'" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#1e1b4b;text-decoration:none"><span style="color:#6b7280">#'+i.id+'</span> '+esc(i.title.length>40?i.title.substring(0,40)+'…':i.title)+' <span style="color:#059669;font-size:11px">→ '+esc(i.assignees.join(', '))+'</span></a>';});h+='</div>';}
+  if(assigned.length){h+='<div style="font-size:12px;font-weight:600;color:#dc2626;margin-bottom:6px">Assigned <span style="font-size:11px;font-weight:500;color:#dc2626">(should be moved to In Progress)</span>:</div><div style="display:flex;flex-wrap:wrap;gap:6px">';assigned.forEach(function(i){h+='<a href="'+esc(i.url)+'" target="_blank" style="display:inline-flex;align-items:center;gap:5px;background:#fff5f5;border:1px solid #fca5a5;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#1e1b4b;text-decoration:none"><span style="color:#6b7280">#'+i.id+'</span> '+esc(i.title.length>40?i.title.substring(0,40)+'…':i.title)+' <span style="color:#dc2626;font-size:11px">→ '+esc(i.assignees.join(', '))+'</span></a>';});h+='</div>';}
   else h+='<div style="font-size:13px;color:#9ca3af">No assigned issues in On Deck Priorities.</div>';
   return h+'</div>';
 }
@@ -1113,7 +1118,18 @@ function renderMain(){
   if(S.activeTab==='report'){renderReport();}
   else if(S.activeTab==='global'){renderGlobalSearch();}
   else if(S.activeTab==='csitems'&&S.zhToken){
-    var csIssues=applyFilters(getTabIssues('csitems'));
+    var csNormal=applyFilters(getTabIssues('csitems'));
+    // Also include CS-labeled exceptions so they appear in the Exceptions panel
+    // regardless of which pipeline they're in (e.g. assigned but not In Progress)
+    var _seen={};csNormal.forEach(function(i){_seen[i.id+'_'+i.repo]=1;});
+    var csExc=S.issues.filter(function(i){
+      var ikey=i.id+'_'+i.repo;
+      if(_seen[ikey])return false;
+      if(S.ignored.indexOf(ikey)!==-1)return false;
+      if(!isException(i))return false;
+      return i.labels.some(function(l){var ll=l.toLowerCase();return ll.indexOf('cs ')===0&&ll!=='cs task item'&&ll!=='cs in testing';});
+    });
+    var csIssues=csNormal.concat(csExc);
     var def=TAB_DEFS.find(function(d){return d.id==='csitems';});
     document.getElementById('mainContent').innerHTML=renderCSItemsByPipeline(csIssues,def);
   } else if(S.activeTab==='exceptions'){
