@@ -944,10 +944,10 @@ function renderCSItemsByPipeline(issues,def){
   var pipeMap={};S.repos.forEach(function(r){(S.zhPipelines[r]||[]).forEach(function(p){if(!pipeMap[p.id])pipeMap[p.id]=p;});});
   var spipes=Object.keys(pipeMap).map(function(k){return pipeMap[k];}).sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
   // Split exceptions from normal issues.
-  // isNIP is checked explicitly here because isException() returns false for issues
-  // with a parent, even if they're in New Issues — but for CS Items, New Issues is
-  // always an exception regardless of parent status.
-  function isCsItemExc(i){return isException(i)||isNIP(i);}
+  // isNIP and CS Item untracked are checked explicitly here because isException() returns
+  // false for issues with a parent — but for CS Items, both conditions are always
+  // exceptions regardless of parent status.
+  function isCsItemExc(i){return isException(i)||isNIP(i)||(i.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(i.id));}
   var excIssues=issues.filter(isCsItemExc);
   var normIssues=issues.filter(function(i){return !isCsItemExc(i);});
   // Group normal issues by pipeline — ordered: In Progress, Telecom, On Deck Priorities, Icebox, then others alpha
