@@ -605,6 +605,26 @@ async function loadIssues(){
   repoResults.forEach(function(r){open=open.concat(r.open);closed=closed.concat(r.closed);});
   S.issues=open;
   S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
+  // For closed issues that lack 'CS In Testing', check whether they were closed by a PR
+  // merge (commit_id on the closed event). If so, they're exempt from the no-testing exception.
+  var noTestCandidates=S.closedIssues.filter(function(i){
+    var ll=i.labels.map(function(l){return l.toLowerCase();});
+    if(ll.indexOf('cs task item')!==-1||ll.indexOf('cs in testing')!==-1)return false;
+    return ll.some(function(l){return CS_LABELS.indexOf(l)!==-1;});
+  });
+  if(noTestCandidates.length){
+    await Promise.all(noTestCandidates.map(async function(i){
+      try{
+        var evts=await ghFetch('/repos/'+i.repo+'/issues/'+i.id+'/events?per_page=100');
+        if(Array.isArray(evts)){
+          // Use the most recent 'closed' event — handles re-open/re-close correctly
+          var closedEvts=evts.filter(function(e){return e.event==='closed';});
+          var lastClosed=closedEvts.length?closedEvts[closedEvts.length-1]:null;
+          i.closedByPR=!!(lastClosed&&lastClosed.commit_id);
+        }else{i.closedByPR=false;}
+      }catch(e){i.closedByPR=false;}
+    }));
+  }
   document.getElementById('dashTitle').textContent='CentralView GitHub Issue Triage'+(S.activeProfile?' — '+S.activeProfile.name:'');
   document.getElementById('dashMeta').textContent=open.length+' open issues — '+todayStr();
 }
@@ -661,7 +681,7 @@ function isClosedException(issue){
   if(!hasCSLabel)return false;
   if(hasCSItem&&!isReferencedInTracking(issue.id))return true;
   if(hasCSItem&&!issue.parent)return true;
-  if(hasCSLabel&&!hasTesting)return true;
+  if(hasCSLabel&&!hasTesting&&!issue.closedByPR)return true;
   return false;
 }
 function getClosedExceptions(){return S.closedIssues.filter(function(i){return isClosedException(i);}).slice().sort(function(a,b){return a.id-b.id;});}
