@@ -435,6 +435,9 @@ async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{head
 async function zhPost(path,data){var r=await fetch('https://api.zenhub.com'+path,{method:'POST',headers:{'X-Authentication-Token':S.zhToken,'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);if(r.status===204||r.headers.get('content-length')==='0')return{};var t=await r.text();return t?JSON.parse(t):{};}
 async function loadSubIssueParents(){var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});await Promise.all(parents.map(async function(p){try{var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child&&!child.parent)child.parent={issueNumber:p.id};});}}catch(e){};}));}
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed to move pipeline: '+e.message);}}
+var _panelStore={};var _panelIdx=0;
+function registerPanel(grp){var k='p'+(++_panelIdx);_panelStore[k]=grp;return k;}
+async function bulkMovePanel(key,pipelineId,sel){if(!pipelineId)return;var list=(_panelStore[key]||[]).filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});if(!list.length){sel.value='';}else if(!confirm('Move '+list.length+' issue(s) to this pipeline?')){sel.value='';}else{for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}}
 async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var notIgnored=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});var list;if(tab==='all')list=notIgnored.filter(function(i){return !isExcludeFromNew(i);});else if(tab==='epa')list=notIgnored.filter(isEPA);else if(tab==='enhancement')list=notIgnored.filter(isEnhancement);else if(tab==='csother')list=notIgnored.filter(isCsOther);else list=[];if(!list.length){sel.value='';}else if(!confirm('Move '+list.length+' issue(s) to this pipeline?')){sel.value='';}else{for(var i=0;i<list.length;i++)await movePipeline(list[i].id,list[i].repo,pipelineId);sel.value='';}}
 
 async function ghFetchAll(path,maxPages){
@@ -780,7 +783,7 @@ function openTable(issues,emptyMsg,showRestore,tab,showMilestone){
   var spipes=Object.keys(pipeMap).map(function(k){return pipeMap[k];}).sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
   var tabLabels={all:'New Issues',epa:'Enh. Pending Approval',enhancement:'Enhancements',csother:'CS Items',closed:'Recently Closed',ignored:'Ignored'};
   var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)"><span class="gt">'+(tabLabels[tab]||'Issues')+' <span class="gc">'+issues.length+'</span></span>';
-  if(S.zhToken&&tab&&tab!=='closed'&&tab!=='ignored'&&spipes.length){h+='<select class="ps" style="color:#374151" onchange="bulkMove(\''+tab+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
+  if(S.zhToken&&tab&&tab!=='closed'&&tab!=='ignored'&&spipes.length){var _pk=registerPanel(issues);h+='<select class="ps" style="color:#374151" onchange="bulkMovePanel(\''+_pk+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
   h+='</div>';
   h+='<div class="tw2"><table><thead><tr>';
   h+='<th onclick="thClick(\'id\')"'+thCls('id')+'>No.'+thArrow('id')+'</th>';
@@ -887,7 +890,7 @@ function byPipelineGroupView(issues,tab,emptyMsg){
     var sorted=grp.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
     var s='<div style="margin-bottom:20px"><div class="gh" style="background:linear-gradient(90deg,'+c+','+c+'dd);border-radius:10px 10px 0 0">';
     s+='<span class="gt" style="color:#fff">'+esc(pname)+'<span class="gc">'+sorted.length+'</span></span>';
-    if(S.zhToken&&spipes.length){s+='<select class="ps" style="color:#374151" onchange="bulkMove(\''+tab+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){s+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});s+='</select>';}
+    if(S.zhToken&&spipes.length){var _pk=registerPanel(grp);s+='<select class="ps" style="color:#374151" onchange="bulkMovePanel(\''+_pk+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){s+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});s+='</select>';}
     s+='</div>';
     s+='<div class="tw2"><table><thead><tr><th>No.</th><th>Title</th>';
     if(multiRepo)s+='<th>Repo</th>';
@@ -908,6 +911,7 @@ function byPipelineGroupView(issues,tab,emptyMsg){
 
 // ── Main render ───────────────────────────────────────────────────────────────
 function renderMain(){
+  _panelStore={};
   var tab=S.activeTab;
   var content=document.getElementById('mainContent');
   if(!content)return;
