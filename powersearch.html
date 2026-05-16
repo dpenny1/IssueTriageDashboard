@@ -213,7 +213,9 @@ function isAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignee
 function isUnassignedNotOnDeck(i){return !!(S.zhToken&&(!i.assignees||i.assignees.length===0)&&i.pipeline&&i.pipeline.pipelineName!=='Product Backlog');}
 function isCsTaskItem(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
 function isCsTaskItemNotTracking(i){return !!(S.zhToken&&isCsTaskItem(i)&&i.pipeline&&i.pipeline.pipelineName!=='CS Tracking Issues');}
-function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
+// Like isAssignedNotInProgress but also allows Review/QA as a valid pipeline for CS items.
+function isCsItemAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues'&&i.pipeline.pipelineName!=='Review/QA');}
+function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);if(isCsItem(i))return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isCsItemAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
 function exceptionCount(issues){return issues.filter(issueHasException).length;}
 function isCsItem(i){return i.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
@@ -721,7 +723,7 @@ function issueRow(iss,showClosed,showRestore){
       if(isMissingParent(iss))warnings.push('⚠ Has CS label but no parent');
       if(isNIP(iss))warnings.push('⚠ Still in New Issues pipeline');
       if(isAssignedInNIP(iss))warnings.push('⚠ Assigned but still in New Issues pipeline');
-      if(isAssignedNotInProgress(iss))warnings.push('⚠ Assigned but not in In Progress pipeline');
+      if(isCsItem(iss)?isCsItemAssignedNotInProgress(iss):isAssignedNotInProgress(iss))warnings.push('⚠ Assigned but not in In Progress pipeline');
       if(isUnassignedNotOnDeck(iss))warnings.push('⚠ Unassigned but not in Product Backlog pipeline');
     }
   }
@@ -1017,7 +1019,7 @@ async function runDiag(){
       }else{
         if(isMissingParent(i))fail('⚠ Has CS label but <strong>no parent issue</strong> found (body regex + sub-issues checked).');
         if(isAssignedInNIP(i))fail('⚠ Assigned but still in <strong>New Issues</strong> pipeline.');
-        if(isAssignedNotInProgress(i))fail('⚠ Assigned but not in <strong>In Progress</strong> pipeline.');
+        if(isCsItem(i)?isCsItemAssignedNotInProgress(i):isAssignedNotInProgress(i))fail('⚠ Assigned but not in <strong>In Progress</strong> pipeline.');
         if(isUnassignedNotOnDeck(i))fail('⚠ Unassigned but not in <strong>Product Backlog</strong> pipeline.');
         else if(isNIP(i))fail('⚠ Still in <strong>New Issues</strong> pipeline — expected to be moved.');
       }
