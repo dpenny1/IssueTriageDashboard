@@ -508,7 +508,7 @@ async function connect(){
   if(!tok){showErr('setupErr','GitHub token is required.');return;}
   if(!rp){showErr('setupErr','Please select a project.');return;}
   S.ghToken=tok;
-  S.repos=rp.split(',').map(function(r){return r.trim();}).filter(Boolean);
+  S.repos=rp.split(',').map(function(r){return r.trim().replace(/\/+$/,'');}).filter(Boolean);
   S.ignored=loadIgnored();S.warnDismissed=loadWarnDismissed();
   var btn=document.getElementById('connectBtn');btn.disabled=true;btn.innerHTML='<span class="spin spd"></span>Loading...';
   var cache=loadCache();
@@ -946,7 +946,7 @@ function renderMain(){
   // Exactly 1 profile — auto-load
   var profile=profiles[0];
   S.activeProfile=profile;
-  S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo;}):[profile.repo];
+  S.repos=profile.type==='group'?(profile.repos||[]).map(function(r){return r.repo.replace(/\/+$/,'');}):[profile.repo.replace(/\/+$/,'')];
   S.repoWorkspaceMap={};
   if(profile.type==='group'){(profile.repos||[]).forEach(function(r){if(r.zhWorkspace)S.repoWorkspaceMap[r.repo]=r.zhWorkspace;});if(profile.repos&&profile.repos[0])S.zhWorkspace=profile.repos[0].zhWorkspace||'';}
   else if(profile.zhWorkspace){S.zhWorkspace=profile.zhWorkspace;}
