@@ -255,7 +255,7 @@ var Vault=(function(){
 
 // ── Tile config ───────────────────────────────────────────────────────────────
 var TILE_CONFIG={
-  financials:{href:'http://localhost:3001/ado-dashboard',icon:'📋',name:'Financials',accentClass:'amber',required:[]},
+  financials:{href:'http://localhost:3001/ado-dashboard',icon:'📋',name:'Financials',accentClass:'amber',required:[],newTab:true},
   cis:{href:'cis.html',icon:'🛡️',name:'CIS',accentClass:'',required:['gh','zh']},
   powersearch:{href:'powersearch.html',icon:'🔍',name:'Power Search',accentClass:'',required:['gh','zh']},
   customerportal:{href:'customerportal.html',icon:'🌐',name:'Customer Portal',accentClass:'',required:['gh','zh']},
@@ -398,7 +398,7 @@ async function launchTile(id){
       if(fs.password)h+='&cv_pass='+encodeURIComponent(fs.password);
       href=cfg.href+h;
     }
-    window.location.href=href;
+    if(cfg.newTab){window.open(href,'_blank');}else{window.location.href=href;}
   }catch(e){
     if(card)card.style.opacity='';
     showToast('Launch failed: '+e.message,'err');
