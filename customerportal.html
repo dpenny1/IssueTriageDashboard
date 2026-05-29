@@ -161,7 +161,7 @@ tr:hover td{background:#f9fafb}
         <a href="index.html">Home</a>
         <a href="cis.html">CIS</a>
         <a href="powersearch.html">Power Search</a>
-        <a href="#" onclick="window.open('http://localhost:3001/ado-dashboard','financials_tab');return false;">Financials</a>
+        <a href="#" onclick="(function(){var fs=JSON.parse(localStorage.getItem('cv_financials_settings_v1')||'{}');var h='#cv_auto=1';if(fs.server)h+='&cv_server='+encodeURIComponent(fs.server);if(fs.collection)h+='&cv_collection='+encodeURIComponent(fs.collection);if(fs.project)h+='&cv_project='+encodeURIComponent(fs.project);if(fs.user)h+='&cv_user='+encodeURIComponent(fs.user);if(fs.password)h+='&cv_pass='+encodeURIComponent(fs.password);window.open('http://localhost:3001/ado-dashboard'+h,'financials_tab');})();return false;">Financials</a>
         <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank">PM Tools</a>
       </nav>
       <div class="hdr-sep"></div>
