@@ -102,7 +102,7 @@ tr:hover td{background:#f9fafb}
     <div class="hdr-brand"><div class="hdr-logo">CP</div><div><h1>Customer Portal</h1></div></div>
     <div style="display:flex;gap:4px">
       <a href="index.html" class="hdr-act">Home</a>
-      <a href="http://localhost:3001/ado-dashboard" target="_blank" class="hdr-act">Financials</a>
+      <a href="https://fin-dashboard.csaapps.com/ado-dashboard/" target="_blank" class="hdr-act">Financials</a>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
     </div>
   </div></div>
@@ -161,7 +161,7 @@ tr:hover td{background:#f9fafb}
         <a href="index.html">Home</a>
         <a href="cis.html">CIS</a>
         <a href="powersearch.html">Power Search</a>
-        <a href="#" onclick="(function(){var fs=JSON.parse(localStorage.getItem('cv_financials_settings_v1')||'{}');var h='#cv_auto=1';if(fs.server)h+='&cv_server='+encodeURIComponent(fs.server);if(fs.collection)h+='&cv_collection='+encodeURIComponent(fs.collection);if(fs.project)h+='&cv_project='+encodeURIComponent(fs.project);if(fs.user)h+='&cv_user='+encodeURIComponent(fs.user);if(fs.password)h+='&cv_pass='+encodeURIComponent(fs.password);window.open('http://localhost:3001/ado-dashboard'+h,'financials_tab');})();return false;">Financials</a>
+        <a href="#" onclick="(function(){var fs=JSON.parse(localStorage.getItem('cv_financials_settings_v1')||'{}');var h='#cv_auto=1';if(fs.server)h+='&cv_server='+encodeURIComponent(fs.server);if(fs.collection)h+='&cv_collection='+encodeURIComponent(fs.collection);if(fs.project)h+='&cv_project='+encodeURIComponent(fs.project);if(fs.user)h+='&cv_user='+encodeURIComponent(fs.user);if(fs.password)h+='&cv_pass='+encodeURIComponent(fs.password);window.open('https://fin-dashboard.csaapps.com/ado-dashboard/'+h,'financials_tab');})();return false;">Financials</a>
         <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank">PM Tools</a>
       </nav>
       <div class="hdr-sep"></div>
@@ -814,7 +814,7 @@ function closedTable(issues){
   h+='<th>By</th>';
   if(S.zhToken)h+='<th>Pipeline</th>';
   h+='</tr></thead><tbody>';
-  var savedSort=JSON.parse(JSON.stringify(S.sortState));S.sortState={col:'closed',dir:1};
+  var savedSort=JSON.parse(JSON.stringify(S.sortState));S.sortState={col:'closed',dir:-1};
   sortIssues(issues).forEach(function(iss){h+=issueRow(iss,true,false,false);});
   S.sortState=savedSort;
   h+='</tbody></table></div></div>';
@@ -888,14 +888,14 @@ function byPipelineGroupView(issues,tab,emptyMsg){
   var h='';
   function pipeSection(pname,grp,c){
     c=c||COLORS[pname]||'#6b7280';
-    var sorted=grp.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+    var sorted=sortIssues(grp);
     var s='<div style="margin-bottom:20px"><div class="gh" style="background:linear-gradient(90deg,'+c+','+c+'dd);border-radius:10px 10px 0 0">';
     s+='<span class="gt" style="color:#fff">'+esc(pname)+'<span class="gc">'+sorted.length+'</span></span>';
     if(S.zhToken&&spipes.length){var _pk=registerPanel(grp);s+='<select class="ps" style="color:#374151" onchange="bulkMovePanel(\''+_pk+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){s+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});s+='</select>';}
     s+='</div>';
-    s+='<div class="tw2"><table><thead><tr><th>No.</th><th>Title</th>';
-    if(multiRepo)s+='<th>Repo</th>';
-    s+='<th>Assignee</th><th>Age</th>';
+    s+='<div class="tw2"><table><thead><tr><th onclick="thClick(\'id\')"'+thCls('id')+'>No.'+thArrow('id')+'</th><th onclick="thClick(\'title\')"'+thCls('title')+'>Title'+thArrow('title')+'</th>';
+    if(multiRepo)s+='<th onclick="thClick(\'repo\')"'+thCls('repo')+'>Repo'+thArrow('repo')+'</th>';
+    s+='<th>Assignee</th><th onclick="thClick(\'age\')"'+thCls('age')+'>Age'+thArrow('age')+'</th>';
     if(S.zhToken)s+='<th>Pipeline</th>';
     s+='<th>Milestone</th><th></th></tr></thead><tbody>';
     sorted.forEach(function(iss){s+=issueRow(iss,false,false,true);});

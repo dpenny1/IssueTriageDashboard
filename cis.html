@@ -115,7 +115,7 @@ tr:hover td{background:#f9fafb}
     <div class="hdr-brand"><div class="hdr-logo">CV</div><div><h1>CentralView GitHub Issue Triage</h1></div></div>
     <div style="display:flex;gap:4px">
       <a href="index.html" class="hdr-act">Home</a>
-      <a href="http://localhost:3001/ado-dashboard" target="_blank" class="hdr-act">Financials</a>
+      <a href="https://fin-dashboard.csaapps.com/ado-dashboard/" target="_blank" class="hdr-act">Financials</a>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
     </div>
   </div></div>
@@ -157,7 +157,7 @@ tr:hover td{background:#f9fafb}
         <a href="index.html">Home</a>
         <a href="powersearch.html">Power Search</a>
         <a href="customerportal.html">Customer Portal</a>
-        <a href="#" onclick="(function(){var fs=JSON.parse(localStorage.getItem('cv_financials_settings_v1')||'{}');var h='#cv_auto=1';if(fs.server)h+='&cv_server='+encodeURIComponent(fs.server);if(fs.collection)h+='&cv_collection='+encodeURIComponent(fs.collection);if(fs.project)h+='&cv_project='+encodeURIComponent(fs.project);if(fs.user)h+='&cv_user='+encodeURIComponent(fs.user);if(fs.password)h+='&cv_pass='+encodeURIComponent(fs.password);window.open('http://localhost:3001/ado-dashboard'+h,'financials_tab');})();return false;">Financials</a>
+        <a href="#" onclick="(function(){var fs=JSON.parse(localStorage.getItem('cv_financials_settings_v1')||'{}');var h='#cv_auto=1';if(fs.server)h+='&cv_server='+encodeURIComponent(fs.server);if(fs.collection)h+='&cv_collection='+encodeURIComponent(fs.collection);if(fs.project)h+='&cv_project='+encodeURIComponent(fs.project);if(fs.user)h+='&cv_user='+encodeURIComponent(fs.user);if(fs.password)h+='&cv_pass='+encodeURIComponent(fs.password);window.open('https://fin-dashboard.csaapps.com/ado-dashboard/'+h,'financials_tab');})();return false;">Financials</a>
         <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank">PM Tools</a>
       </nav>
       <div class="hdr-sep"></div>
@@ -686,7 +686,7 @@ function isClosedException(issue){
   if(hasCSLabel&&!hasTesting&&!issue.closedByPR)return true;
   return false;
 }
-function getClosedExceptions(){return S.closedIssues.filter(function(i){return isClosedException(i);}).slice().sort(function(a,b){return a.id-b.id;});}
+function getClosedExceptions(){return S.closedIssues.filter(function(i){return isClosedException(i);});}
 function ignoreClosedExc(key){if(S.closedExcIgnored.indexOf(key)===-1)S.closedExcIgnored.push(key);saveClosedExcIgnored();renderMain();}
 function isExempt(issue){var t=issue.title.toLowerCase();return t.indexOf('cs features')===0||t.indexOf('cs production issues')===0;}
 function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');}
@@ -744,7 +744,6 @@ function getIssueTabs(issue){
 function applyFilters(list){var q=(document.getElementById('searchInput').value||'').toLowerCase(),fl=(document.getElementById('filterLabel').value||'').toLowerCase(),fr=document.getElementById('filterRepo').value||'',fp=document.getElementById('filterPipeline').value||'';if(q)list=list.filter(function(i){return i.title.toLowerCase().indexOf(q)!==-1||String(i.id).indexOf(q)!==-1||i.labels.join(' ').toLowerCase().indexOf(q)!==-1||i.repo.toLowerCase().indexOf(q)!==-1||i.assignees.join(' ').toLowerCase().indexOf(q)!==-1;});if(fl)list=list.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()===fl;});});if(fr)list=list.filter(function(i){return i.repo===fr;});if(fp)list=list.filter(function(i){return i.pipeline&&i.pipeline.pipelineName===fp;});return list;}
 function sortIssues(list,tab){
   if(tab==='taskitem')return list.slice().sort(function(a,b){var at=a.title.toLowerCase(),bt=b.title.toLowerCase();var aP=at.indexOf('cs production issues')===0,bP=bt.indexOf('cs production issues')===0;var aF=at.indexOf('cs features')===0,bF=bt.indexOf('cs features')===0;var aCS=at.indexOf('cs ')===0,bCS=bt.indexOf('cs ')===0;if(aP&&!bP)return -1;if(!aP&&bP)return 1;if(aF&&!bF)return -1;if(!aF&&bF)return 1;if(aCS&&!bCS)return -1;if(!aCS&&bCS)return 1;return at.localeCompare(bt);});
-  if(tab==='exceptions')return list.slice().sort(function(a,b){return a.id-b.id;});
   if(tab==='closed'){var dir=S.sortState.col==='closed'?S.sortState.dir:-1;return list.slice().sort(function(a,b){var av=new Date(a.closedAt||0),bv=new Date(b.closedAt||0);if(av<bv)return -dir;if(av>bv)return dir;return 0;});}
   var col=S.sortState.col,dir=S.sortState.dir;
   if(tab==='newitems'&&col==='age')dir=1;
@@ -980,7 +979,7 @@ function renderCSItemsByPipeline(issues,def){
   var orderedKeys=PRIORITY.filter(function(k){return !!groups[k];}).concat(others);
   var COLORS={'In Progress':'#059669','Telecom':'#0891b2','On Deck Priorities':'#d97706','Icebox':'#6b7280'};
   function pipeRows(grp){
-    var sorted=grp.slice().sort(function(a,b){return new Date(a.createdAt)-new Date(b.createdAt);});
+    var sorted=sortIssues(grp,'csitems');
     var s='';
     sorted.forEach(function(issue){
       var ikey=issue.id+'_'+issue.repo,days=ageDays(issue.createdAt);
@@ -1085,8 +1084,8 @@ function setCsItemsPipeline(pn){_csItemsPipeline=pn;renderMain();}
 function renderExceptionsView(){
   var def=TAB_DEFS.find(function(d){return d.id==='exceptions';});
   var color=tabColor(def);
-  var openExc=applyFilters(sortIssues(getExceptions(),'exceptions'));
-  var closedExc=getClosedExceptions();
+  var openExc=applyFilters(sortIssues(getExceptions()));
+  var closedExc=sortIssues(getClosedExceptions(),'closed');
   return renderExcOpenTable(openExc,color)+'<div style="margin-top:24px"></div>'+renderExcClosedTable(closedExc);
 }
 function renderExcOpenTable(issues,color){
@@ -1186,12 +1185,16 @@ function renderGlobalSearch(){
   if(filterState){all=all.filter(function(i){return i.state===filterState;});}
   if(filterRepo){all=all.filter(function(i){return i.repo===filterRepo;});}
 
-  // Sort: open first then closed, newest first within each
-  all=all.slice().sort(function(a,b){
+  // Sort by active column if set, otherwise open first then closed, newest first within each
+  var _gsc=S.sortState.col,_gsd=S.sortState.dir;
+  if(_gsc==='id'){all=all.slice().sort(function(a,b){return _gsd*(a.id-b.id);});}
+  else if(_gsc==='title'){all=all.slice().sort(function(a,b){var av=a.title.toLowerCase(),bv=b.title.toLowerCase();return _gsd*(av<bv?-1:av>bv?1:0);});}
+  else if(_gsc==='repo'){all=all.slice().sort(function(a,b){var av=a.repo.toLowerCase(),bv=b.repo.toLowerCase();return _gsd*(av<bv?-1:av>bv?1:0);});}
+  else{all=all.slice().sort(function(a,b){
     if(a.state!==b.state)return a.state==='open'?-1:1;
     var da=new Date(a.state==='closed'?a.closedAt:a.createdAt),db=new Date(b.state==='closed'?b.closedAt:b.createdAt);
     return db-da;
-  });
+  });}
 
   var TAB_COLORS={newitems:'#0891b2',exceptions:'#b91c1c',prod:'#dc2626',uat:'#d97706',failedtesting:'#c2410c',csitems:'#4338ca',testing:'#059669',taskitem:'#7c3aed',closed:'#374151',ignored:'#6b7280'};
   var TAB_LABELS={newitems:'New Issues',exceptions:'Exceptions',prod:'Production Patch',uat:'UAT Patch',failedtesting:'Failed Testing',csitems:'CS Items',testing:'CS In Testing',taskitem:'CS Task Items',closed:'Closed',ignored:'Ignored'};
@@ -1203,7 +1206,8 @@ function renderGlobalSearch(){
 
   var h='<div style="font-size:12px;color:#6b7280;margin-bottom:10px">'+all.length+' result'+(all.length===1?'':'s')+'</div>';
   h+='<table style="width:100%;border-collapse:collapse;font-size:13px">';
-  h+='<thead><tr style="background:#f3f4f6"><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">#</th><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">Title</th><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">Tab</th><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">Labels</th><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">Repo</th><th style="padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb">State</th></tr></thead><tbody>';
+  var _gs='padding:8px 12px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb';
+  h+='<thead><tr style="background:#f3f4f6">'+mkTh('id','#')+mkTh('title','Title')+'<th style="'+_gs+'">Tab</th><th style="'+_gs+'">Labels</th>'+mkTh('repo','Repo')+'<th style="'+_gs+'">State</th></tr></thead><tbody>';
   all.forEach(function(issue,idx){
     var tabs=getIssueTabs(issue);
     var tabBadges=tabs.map(function(tid){var c=TAB_COLORS[tid]||'#6b7280';var l=TAB_LABELS[tid]||tid;return '<span onclick="switchTab(\''+tid+'\')" style="cursor:pointer;display:inline-block;background:'+c+'22;color:'+c+';border:1px solid '+c+'44;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap" title="Go to '+esc(l)+'">'+esc(l)+'</span>';}).join(' ');
