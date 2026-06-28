@@ -683,7 +683,7 @@ function isClosedException(issue){
   if(!hasCSLabel)return false;
   if(hasCSItem&&!isReferencedInTracking(issue.id))return true;
   if(hasCSItem&&!issue.parent)return true;
-  if(hasCSLabel&&!hasTesting&&!issue.closedByPR)return true;
+  if(hasCSLabel&&!hasTesting&&!issue.closedByPR&&!isReferencedInTracking(issue.id))return true;
   return false;
 }
 function getClosedExceptions(){return S.closedIssues.filter(function(i){return isClosedException(i);});}
