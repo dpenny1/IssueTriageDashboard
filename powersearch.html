@@ -87,6 +87,12 @@ tr:hover td{background:#f9fafb}
 #loadingOverlay .lo-title{color:#fff;font-size:1.1rem;font-weight:700}
 #loadingOverlay .lo-msg{color:#c7d2fe;font-size:13px;min-height:20px;text-align:center}
 .group-header{background:#e0e7ff;padding:8px 13px;font-size:12px;font-weight:700;color:#1e1b4b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #c7d2fe}
+
+/* ── Phone Dashboard exception badge ── */
+.phone-exc-badge{display:none;min-width:16px;height:16px;padding:0 5px;margin-left:5px;border-radius:999px;background:#dc2626;color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;vertical-align:middle;box-shadow:0 0 0 2px rgba(220,38,38,0.28)}
+.phone-exc-badge.is-on{display:inline-block;animation:phoneExcPulse 2s ease-in-out infinite}
+@keyframes phoneExcPulse{0%,100%{box-shadow:0 0 0 2px rgba(220,38,38,0.28)}50%{box-shadow:0 0 0 5px rgba(220,38,38,0.10)}}
+.card-name .phone-exc-badge{height:18px;line-height:18px;font-size:11px}
 </style>
 </head>
 <body>
@@ -105,6 +111,7 @@ tr:hover td{background:#f9fafb}
       <a href="index.html" class="hdr-act">Home</a>
       <a href="https://fin-dashboard.csaapps.com/ado-dashboard/" target="_blank" class="hdr-act">Financials</a>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
+      <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank" class="hdr-act">Phone<span class="phone-exc-badge"></span></a>
     </div>
   </div></div>
   <div class="main"><div class="sw">
@@ -144,6 +151,7 @@ tr:hover td{background:#f9fafb}
     <div class="hdr-brand"><div class="hdr-logo">PS</div><div><h1>Power Search</h1></div></div>
     <div class="hdr-right">
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
+      <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank" class="hdr-act">Phone<span class="phone-exc-badge"></span></a>
       <div class="hdr-sep"></div>
       <button class="hdr-act" onclick="backToSetup()">← Back</button>
     </div>
@@ -165,6 +173,7 @@ tr:hover td{background:#f9fafb}
         <a href="customerportal.html">Customer Portal</a>
         <a href="#" onclick="(function(){var fs=JSON.parse(localStorage.getItem('cv_financials_settings_v1')||'{}');var h='#cv_auto=1';if(fs.server)h+='&cv_server='+encodeURIComponent(fs.server);if(fs.collection)h+='&cv_collection='+encodeURIComponent(fs.collection);if(fs.project)h+='&cv_project='+encodeURIComponent(fs.project);if(fs.user)h+='&cv_user='+encodeURIComponent(fs.user);if(fs.password)h+='&cv_pass='+encodeURIComponent(fs.password);window.open('https://fin-dashboard.csaapps.com/ado-dashboard/'+h,'financials_tab');})();return false;">Financials</a>
         <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank">PM Tools</a>
+        <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank">Phone<span class="phone-exc-badge"></span></a>
       </nav>
       <div class="hdr-sep"></div>
       <button class="hdr-act" id="refreshBtn" onclick="doRefresh()" title="Refresh"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
@@ -1051,5 +1060,50 @@ function renderDiag(steps,out){
     <div id="diagResult"></div>
   </div>
 </div>
+
+<!-- ── Phone Dashboard exception badge ──────────────────────────────────────
+     Reads the snapshot written by rc-dashboard.html. Both apps are served
+     from dpenny1.github.io, so they share one localStorage origin.
+     Snapshot shape: {mismatch:N, refused:N, total:N, ts:epochMs}
+     A snapshot older than MAX_AGE is treated as "no data" (badge hidden).  -->
+<script>
+(function(){
+  var KEY='rc_exceptions_v1', MAX_AGE=10*60*1000, POLL=15000;
+  function read(){
+    try{
+      var d=JSON.parse(localStorage.getItem(KEY)||'null');
+      if(!d||typeof d.total!=='number') return null;
+      if(!d.ts||(Date.now()-d.ts)>MAX_AGE) return null;
+      return d;
+    }catch(e){ return null; }
+  }
+  function paint(){
+    var d=read(), n=d?d.total:0;
+    var tip = d
+      ? (n>0 ? n+' exception'+(n===1?'':'s')+' — '+d.mismatch+' mismatch, '+d.refused+' refused'
+             : 'RingCentral Supervisor Dashboard — no exceptions')
+      : 'RingCentral Supervisor Dashboard (open it to see live exception counts)';
+    var b=document.querySelectorAll('.phone-exc-badge');
+    for(var i=0;i<b.length;i++){
+      b[i].textContent = n>99 ? '99+' : String(n);
+      b[i].className = 'phone-exc-badge' + (n>0 ? ' is-on' : '');
+      var host=b[i].closest ? b[i].closest('a') : b[i].parentNode;
+      if(host) host.title = tip;
+    }
+    var det=document.getElementById('phoneExcDetail');
+    if(det){
+      det.innerHTML = !d ? ''
+        : (n>0
+            ? '<span class="ttok-chip ttok-set amber">'+d.mismatch+' mismatch</span>'+
+              '<span class="ttok-chip ttok-set amber">'+d.refused+' refused</span>'
+            : '<span class="ttok-chip ttok-set">all clear</span>');
+    }
+  }
+  paint();
+  setInterval(paint, POLL);
+  window.addEventListener('storage', function(e){ if(!e.key || e.key===KEY) paint(); });
+  window.addEventListener('focus', paint);
+})();
+</script>
 </body>
 </html>

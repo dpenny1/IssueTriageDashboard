@@ -93,6 +93,12 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #toast.warn{background:#b45309}
 #toast.err{background:#dc2626}
+
+/* ── Phone Dashboard exception badge ── */
+.phone-exc-badge{display:none;min-width:16px;height:16px;padding:0 5px;margin-left:5px;border-radius:999px;background:#dc2626;color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;vertical-align:middle;box-shadow:0 0 0 2px rgba(220,38,38,0.28)}
+.phone-exc-badge.is-on{display:inline-block;animation:phoneExcPulse 2s ease-in-out infinite}
+@keyframes phoneExcPulse{0%,100%{box-shadow:0 0 0 2px rgba(220,38,38,0.28)}50%{box-shadow:0 0 0 5px rgba(220,38,38,0.10)}}
+.card-name .phone-exc-badge{height:18px;line-height:18px;font-size:11px}
 </style>
 </head>
 <body>
@@ -104,6 +110,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div><h1>CentralView Issue Triage</h1></div>
     </div>
     <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
+    <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank" class="hdr-act">Phone<span class="phone-exc-badge"></span></a>
   </div>
 </div>
 
@@ -204,6 +211,15 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
       <div class="tile-tokens" id="tile-tokens-customerportal"></div>
     </div>
+
+    <a class="card" style="border-top-color:#1a56db;text-decoration:none" id="tile-phone"
+       href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank">
+      <div class="card-icon">&#128222;</div>
+      <div class="card-name">Phone<span class="phone-exc-badge"></span></div>
+      <div class="card-desc">RingCentral supervisor &mdash; agent states, mismatches &amp; refused</div>
+      <span class="card-badge" style="background:#dbeafe;color:#1e40af">Live</span>
+      <div class="tile-tokens" id="phoneExcDetail"></div>
+    </a>
 
   </div>
 </div>
@@ -595,6 +611,51 @@ renderTileChips();
 (function(){
   var saved=sessionStorage.getItem('cv_vault_pw');
   if(saved){unlockVault(saved);}
+})();
+</script>
+
+<!-- ── Phone Dashboard exception badge ──────────────────────────────────────
+     Reads the snapshot written by rc-dashboard.html. Both apps are served
+     from dpenny1.github.io, so they share one localStorage origin.
+     Snapshot shape: {mismatch:N, refused:N, total:N, ts:epochMs}
+     A snapshot older than MAX_AGE is treated as "no data" (badge hidden).  -->
+<script>
+(function(){
+  var KEY='rc_exceptions_v1', MAX_AGE=10*60*1000, POLL=15000;
+  function read(){
+    try{
+      var d=JSON.parse(localStorage.getItem(KEY)||'null');
+      if(!d||typeof d.total!=='number') return null;
+      if(!d.ts||(Date.now()-d.ts)>MAX_AGE) return null;
+      return d;
+    }catch(e){ return null; }
+  }
+  function paint(){
+    var d=read(), n=d?d.total:0;
+    var tip = d
+      ? (n>0 ? n+' exception'+(n===1?'':'s')+' — '+d.mismatch+' mismatch, '+d.refused+' refused'
+             : 'RingCentral Supervisor Dashboard — no exceptions')
+      : 'RingCentral Supervisor Dashboard (open it to see live exception counts)';
+    var b=document.querySelectorAll('.phone-exc-badge');
+    for(var i=0;i<b.length;i++){
+      b[i].textContent = n>99 ? '99+' : String(n);
+      b[i].className = 'phone-exc-badge' + (n>0 ? ' is-on' : '');
+      var host=b[i].closest ? b[i].closest('a') : b[i].parentNode;
+      if(host) host.title = tip;
+    }
+    var det=document.getElementById('phoneExcDetail');
+    if(det){
+      det.innerHTML = !d ? ''
+        : (n>0
+            ? '<span class="ttok-chip ttok-set amber">'+d.mismatch+' mismatch</span>'+
+              '<span class="ttok-chip ttok-set amber">'+d.refused+' refused</span>'
+            : '<span class="ttok-chip ttok-set">all clear</span>');
+    }
+  }
+  paint();
+  setInterval(paint, POLL);
+  window.addEventListener('storage', function(e){ if(!e.key || e.key===KEY) paint(); });
+  window.addEventListener('focus', paint);
 })();
 </script>
 </body>
