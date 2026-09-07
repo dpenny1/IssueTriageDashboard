@@ -625,6 +625,14 @@ function populateFilters(){
   if(curP)fp.value=curP;
 }
 
+// Blank the filter controls without re-rendering. clearFilters() calls
+// renderMain(), which the auto-jump cannot do without recursing.
+function resetFilterInputs(){
+  ['searchInput','filterLabel','filterRepo','filterAssignee','filterPipeline']
+    .forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  S.preFilterLabel='';
+}
+
 function clearFilters(){
   document.getElementById('searchInput').value='';
   document.getElementById('filterLabel').value='';
@@ -721,7 +729,12 @@ function buildTabs(){
   // whenever there are any. This re-asserts on every render rather than firing
   // once, because a background refresh drops the ZenHub pipelines that most
   // exception rules depend on and only zhLoad() puts them back.
-  if(S._tabAuto&&excN)S.activeTab='exceptions';
+  if(S._tabAuto&&excN&&S.activeTab!=='exceptions'){
+    S.activeTab='exceptions';
+    // A stale filter would leave the Exceptions tab looking empty even though
+    // the tile shows a count, so land on it unfiltered.
+    resetFilterInputs();
+  }
   // Never sit on the Exceptions tab once it has emptied out
   if(S.activeTab==='exceptions'&&!excN)S.activeTab='all';
   var h='';
@@ -965,6 +978,7 @@ function renderMain(){
   // no tab has been chosen by hand, exceptions still win.
   if(S._tabAuto&&S.activeTab!=='exceptions'&&getExceptions().length){
     S.activeTab='exceptions';
+    resetFilterInputs();
     buildTabs();          // buildTabs never calls renderMain, so no recursion
   }
   var tab=S.activeTab;
@@ -1056,6 +1070,18 @@ function showDiagModal(){
   (S.repos.length?S.repos:['(no repos loaded)']).forEach(function(r){var o=document.createElement('option');o.value=r;o.textContent=r;sel.appendChild(o);});
   document.getElementById('diagResult').innerHTML='';
   document.getElementById('diagIssueNum').value='';
+  var st=document.getElementById('diagResult');
+  if(st){
+    st.innerHTML='<div style="font-size:12px;background:#f8faff;border:1px solid #e0e7ff;'+
+      'border-radius:8px;padding:10px 13px;margin-bottom:12px;line-height:1.7">'+
+      '<strong>Tab state</strong><br>'+
+      'exceptions: <strong>'+getExceptions().length+'</strong> &nbsp;·&nbsp; '+
+      'active tab: <strong>'+esc(S.activeTab)+'</strong> &nbsp;·&nbsp; '+
+      'auto-jump armed: <strong>'+(S._tabAuto?'yes':'no (you picked a tab)')+'</strong><br>'+
+      'issues loaded: '+S.issues.length+' &nbsp;·&nbsp; ZenHub: '+(S.zhConnected?'connected':'not connected')+
+      ' &nbsp;·&nbsp; ignored: '+S.ignored.length+' &nbsp;·&nbsp; dismissed warnings: '+S.warnDismissed.length+
+      '</div>';
+  }
   document.getElementById('diagModal').style.display='flex';
   setTimeout(function(){document.getElementById('diagIssueNum').focus();},80);
 }
