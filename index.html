@@ -65,6 +65,9 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 .vtok-badge.zh{background:#dcfce7;color:#15803d}
 .vtok-badge.tfs{background:#fef3c7;color:#92400e}
 .vtok-badge.asana{background:#f3e8ff;color:#7e22ce}
+.vtok-badge.cx{background:#ffedd5;color:#9a3412}
+.ttok-chip.ttok-rc{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe}
+.rc-row{display:flex;align-items:center;gap:9px;margin-bottom:9px;padding:9px 12px;background:#f8faff;border-radius:9px;border:1px solid #e0e7ff}
 
 /* Settings modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);z-index:1000;align-items:center;justify-content:center}
@@ -154,6 +157,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
               <option value="zh">ZenHub (ZH)</option>
               <option value="tfs">TFS</option>
               <option value="asana">Asana</option>
+              <option value="cx">CXone (CX)</option>
             </select>
             <input type="password" id="idxNewTok" placeholder="Token value" autocomplete="new-password" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:12px;outline:none;font-family:monospace"/>
             <button class="btn-sm" style="background:#4338ca;color:#fff;border-color:#4338ca" onclick="idxVaultSave()">＋ Save</button>
@@ -212,14 +216,17 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="tile-tokens" id="tile-tokens-customerportal"></div>
     </div>
 
-    <a class="card" style="border-top-color:#1a56db;text-decoration:none" id="tile-phone"
-       href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank">
+    <div class="card" style="border-top-color:#1a56db" id="tile-phone"
+         onclick="openTile('phone')" role="button" tabindex="0"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openTile('phone')">
+      <button class="card-gear" onclick="openSettings('phone',event)" title="Phone settings">&#9881;</button>
       <div class="card-icon">&#128222;</div>
       <div class="card-name">Phone<span class="phone-exc-badge"></span></div>
       <div class="card-desc">RingCentral supervisor &mdash; agent states, mismatches &amp; refused</div>
       <span class="card-badge" style="background:#dbeafe;color:#1e40af">Live</span>
+      <div class="tile-tokens" id="tile-tokens-phone"></div>
       <div class="tile-tokens" id="phoneExcDetail"></div>
-    </a>
+    </div>
 
   </div>
 </div>
@@ -269,14 +276,58 @@ var Vault=(function(){
   };
 })();
 
+// ── RingCentral MVP auth (delegated to PhoneDashboard, same origin) ───────────
+// Both apps are served from dpenny1.github.io, so rc-auth.js can be imported
+// here and its tokens (localStorage rc_*) are shared with the phone dashboard.
+var PHONE_BASE='https://dpenny1.github.io/PhoneDashboard/';
+
+function rcIsSignedIn(){
+  try{
+    return !!localStorage.getItem('rc_access_token') &&
+           Date.now() < Number(localStorage.getItem('rc_token_expiry')||0);
+  }catch(e){ return false; }
+}
+
+function rcExpiresIn(){
+  try{
+    var ms=Number(localStorage.getItem('rc_token_expiry')||0)-Date.now();
+    if(ms<=0)return null;
+    var m=Math.round(ms/60000);
+    return m<60 ? m+'m' : Math.round(m/60)+'h';
+  }catch(e){ return null; }
+}
+
+// Starts the RingCentral PKCE flow from this page. rc-auth.js stashes
+// location.href as the return URL, so callback.html brings us back here.
+async function rcStartLogin(pendingTile){
+  try{
+    if(pendingTile)sessionStorage.setItem('cv_pending_tile',pendingTile);
+    var m=await import(PHONE_BASE+'rc-auth.js');
+    await m.rcLogin();
+  }catch(e){
+    sessionStorage.removeItem('cv_pending_tile');
+    showToast('Could not start RingCentral sign-in — opening the login page','warn');
+    window.open(PHONE_BASE+'index.html','_blank');
+  }
+}
+
+function rcSignOut(){
+  try{['rc_access_token','rc_refresh_token','rc_token_expiry']
+      .forEach(function(k){localStorage.removeItem(k);});}catch(e){}
+  renderTileChips();
+  if(document.getElementById('settingsModal').style.display==='flex')closeSettings();
+  showToast('Signed out of RingCentral','warn');
+}
+
 // ── Tile config ───────────────────────────────────────────────────────────────
 var TILE_CONFIG={
   financials:{href:'https://fin-dashboard.csaapps.com/ado-dashboard/',icon:'📋',name:'Financials',accentClass:'amber',required:[],newTab:true},
   cis:{href:'cis.html',icon:'🛡️',name:'CIS',accentClass:'',required:['gh','zh']},
   powersearch:{href:'powersearch.html',icon:'🔍',name:'Power Search',accentClass:'',required:['gh','zh']},
   customerportal:{href:'customerportal.html',icon:'🌐',name:'Customer Portal',accentClass:'',required:['gh','zh']},
+  phone:{href:PHONE_BASE+'rc-dashboard.html',icon:'📞',name:'Phone',accentClass:'',required:['cx'],newTab:true,rcAuth:true},
 };
-var TYPE_LABELS={gh:'GitHub',zh:'ZenHub',tfs:'TFS (Password)',asana:'Asana'};
+var TYPE_LABELS={gh:'GitHub',zh:'ZenHub',tfs:'TFS (Password)',asana:'Asana',cx:'CXone Token'};
 
 // ── Financials connection settings ────────────────────────────────────────────
 var FINANCIALS_KEY='cv_financials_settings_v1';
@@ -347,6 +398,13 @@ function renderTileChips(){
         h+='<span class="ttok-chip ttok-unset">'+(type==='tfs'?'Password':type==='gh'?'GitHub':esc(type.toUpperCase()))+' not set</span>';
       }
     });
+    // Phone: RingCentral MVP sign-in status
+    if(id==='phone'){
+      var exp=rcExpiresIn();
+      h+=rcIsSignedIn()
+        ? '<span class="ttok-chip ttok-rc" title="RingCentral MVP session active'+(exp?' — expires in '+exp:'')+'">RC signed in</span>'
+        : '<span class="ttok-chip ttok-unset">RC not signed in</span>';
+    }
     // Financials: show project chip and password status
     if(id==='financials'){
       var fs=loadFinancialsSettings();
@@ -384,7 +442,31 @@ function openTile(id){
     showToast(cfg.name+' needs: '+missing.join(', ')+' — add to vault first','warn');
     return;
   }
+  // Phone tile also needs a live RingCentral MVP session
+  if(cfg.rcAuth&&!rcIsSignedIn()){
+    if(confirm('RingCentral MVP sign-in required.\n\nYou will be sent to RingCentral to sign in, then returned here and the dashboard will open automatically.')){
+      pushTileCreds(id)
+        .then(function(){rcStartLogin(id);})
+        .catch(function(e){showToast('Could not prepare CXone token: '+e.message,'err');});
+    }
+    return;
+  }
   launchTile(id);
+}
+
+// Decrypt this tile's vault tokens and hand them to their destination.
+// CXone is special: rc-dashboard.html reads localStorage.cx_access_token.
+async function pushTileCreds(id){
+  var cfg=TILE_CONFIG[id],asgn=loadAssignments()[id]||{};
+  for(var i=0;i<cfg.required.length;i++){
+    var type=cfg.required[i],name=asgn[type];
+    if(!name)continue;
+    var value=await Vault.get(name);
+    if(!value)throw new Error('Could not decrypt '+name);
+    if(type==='cx'){localStorage.setItem('cx_access_token',value);}
+    else{sessionStorage.setItem('cv_session_'+type,value);}
+    sessionStorage.setItem('cv_session_'+type+'_name',name);
+  }
 }
 
 async function launchTile(id){
@@ -393,13 +475,18 @@ async function launchTile(id){
   var card=document.getElementById('tile-'+id);
   if(card)card.style.opacity='0.7';
   try{
-    // Decrypt and push vault tokens into sessionStorage (GH tiles)
+    // Decrypt and push vault tokens to where each destination reads them
     for(var i=0;i<cfg.required.length;i++){
       var type=cfg.required[i];
       var name=asgn[type];
       var value=await Vault.get(name);
       if(!value)throw new Error('Could not decrypt '+name);
-      sessionStorage.setItem('cv_session_'+type,value);
+      if(type==='cx'){
+        // rc-dashboard.html / cx-auth.js read this key directly
+        localStorage.setItem('cx_access_token',value);
+      } else {
+        sessionStorage.setItem('cv_session_'+type,value);
+      }
       sessionStorage.setItem('cv_session_'+type+'_name',name);
     }
     // Build destination URL
@@ -466,10 +553,27 @@ function openSettings(id,event){
       }
       body+='</div>';
     });
-    body+='<div class="info-box" style="margin-top:14px">📁 <strong>Project profiles</strong> are configured within the dashboard — click the tile to open and use the project selector or ⚙ settings inside the dashboard.</div>';
+    if(id==='phone'){
+      // RingCentral MVP is OAuth, not a vault token — show its own row
+      body+='<div style="font-size:13px;font-weight:700;color:#374151;margin:16px 0 12px">RingCentral MVP</div>';
+      body+='<div class="rc-row">';
+      body+='<span class="vtok-badge" style="background:#dbeafe;color:#1e40af">RC</span>';
+      if(rcIsSignedIn()){
+        var exp=rcExpiresIn();
+        body+='<span style="font-size:13px;font-weight:600;color:#1e1b4b;flex:1">Signed in'+(exp?' — expires in '+esc(exp):'')+'</span>';
+        body+='<button class="btn-sm" style="border-color:#fca5a5;color:#dc2626" onclick="rcSignOut()">Sign out</button>';
+      } else {
+        body+='<span style="font-size:12px;color:#dc2626;flex:1">not signed in</span>';
+        body+='<button class="btn-sm" style="background:#1a56db;color:#fff;border-color:#1a56db" onclick="rcStartLogin()">Sign in with RingCentral</button>';
+      }
+      body+='</div>';
+      body+='<div class="info-box" style="margin-top:14px">🔐 Sign-in is handled by RingCentral (PKCE) and returns you to this page. The CXone token above is written to the phone dashboard when you launch the tile.</div>';
+    } else {
+      body+='<div class="info-box" style="margin-top:14px">📁 <strong>Project profiles</strong> are configured within the dashboard — click the tile to open and use the project selector or ⚙ settings inside the dashboard.</div>';
+    }
     var openHref=cfg.href;
     actions='<button class="btn-cancel" onclick="closeSettings()">Close</button>';
-    actions+='<a href="'+esc(openHref)+'" class="btn-launch" style="text-decoration:none">Open Dashboard ↗</a>';
+    actions+='<a href="'+esc(openHref)+'"'+(cfg.newTab?' target="_blank"':'')+' class="btn-launch" style="text-decoration:none">Open Dashboard ↗</a>';
   }
 
   document.getElementById('settingsBody').innerHTML=body;
@@ -608,10 +712,26 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 renderTileChips();
-(function(){
+(async function(){
   var saved=sessionStorage.getItem('cv_vault_pw');
-  if(saved){unlockVault(saved);}
+  if(saved){await unlockVault(saved);}
+  // Returning from the RingCentral callback? Finish what we started.
+  var pending=sessionStorage.getItem('cv_pending_tile');
+  if(pending&&rcIsSignedIn()){
+    sessionStorage.removeItem('cv_pending_tile');
+    renderTileChips();
+    if(Vault.isUnlocked()&&tileIsReady(pending)){
+      showToast('Signed in to RingCentral — opening '+TILE_CONFIG[pending].name);
+      setTimeout(function(){launchTile(pending);},600);
+    } else {
+      showToast('Signed in to RingCentral ✓');
+    }
+  }
 })();
+// Keep the RC chip honest if the token is cleared or refreshed elsewhere
+window.addEventListener('storage',function(e){
+  if(!e.key||e.key.indexOf('rc_')===0||e.key==='cx_access_token')renderTileChips();
+});
 </script>
 
 <!-- ── Phone Dashboard exception badge ──────────────────────────────────────
