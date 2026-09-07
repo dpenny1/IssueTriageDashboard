@@ -114,8 +114,8 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="hdr-logo">CV</div>
       <div><h1>CentralView Issue Triage</h1></div>
     </div>
-    <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
     <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank" class="hdr-act">Phone</a>
+    <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
   </div>
 </div>
 
@@ -207,15 +207,15 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="tile-tokens" id="tile-tokens-powersearch"></div>
     </div>
 
-    <div class="card" style="border-top-color:#4338ca" id="tile-customerportal"
-         onclick="openTile('customerportal')" role="button" tabindex="0"
-         onkeydown="if(event.key==='Enter'||event.key===' ')openTile('customerportal')">
-      <button class="card-gear" onclick="openSettings('customerportal',event)" title="Customer Portal settings">⚙</button>
+    <div class="card" style="border-top-color:#4338ca" id="tile-portal"
+         onclick="openTile('portal')" role="button" tabindex="0"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openTile('portal')">
+      <button class="card-gear" onclick="openSettings('portal',event)" title="Portal settings">⚙</button>
       <div class="card-icon">🌐</div>
-      <div class="card-name">Customer Portal<span class="exc-badge" data-exc="customerportal"></span></div>
+      <div class="card-name">Portal<span class="exc-badge" data-exc="portal"></span></div>
       <div class="card-desc">Issues dashboard — tracking, search &amp; triage</div>
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
-      <div class="tile-tokens" id="tile-tokens-customerportal"></div>
+      <div class="tile-tokens" id="tile-tokens-portal"></div>
     </div>
 
     <div class="card" style="border-top-color:#1a56db" id="tile-phone"
@@ -326,7 +326,7 @@ var TILE_CONFIG={
   financials:{href:'https://fin-dashboard.csaapps.com/ado-dashboard/',icon:'📋',name:'Financials',accentClass:'amber',required:[],newTab:true},
   cis:{href:'cis.html',icon:'🛡️',name:'CIS',accentClass:'',required:['gh','zh']},
   powersearch:{href:'powersearch.html',icon:'🔍',name:'Power Search',accentClass:'',required:['gh','zh']},
-  customerportal:{href:'customerportal.html',icon:'🌐',name:'Customer Portal',accentClass:'',required:['gh','zh']},
+  portal:{href:'portal.html',icon:'🌐',name:'Portal',accentClass:'',required:['gh','zh']},
   phone:{href:PHONE_BASE+'rc-dashboard.html',icon:'📞',name:'Phone',accentClass:'',required:['cx'],newTab:true,rcAuth:true},
 };
 var TYPE_LABELS={gh:'GitHub',zh:'ZenHub',tfs:'TFS (Password)',asana:'Asana',cx:'CXone Token'};
@@ -755,7 +755,7 @@ var EXC=(function(){
   var SOURCES=[
     {id:'cis',            key:'cv_exc_cis',            label:'CIS',             test:/(^|\/)cis\.html/i},
     {id:'powersearch',    key:'cv_exc_powersearch',    label:'Power Search',    test:/(^|\/)powersearch\.html/i},
-    {id:'customerportal', key:'cv_exc_customerportal', label:'Customer Portal', test:/(^|\/)customerportal\.html/i},
+    {id:'portal', key:'cv_exc_portal', label:'Portal', test:/(^|\/)portal\.html/i},
     {id:'phone',          key:'rc_exceptions_v1',      label:'Phone',           test:/PhoneDashboard/i,
      fresh:10*60000, max:10*60000,
      detail:function(d){return d.mismatch+' mismatch, '+d.refused+' refused';}}

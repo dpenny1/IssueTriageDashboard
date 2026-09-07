@@ -8,7 +8,7 @@ A collection of single-page GitHub issue dashboards for tracking, triaging, and 
 |-----------|------|-------------|
 | 🛡️ CIS | `cis.html` | CS Issues Hub — full triage with label-based tabs, ZenHub pipeline support, exception tracking, and weekly report |
 | 🔍 Power Search | `powersearch.html` | General-purpose issue dashboard with search, filters, and label grouping |
-| 🌐 Customer Portal | `customerportal.html` | Issues dashboard for the Customer Portal project |
+| 🌐 Portal | `portal.html` | Issues dashboard for the Portal project |
 
 Open `index.html` to navigate between dashboards.
 
@@ -62,5 +62,5 @@ Each dashboard uses isolated `localStorage` keys to avoid conflicts:
 |-----------|-----------|--------------|
 | CIS | `cis_issues_cache_v1` | `cis_profiles_v2` |
 | Power Search | `ps_issues_cache_v1` | `ps_profiles_v1` |
-| Customer Portal | `cp_issues_cache_v1` | `cp_profiles_v1` |
+| Portal | `cp_issues_cache_v1` | `cp_profiles_v1` |
 | Shared vault | `cis_vault_v1` | — |

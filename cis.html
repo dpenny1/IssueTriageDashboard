@@ -123,9 +123,9 @@ tr:hover td{background:#f9fafb}
     <div class="hdr-brand"><div class="hdr-logo">CV</div><div><h1>CentralView GitHub Issue Triage</h1></div></div>
     <div style="display:flex;gap:4px">
       <a href="index.html" class="hdr-act">Home</a>
+      <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank" class="hdr-act">Phone</a>
       <a href="https://fin-dashboard.csaapps.com/ado-dashboard/" target="_blank" class="hdr-act">Financials</a>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
-      <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank" class="hdr-act">Phone</a>
     </div>
   </div></div>
   <div class="main"><div class="sw"><div class="sc">
@@ -147,8 +147,8 @@ tr:hover td{background:#f9fafb}
   <div class="hdr"><div class="hdr-in">
     <div class="hdr-brand"><div class="hdr-logo">CV</div><div><h1>CentralView GitHub Issue Triage</h1></div></div>
     <div class="hdr-right">
-      <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
       <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank" class="hdr-act">Phone</a>
+      <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
       <div class="hdr-sep"></div>
       <button class="hdr-act" onclick="backToSetup()">← Back</button>
     </div>
@@ -165,11 +165,11 @@ tr:hover td{background:#f9fafb}
     <div class="hdr-right">
       <nav class="hdr-nav">
         <a href="index.html">Home</a>
+        <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank">Phone</a>
         <a href="powersearch.html">Power Search</a>
-        <a href="customerportal.html">Customer Portal</a>
+        <a href="portal.html">Portal</a>
         <a href="#" onclick="(function(){var fs=JSON.parse(localStorage.getItem('cv_financials_settings_v1')||'{}');var h='#cv_auto=1';if(fs.server)h+='&cv_server='+encodeURIComponent(fs.server);if(fs.collection)h+='&cv_collection='+encodeURIComponent(fs.collection);if(fs.project)h+='&cv_project='+encodeURIComponent(fs.project);if(fs.user)h+='&cv_user='+encodeURIComponent(fs.user);if(fs.password)h+='&cv_pass='+encodeURIComponent(fs.password);window.open('https://fin-dashboard.csaapps.com/ado-dashboard/'+h,'financials_tab');})();return false;">Financials</a>
         <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank">PM Tools</a>
-        <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank">Phone</a>
       </nav>
       <div class="hdr-sep"></div>
       <button class="hdr-act" id="refreshBtn" onclick="doRefresh()" title="Refresh"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
@@ -1871,7 +1871,7 @@ var EXC=(function(){
   var SOURCES=[
     {id:'cis',            key:'cv_exc_cis',            label:'CIS',             test:/(^|\/)cis\.html/i},
     {id:'powersearch',    key:'cv_exc_powersearch',    label:'Power Search',    test:/(^|\/)powersearch\.html/i},
-    {id:'customerportal', key:'cv_exc_customerportal', label:'Customer Portal', test:/(^|\/)customerportal\.html/i},
+    {id:'portal', key:'cv_exc_portal', label:'Portal', test:/(^|\/)portal\.html/i},
     {id:'phone',          key:'rc_exceptions_v1',      label:'Phone',           test:/PhoneDashboard/i,
      fresh:10*60000, max:10*60000,
      detail:function(d){return d.mismatch+' mismatch, '+d.refused+' refused';}}
