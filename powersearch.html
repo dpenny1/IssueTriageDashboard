@@ -706,14 +706,11 @@ function tabCount(id){
 
 function buildTabs(){
   var excN=getExceptions().length;
-  // First render after a data load lands on Exceptions when there are any.
-  // Later refreshes leave you wherever you were.
-  // Most exception rules need ZenHub pipelines, so hold the auto-jump
-  // until either an exception shows up or ZenHub has finished loading.
-  if(S._tabAuto&&S.issues.length&&(excN||S.zhConnected)){
-    S._tabAuto=false;
-    S.activeTab=excN?'exceptions':'all';
-  }
+  // Until you pick a tab yourself, the page keeps landing on Exceptions
+  // whenever there are any. This re-asserts on every render rather than firing
+  // once, because a background refresh drops the ZenHub pipelines that most
+  // exception rules depend on and only zhLoad() puts them back.
+  if(S._tabAuto&&excN)S.activeTab='exceptions';
   // Never sit on the Exceptions tab once it has emptied out
   if(S.activeTab==='exceptions'&&!excN)S.activeTab='all';
   var h='';
