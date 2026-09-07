@@ -97,11 +97,13 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
 #toast.warn{background:#b45309}
 #toast.err{background:#dc2626}
 
-/* ── Phone Dashboard exception badge ── */
-.phone-exc-badge{display:none;min-width:16px;height:16px;padding:0 5px;margin-left:5px;border-radius:999px;background:#dc2626;color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;vertical-align:middle;box-shadow:0 0 0 2px rgba(220,38,38,0.28)}
-.phone-exc-badge.is-on{display:inline-block;animation:phoneExcPulse 2s ease-in-out infinite}
-@keyframes phoneExcPulse{0%,100%{box-shadow:0 0 0 2px rgba(220,38,38,0.28)}50%{box-shadow:0 0 0 5px rgba(220,38,38,0.10)}}
-.card-name .phone-exc-badge{height:18px;line-height:18px;font-size:11px}
+/* ── Cross-dashboard exception badges ── */
+.exc-badge{display:none;min-width:16px;height:16px;padding:0 5px;margin-left:5px;border-radius:999px;background:#dc2626;color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;vertical-align:middle;box-shadow:0 0 0 2px rgba(220,38,38,0.28)}
+.exc-badge.on{display:inline-block}
+.exc-badge.live{animation:excPulse 2s ease-in-out infinite}
+.exc-badge.stale{background:#94a3b8;box-shadow:0 0 0 2px rgba(148,163,184,0.22)}
+@keyframes excPulse{0%,100%{box-shadow:0 0 0 2px rgba(220,38,38,0.28)}50%{box-shadow:0 0 0 5px rgba(220,38,38,0.10)}}
+.card-name .exc-badge{height:18px;line-height:18px;font-size:11px}
 </style>
 </head>
 <body>
@@ -113,7 +115,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div><h1>CentralView Issue Triage</h1></div>
     </div>
     <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
-    <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank" class="hdr-act">Phone<span class="phone-exc-badge"></span></a>
+    <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank" class="hdr-act">Phone</a>
   </div>
 </div>
 
@@ -188,7 +190,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
          onkeydown="if(event.key==='Enter'||event.key===' ')openTile('cis')">
       <button class="card-gear" onclick="openSettings('cis',event)" title="CIS settings">⚙</button>
       <div class="card-icon">🛡️</div>
-      <div class="card-name">CIS</div>
+      <div class="card-name">CIS<span class="exc-badge" data-exc="cis"></span></div>
       <div class="card-desc">CS Issues Hub — tracking, patches, exceptions &amp; weekly report</div>
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
       <div class="tile-tokens" id="tile-tokens-cis"></div>
@@ -199,7 +201,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
          onkeydown="if(event.key==='Enter'||event.key===' ')openTile('powersearch')">
       <button class="card-gear" onclick="openSettings('powersearch',event)" title="Power Search settings">⚙</button>
       <div class="card-icon">🔍</div>
-      <div class="card-name">Power Search</div>
+      <div class="card-name">Power Search<span class="exc-badge" data-exc="powersearch"></span></div>
       <div class="card-desc">Issues dashboard — tracking, search &amp; triage</div>
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
       <div class="tile-tokens" id="tile-tokens-powersearch"></div>
@@ -210,7 +212,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
          onkeydown="if(event.key==='Enter'||event.key===' ')openTile('customerportal')">
       <button class="card-gear" onclick="openSettings('customerportal',event)" title="Customer Portal settings">⚙</button>
       <div class="card-icon">🌐</div>
-      <div class="card-name">Customer Portal</div>
+      <div class="card-name">Customer Portal<span class="exc-badge" data-exc="customerportal"></span></div>
       <div class="card-desc">Issues dashboard — tracking, search &amp; triage</div>
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
       <div class="tile-tokens" id="tile-tokens-customerportal"></div>
@@ -221,7 +223,7 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
          onkeydown="if(event.key==='Enter'||event.key===' ')openTile('phone')">
       <button class="card-gear" onclick="openSettings('phone',event)" title="Phone settings">&#9881;</button>
       <div class="card-icon">&#128222;</div>
-      <div class="card-name">Phone<span class="phone-exc-badge"></span></div>
+      <div class="card-name">Phone<span class="exc-badge" data-exc="phone"></span></div>
       <div class="card-desc">RingCentral supervisor &mdash; agent states, mismatches &amp; refused</div>
       <span class="card-badge" style="background:#dbeafe;color:#1e40af">Live</span>
       <div class="tile-tokens" id="tile-tokens-phone"></div>
@@ -734,48 +736,117 @@ window.addEventListener('storage',function(e){
 });
 </script>
 
-<!-- ── Phone Dashboard exception badge ──────────────────────────────────────
-     Reads the snapshot written by rc-dashboard.html. Both apps are served
-     from dpenny1.github.io, so they share one localStorage origin.
-     Snapshot shape: {mismatch:N, refused:N, total:N, ts:epochMs}
-     A snapshot older than MAX_AGE is treated as "no data" (badge hidden).  -->
+<!-- ── Cross-dashboard exception badges ─────────────────────────────────────
+     Each dashboard publishes its own exception count while it is open; every
+     header renders the counts for the *other* dashboards, so you can see
+     where the work is without opening each page in turn.
+
+       cv_exc_<id>       {n, ts}    written by publishExceptions() in each page
+       rc_exceptions_v1  {mismatch, refused, total, ts}
+                         written by rc-dashboard.html (PhoneDashboard repo)
+
+     All of these apps share the dpenny1.github.io origin, so the keys are
+     visible to each other. Financials is on another domain — no badge.
+
+     Freshness: red while the source page was open within the hour, grey up
+     to 24h, hidden after that. The phone dashboard is live presence data, so
+     it uses a 10-minute window and never goes grey.                        -->
 <script>
-(function(){
-  var KEY='rc_exceptions_v1', MAX_AGE=10*60*1000, POLL=15000;
-  function read(){
+var EXC=(function(){
+  var HOUR=3600000, DAY=24*HOUR;
+  var SOURCES=[
+    {id:'cis',            key:'cv_exc_cis',            label:'CIS',             test:/(^|\/)cis\.html/i},
+    {id:'powersearch',    key:'cv_exc_powersearch',    label:'Power Search',    test:/(^|\/)powersearch\.html/i},
+    {id:'customerportal', key:'cv_exc_customerportal', label:'Customer Portal', test:/(^|\/)customerportal\.html/i},
+    {id:'phone',          key:'rc_exceptions_v1',      label:'Phone',           test:/PhoneDashboard/i,
+     fresh:10*60000, max:10*60000,
+     detail:function(d){return d.mismatch+' mismatch, '+d.refused+' refused';}}
+  ];
+  var BY_ID={};
+  SOURCES.forEach(function(s){BY_ID[s.id]=s;});
+
+  function read(s){
     try{
-      var d=JSON.parse(localStorage.getItem(KEY)||'null');
-      if(!d||typeof d.total!=='number') return null;
-      if(!d.ts||(Date.now()-d.ts)>MAX_AGE) return null;
-      return d;
+      var d=JSON.parse(localStorage.getItem(s.key)||'null');
+      if(!d||!d.ts)return null;
+      var n=(typeof d.total==='number')?d.total:d.n;
+      if(typeof n!=='number')return null;
+      var age=Date.now()-d.ts;
+      if(age>(s.max||DAY))return null;
+      return {n:n,age:age,stale:age>(s.fresh||HOUR),data:d};
     }catch(e){ return null; }
   }
+
+  function ago(ms){
+    var m=Math.round(ms/60000);
+    if(m<1)return 'just now';
+    if(m<60)return m+'m ago';
+    var h=Math.round(m/60);
+    return h<24?h+'h ago':'yesterday';
+  }
+
   function paint(){
-    var d=read(), n=d?d.total:0;
-    var tip = d
-      ? (n>0 ? n+' exception'+(n===1?'':'s')+' — '+d.mismatch+' mismatch, '+d.refused+' refused'
-             : 'RingCentral Supervisor Dashboard — no exceptions')
-      : 'RingCentral Supervisor Dashboard (open it to see live exception counts)';
-    var b=document.querySelectorAll('.phone-exc-badge');
-    for(var i=0;i<b.length;i++){
-      b[i].textContent = n>99 ? '99+' : String(n);
-      b[i].className = 'phone-exc-badge' + (n>0 ? ' is-on' : '');
-      var host=b[i].closest ? b[i].closest('a') : b[i].parentNode;
-      if(host) host.title = tip;
+    var els=document.querySelectorAll('.exc-badge');
+    for(var i=0;i<els.length;i++){
+      var el=els[i], s=BY_ID[el.getAttribute('data-exc')];
+      if(!s)continue;
+      var r=read(s), host=el.parentNode;
+      if(!r||r.n<=0){
+        el.className='exc-badge';
+        el.textContent='';
+        if(host&&host.removeAttribute)host.removeAttribute('title');
+        continue;
+      }
+      el.textContent=r.n>99?'99+':String(r.n);
+      el.className='exc-badge on'+(r.stale?' stale':' live');
+      if(host){
+        host.title=s.label+' — '+r.n+' exception'+(r.n===1?'':'s')+
+                   (s.detail?' ('+s.detail(r.data)+')':'')+
+                   ' · as of '+ago(r.age);
+      }
     }
     var det=document.getElementById('phoneExcDetail');
     if(det){
-      det.innerHTML = !d ? ''
-        : (n>0
-            ? '<span class="ttok-chip ttok-set amber">'+d.mismatch+' mismatch</span>'+
-              '<span class="ttok-chip ttok-set amber">'+d.refused+' refused</span>'
+      var p=read(BY_ID.phone);
+      det.innerHTML = !p ? ''
+        : (p.n>0
+            ? '<span class="ttok-chip ttok-set amber">'+p.data.mismatch+' mismatch</span>'+
+              '<span class="ttok-chip ttok-set amber">'+p.data.refused+' refused</span>'
             : '<span class="ttok-chip ttok-set">all clear</span>');
     }
   }
-  paint();
-  setInterval(paint, POLL);
-  window.addEventListener('storage', function(e){ if(!e.key || e.key===KEY) paint(); });
-  window.addEventListener('focus', paint);
+
+  // Attach a badge to every header link pointing at a badged dashboard,
+  // skipping links back to the page we are already on.
+  function wire(){
+    var here=location.pathname;
+    var links=document.querySelectorAll('.hdr a[href]');
+    for(var i=0;i<links.length;i++){
+      var a=links[i], href=a.getAttribute('href')||'';
+      if(a.querySelector('.exc-badge'))continue;
+      for(var j=0;j<SOURCES.length;j++){
+        var s=SOURCES[j];
+        if(!s.test.test(href))continue;
+        if(s.test.test(here))break;          // don't badge a link to this page
+        var b=document.createElement('span');
+        b.className='exc-badge';
+        b.setAttribute('data-exc',s.id);
+        a.appendChild(b);
+        break;
+      }
+    }
+    paint();
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wire);
+  else wire();
+  setInterval(paint,15000);
+  window.addEventListener('storage',function(e){
+    if(!e.key||e.key.indexOf('cv_exc_')===0||e.key==='rc_exceptions_v1')paint();
+  });
+  window.addEventListener('focus',paint);
+
+  return {paint:paint,wire:wire};
 })();
 </script>
 </body>
