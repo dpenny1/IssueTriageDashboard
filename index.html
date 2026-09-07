@@ -400,12 +400,11 @@ function renderTileChips(){
         h+='<span class="ttok-chip ttok-unset">'+(type==='tfs'?'Password':type==='gh'?'GitHub':esc(type.toUpperCase()))+' not set</span>';
       }
     });
-    // Phone: RingCentral MVP sign-in status
-    if(id==='phone'){
+    // Phone: confirm an active RingCentral MVP session, but never nag about
+    // a missing one — clicking the tile just sends you to RC to sign in.
+    if(id==='phone'&&rcIsSignedIn()){
       var exp=rcExpiresIn();
-      h+=rcIsSignedIn()
-        ? '<span class="ttok-chip ttok-rc" title="RingCentral MVP session active'+(exp?' — expires in '+exp:'')+'">RC signed in</span>'
-        : '<span class="ttok-chip ttok-unset">RC not signed in</span>';
+      h+='<span class="ttok-chip ttok-rc" title="RingCentral MVP session active'+(exp?' — expires in '+exp:'')+'">RC signed in</span>';
     }
     // Financials: show project chip and password status
     if(id==='financials'){
@@ -444,13 +443,12 @@ function openTile(id){
     showToast(cfg.name+' needs: '+missing.join(', ')+' — add to vault first','warn');
     return;
   }
-  // Phone tile also needs a live RingCentral MVP session
+  // Phone tile also needs a live RingCentral MVP session — go straight there,
+  // no prompt. callback.html returns here and the dashboard opens itself.
   if(cfg.rcAuth&&!rcIsSignedIn()){
-    if(confirm('RingCentral MVP sign-in required.\n\nYou will be sent to RingCentral to sign in, then returned here and the dashboard will open automatically.')){
-      pushTileCreds(id)
-        .then(function(){rcStartLogin(id);})
-        .catch(function(e){showToast('Could not prepare CXone token: '+e.message,'err');});
-    }
+    pushTileCreds(id)
+      .then(function(){rcStartLogin(id);})
+      .catch(function(e){showToast('Could not prepare CXone token: '+e.message,'err');});
     return;
   }
   launchTile(id);
