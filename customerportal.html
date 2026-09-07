@@ -210,7 +210,8 @@ var S={
   autoRefreshTimer:null,
   preFilterLabel:'',
   zhToken:'',zhWorkspace:'',repoIds:{},zhPipelines:{},zhIssueMap:{},repoWorkspaceMap:{},zhConnected:false,milestones:{},
-  warnDismissed:[]
+  warnDismissed:[],
+  _tabAuto:true
 };
 var STORAGE_KEY='cp_issues_cache_v1',PROFILES_KEY='cp_profiles_v1',IGNORED_KEY='cp_ignored_v1',CP_WARN_DISMISSED_KEY='cp_warn_dismissed_v1';
 var CS_LABELS_CP=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
@@ -234,6 +235,14 @@ function isCsTaskItemNotTracking(i){return !!(S.zhToken&&isCsTaskItem(i)&&i.pipe
 function isEPANotInNewIssues(i){return !!(S.zhToken&&isEPA(i)&&i.pipeline&&i.pipeline.pipelineName!=='New Issues');}
 function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);if(isEPA(i))return isEPANotInNewIssues(i)||isEPAMilestoneMissing(i)||isMilestoneOrphan(i);return isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
 function exceptionCount(issues){return issues.filter(issueHasException).length;}
+
+// ── Exceptions ────────────────────────────────────────────────────────────────
+// Exceptions are pulled out of the other tabs (same model as CIS) so they are
+// visible on load instead of hiding one click deep inside a tile.
+function notIgnoredOpen(){return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});}
+function getExceptions(){return notIgnoredOpen().filter(issueHasException);}
+function isClean(i){return !issueHasException(i);}
+
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
 function loadWarnDismissed(){try{var v=localStorage.getItem(CP_WARN_DISMISSED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveWarnDismissed(){try{localStorage.setItem(CP_WARN_DISMISSED_KEY,JSON.stringify(S.warnDismissed));}catch(e){}}
@@ -465,7 +474,7 @@ async function ghFetchAll(path,maxPages){
 }
 
 async function loadZHData(){S.zhIssueMap={};S._zhErrors=[];S.repos.forEach(function(r){if(!S.repoWorkspaceMap[r]&&S.zhWorkspace)S.repoWorkspaceMap[r]=S.zhWorkspace;});for(var i=0;i<S.repos.length;i++){var repo=S.repos[i],ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!S.zhToken||!ws)continue;try{var rd=await ghFetch('/repos/'+repo);S.repoIds[repo]=rd.id;var bd=await zhGet('/p2/workspaces/'+ws+'/repositories/'+rd.id+'/board');S.zhPipelines[repo]=(bd.pipelines||[]).map(function(p){return {id:p.id,name:p.name};});(bd.pipelines||[]).forEach(function(p){(p.issues||[]).forEach(function(iss){S.zhIssueMap[iss.issue_number+'_'+repo]={pipelineId:p.id,pipelineName:p.name,workspace:ws};});});}catch(e){S._zhErrors.push(repo+': '+e.message);console.error('[ZenHub] loadZHData error for '+repo,e);}}var mapped=0;S.issues.forEach(function(i){var m=S.zhIssueMap[i.id+'_'+i.repo];if(m){i.pipeline=m;mapped++;}});console.log('[ZenHub] mapped '+mapped+' of '+S.issues.length+' issues; map size='+Object.keys(S.zhIssueMap).length);return mapped;}
-function zhLoad(){if(!S.zhToken){return;}if(!S.zhWorkspace){setStatus('<span style="color:#f59e0b">⚠ ZenHub token found but no Workspace ID set — edit your project in Settings to add it</span>');return;}S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(mapped){S.zhConnected=true;saveCache();populateFilters();renderMain();if(S._zhErrors&&S._zhErrors.length){setStatus('<span style="color:#fca5a5">⚠ ZenHub errors: '+esc(S._zhErrors.join('; '))+'</span>');}else if(!mapped){setStatus('<span style="color:#f59e0b">⚠ ZenHub connected but 0 issues mapped — verify Workspace ID &amp; token</span>');}else{setStatus('<span style="color:#6ee7b7">✓ ZenHub: '+mapped+' issues mapped</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
+function zhLoad(){if(!S.zhToken){return;}if(!S.zhWorkspace){setStatus('<span style="color:#f59e0b">⚠ ZenHub token found but no Workspace ID set — edit your project in Settings to add it</span>');return;}S.zhConnected=false;setStatus('<span style="color:#fbbf24">⏳ ZenHub loading...</span>');loadZHData().then(function(mapped){S.zhConnected=true;saveCache();populateFilters();buildTabs();renderMain();if(S._zhErrors&&S._zhErrors.length){setStatus('<span style="color:#fca5a5">⚠ ZenHub errors: '+esc(S._zhErrors.join('; '))+'</span>');}else if(!mapped){setStatus('<span style="color:#f59e0b">⚠ ZenHub connected but 0 issues mapped — verify Workspace ID &amp; token</span>');}else{setStatus('<span style="color:#6ee7b7">✓ ZenHub: '+mapped+' issues mapped</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');}}).catch(function(e){S.zhConnected=false;setStatus('<span style="color:#fca5a5">✕ ZenHub failed: '+esc(e.message)+'</span>');});}
 
 async function loadLabelColors(){
   for(var i=0;i<S.repos.length;i++){
@@ -651,19 +660,25 @@ function publishExceptions(n){
 
 function renderStats(){
   var notIgnored=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
-  var newSrc=notIgnored.filter(function(i){return !isExcludeFromNew(i);});
-  var epaSrc=notIgnored.filter(isEPA);
-  var enhSrc=notIgnored.filter(isEnhancement);
-  var csOtherSrc=notIgnored.filter(isCsOther);
+  var excSrc=notIgnored.filter(issueHasException);
+  // Everything else is counted on the clean set — an exception belongs to the
+  // Exceptions tile only, so the per-tile red sub-badges are always 0 now.
+  var clean=notIgnored.filter(isClean);
+  var newSrc=clean.filter(function(i){return !isExcludeFromNew(i);});
+  var epaSrc=clean.filter(isEPA);
+  var enhSrc=clean.filter(isEnhancement);
+  var csOtherSrc=clean.filter(isCsOther);
   var stats=[
-    {n:newSrc.length,exc:exceptionCount(newSrc),l:'New Issues',c:'#4338ca',tab:'all'},
-    {n:csOtherSrc.length,exc:exceptionCount(csOtherSrc),l:'CS Items',c:'#0891b2',tab:'csother'},
-    {n:enhSrc.length,exc:exceptionCount(enhSrc),l:'Enhancements',c:'#d97706',tab:'enhancement'},
-    {n:epaSrc.length,exc:exceptionCount(epaSrc),l:'Enh. Pending Approval',c:'#7c3aed',tab:'epa'},
+    {n:newSrc.length,exc:0,l:'New Issues',c:'#4338ca',tab:'all'},
+    {n:csOtherSrc.length,exc:0,l:'CS Items',c:'#0891b2',tab:'csother'},
+    {n:enhSrc.length,exc:0,l:'Enhancements',c:'#d97706',tab:'enhancement'},
+    {n:epaSrc.length,exc:0,l:'Enh. Pending Approval',c:'#7c3aed',tab:'epa'},
     {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#059669',tab:'closed'},
     {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'}
   ];
-  publishExceptions(exceptionCount(notIgnored));
+  // Exceptions lead the row, and only show up when there is something to fix
+  if(excSrc.length)stats.unshift({n:excSrc.length,exc:0,l:'Exceptions',c:'#b91c1c',tab:'exceptions'});
+  publishExceptions(excSrc.length);
   var h='';
   stats.forEach(function(s){
     h+='<div class="sc2" style="border-top-color:'+s.c+'" onclick="switchTab(\''+s.tab+'\')">';
@@ -678,6 +693,7 @@ function renderStats(){
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 var TAB_DEFS=[
+  {id:'exceptions',label:'Exceptions',color:'#b91c1c',onlyIfAny:true},
   {id:'all',label:'New Issues',color:'#4338ca'},
   {id:'csother',label:'CS Items',color:'#0891b2'},
   {id:'enhancement',label:'Enhancements',color:'#d97706'},
@@ -688,18 +704,32 @@ var TAB_DEFS=[
 
 function tabCount(id){
   var notIgnored=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
-  if(id==='all')return notIgnored.filter(function(i){return !isExcludeFromNew(i);}).length;
-  if(id==='epa')return notIgnored.filter(isEPA).length;
-  if(id==='enhancement')return notIgnored.filter(isEnhancement).length;
-  if(id==='csother')return notIgnored.filter(isCsOther).length;
+  if(id==='exceptions')return notIgnored.filter(issueHasException).length;
+  var clean=notIgnored.filter(isClean);
+  if(id==='all')return clean.filter(function(i){return !isExcludeFromNew(i);}).length;
+  if(id==='epa')return clean.filter(isEPA).length;
+  if(id==='enhancement')return clean.filter(isEnhancement).length;
+  if(id==='csother')return clean.filter(isCsOther).length;
   if(id==='closed')return S.closedIssues.length;
   if(id==='ignored')return S.ignored.length;
   return 0;
 }
 
 function buildTabs(){
+  var excN=getExceptions().length;
+  // First render after a data load lands on Exceptions when there are any.
+  // Later refreshes leave you wherever you were.
+  // Most exception rules need ZenHub pipelines, so hold the auto-jump
+  // until either an exception shows up or ZenHub has finished loading.
+  if(S._tabAuto&&S.issues.length&&(excN||S.zhConnected)){
+    S._tabAuto=false;
+    S.activeTab=excN?'exceptions':'all';
+  }
+  // Never sit on the Exceptions tab once it has emptied out
+  if(S.activeTab==='exceptions'&&!excN)S.activeTab='all';
   var h='';
   TAB_DEFS.forEach(function(t){
+    if(t.onlyIfAny&&!excN)return;
     var on=S.activeTab===t.id?' on':'';
     var cnt=tabCount(t.id);
     h+='<button class="tab'+on+'" onclick="switchTab(\''+t.id+'\')" style="'+(on?' color:'+t.color+';border-top:2px solid '+t.color:'')+'">';
@@ -710,6 +740,7 @@ function buildTabs(){
 }
 
 function switchTab(id){
+  S._tabAuto=false;   // a deliberate click wins over the auto-jump
   S.activeTab=id;
   clearFilters();
   buildTabs();
@@ -946,22 +977,26 @@ function renderMain(){
     content.innerHTML=closedTable(applyFilters(S.closedIssues));
     return;
   }
+  if(tab==='exceptions'){
+    content.innerHTML=openTable(applyFilters(getExceptions()),'No exceptions — all clear!',false,'exceptions',true);
+    return;
+  }
   if(tab==='epa'){
-    var epaSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isEPA(i);});
+    var epaSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&isEPA(i);});
     content.innerHTML=openTable(applyFilters(epaSrc),'No enhancement pending approval items.',false,'epa',true);
     return;
   }
   if(tab==='enhancement'){
-    var enhSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isEnhancement(i);});
+    var enhSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&isEnhancement(i);});
     content.innerHTML=byPipelineGroupView(applyFilters(enhSrc),'enhancement','No enhancement items.');
     return;
   }
   if(tab==='csother'){
-    var csOtherSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isCsOther(i);});
+    var csOtherSrc=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&isCsOther(i);});
     content.innerHTML=byPipelineGroupView(applyFilters(csOtherSrc),'csother','No CS items found.');
     return;
   }
-  var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&!isExcludeFromNew(i);});
+  var src=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&!isExcludeFromNew(i);});
   content.innerHTML=openTable(applyFilters(src),'No new issues — all clear!',false,'all',true);
 }
 
