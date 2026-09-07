@@ -114,8 +114,10 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="hdr-logo">CV</div>
       <div><h1>CentralView Issue Triage</h1></div>
     </div>
-    <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="_blank" class="hdr-act">Phone</a>
-    <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
+    <div style="display:flex;gap:4px">
+      <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="phone_dashboard" class="hdr-act">Phone</a>
+      <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
+    </div>
   </div>
 </div>
 
@@ -322,11 +324,11 @@ function rcSignOut(){
 
 // ── Tile config ───────────────────────────────────────────────────────────────
 var TILE_CONFIG={
-  financials:{href:'https://fin-dashboard.csaapps.com/ado-dashboard/',icon:'📋',name:'Financials',accentClass:'amber',required:[],newTab:true},
+  financials:{href:'https://fin-dashboard.csaapps.com/ado-dashboard/',icon:'📋',name:'Financials',accentClass:'amber',required:[],newTab:true,target:'financials_tab'},
   cis:{href:'cis.html',icon:'🛡️',name:'CIS',accentClass:'',required:['gh','zh']},
   powersearch:{href:'powersearch.html',icon:'🔍',name:'Power Search',accentClass:'',required:['gh','zh']},
   portal:{href:'portal.html',icon:'🌐',name:'Portal',accentClass:'',required:['gh','zh']},
-  phone:{href:PHONE_BASE+'rc-dashboard.html',icon:'📞',name:'Phone',accentClass:'',required:['cx'],newTab:true,rcAuth:true},
+  phone:{href:PHONE_BASE+'rc-dashboard.html',icon:'📞',name:'Phone',accentClass:'',required:['cx'],newTab:true,target:'phone_dashboard',rcAuth:true},
 };
 var TYPE_LABELS={gh:'GitHub',zh:'ZenHub',tfs:'TFS (Password)',asana:'Asana',cx:'CXone Token'};
 
@@ -500,7 +502,9 @@ async function launchTile(id){
       if(fs.password)h+='&cv_pass='+encodeURIComponent(fs.password);
       href=cfg.href+h;
     }
-    if(cfg.newTab){window.open(href,'_blank');}else{window.location.href=href;}
+    // A named target reuses that dashboard's existing tab rather than
+    // opening another copy each time the tile is clicked.
+    if(cfg.newTab){window.open(href,cfg.target||'_blank');}else{window.location.href=href;}
   }catch(e){
     if(card)card.style.opacity='';
     showToast('Launch failed: '+e.message,'err');
