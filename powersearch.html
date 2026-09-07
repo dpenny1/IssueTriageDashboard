@@ -1172,15 +1172,6 @@ var EXC=(function(){
                    ' · as of '+ago(r.age);
       }
     }
-    var det=document.getElementById('phoneExcDetail');
-    if(det){
-      var p=read(BY_ID.phone);
-      det.innerHTML = !p ? ''
-        : (p.n>0
-            ? '<span class="ttok-chip ttok-set amber">'+p.data.mismatch+' mismatch</span>'+
-              '<span class="ttok-chip ttok-set amber">'+p.data.refused+' refused</span>'
-            : '<span class="ttok-chip ttok-set">all clear</span>');
-    }
   }
 
   // Attach a badge to every header link pointing at a badged dashboard,

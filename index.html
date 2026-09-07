@@ -185,6 +185,17 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="tile-tokens" id="tile-tokens-financials"></div>
     </div>
 
+    <div class="card" style="border-top-color:#1a56db" id="tile-phone"
+         onclick="openTile('phone')" role="button" tabindex="0"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openTile('phone')">
+      <button class="card-gear" onclick="openSettings('phone',event)" title="Phone settings">&#9881;</button>
+      <div class="card-icon">&#128222;</div>
+      <div class="card-name">Phone<span class="exc-badge" data-exc="phone"></span></div>
+      <div class="card-desc">RingCentral supervisor &mdash; agent states, mismatches &amp; refused</div>
+      <span class="card-badge" style="background:#dbeafe;color:#1e40af">Live</span>
+      <div class="tile-tokens" id="tile-tokens-phone"></div>
+    </div>
+
     <div class="card" style="border-top-color:#4338ca" id="tile-cis"
          onclick="openTile('cis')" role="button" tabindex="0"
          onkeydown="if(event.key==='Enter'||event.key===' ')openTile('cis')">
@@ -216,18 +227,6 @@ body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#f9
       <div class="card-desc">Issues dashboard — tracking, search &amp; triage</div>
       <span class="card-badge" style="background:#e0e7ff;color:#3730a3">Live</span>
       <div class="tile-tokens" id="tile-tokens-portal"></div>
-    </div>
-
-    <div class="card" style="border-top-color:#1a56db" id="tile-phone"
-         onclick="openTile('phone')" role="button" tabindex="0"
-         onkeydown="if(event.key==='Enter'||event.key===' ')openTile('phone')">
-      <button class="card-gear" onclick="openSettings('phone',event)" title="Phone settings">&#9881;</button>
-      <div class="card-icon">&#128222;</div>
-      <div class="card-name">Phone<span class="exc-badge" data-exc="phone"></span></div>
-      <div class="card-desc">RingCentral supervisor &mdash; agent states, mismatches &amp; refused</div>
-      <span class="card-badge" style="background:#dbeafe;color:#1e40af">Live</span>
-      <div class="tile-tokens" id="tile-tokens-phone"></div>
-      <div class="tile-tokens" id="phoneExcDetail"></div>
     </div>
 
   </div>
@@ -802,15 +801,6 @@ var EXC=(function(){
                    (s.detail?' ('+s.detail(r.data)+')':'')+
                    ' · as of '+ago(r.age);
       }
-    }
-    var det=document.getElementById('phoneExcDetail');
-    if(det){
-      var p=read(BY_ID.phone);
-      det.innerHTML = !p ? ''
-        : (p.n>0
-            ? '<span class="ttok-chip ttok-set amber">'+p.data.mismatch+' mismatch</span>'+
-              '<span class="ttok-chip ttok-set amber">'+p.data.refused+' refused</span>'
-            : '<span class="ttok-chip ttok-set">all clear</span>');
     }
   }
 
