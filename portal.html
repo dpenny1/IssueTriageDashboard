@@ -111,7 +111,6 @@ tr:hover td{background:#f9fafb}
     <div style="display:flex;gap:4px">
       <a href="index.html" class="hdr-act">Home</a>
       <a href="https://fin-dashboard.csaapps.com/ado-dashboard/" target="_blank" class="hdr-act">Financials</a>
-      <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="phone_dashboard" class="hdr-act">Phone</a>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
     </div>
   </div></div>
@@ -150,7 +149,6 @@ tr:hover td{background:#f9fafb}
   <div class="hdr"><div class="hdr-in">
     <div class="hdr-brand"><div class="hdr-logo">PT</div><div><h1>Portal</h1></div></div>
     <div class="hdr-right">
-      <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="phone_dashboard" class="hdr-act">Phone</a>
       <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank" class="hdr-act">PM Tools</a>
       <div class="hdr-sep"></div>
       <button class="hdr-act" onclick="backToSetup()">← Back</button>
@@ -172,7 +170,6 @@ tr:hover td{background:#f9fafb}
         <a href="cis.html">CIS</a>
         <a href="powersearch.html">Power Search</a>
         <a href="#" onclick="(function(){var fs=JSON.parse(localStorage.getItem('cv_financials_settings_v1')||'{}');var h='#cv_auto=1';if(fs.server)h+='&cv_server='+encodeURIComponent(fs.server);if(fs.collection)h+='&cv_collection='+encodeURIComponent(fs.collection);if(fs.project)h+='&cv_project='+encodeURIComponent(fs.project);if(fs.user)h+='&cv_user='+encodeURIComponent(fs.user);if(fs.password)h+='&cv_pass='+encodeURIComponent(fs.password);window.open('https://fin-dashboard.csaapps.com/ado-dashboard/'+h,'financials_tab');})();return false;">Financials</a>
-        <a href="https://dpenny1.github.io/PhoneDashboard/rc-dashboard.html" target="phone_dashboard">Phone</a>
         <a href="https://dpenny1.github.io/PMTools/index.html" target="_blank">PM Tools</a>
       </nav>
       <div class="hdr-sep"></div>
@@ -1170,25 +1167,19 @@ function renderDiag(steps,out){
      where the work is without opening each page in turn.
 
        cv_exc_<id>       {n, ts}    written by publishExceptions() in each page
-       rc_exceptions_v1  {mismatch, refused, total, ts}
-                         written by rc-dashboard.html (PhoneDashboard repo)
 
      All of these apps share the dpenny1.github.io origin, so the keys are
      visible to each other. Financials is on another domain — no badge.
 
      Freshness: red while the source page was open within the hour, grey up
-     to 24h, hidden after that. The phone dashboard is live presence data, so
-     it uses a 10-minute window and never goes grey.                        -->
+     to 24h, hidden after that.                                             -->
 <script>
 var EXC=(function(){
   var HOUR=3600000, DAY=24*HOUR;
   var SOURCES=[
     {id:'cis',            key:'cv_exc_cis',            label:'CIS',             test:/(^|\/)cis\.html/i},
     {id:'powersearch',    key:'cv_exc_powersearch',    label:'Power Search',    test:/(^|\/)powersearch\.html/i},
-    {id:'portal', key:'cv_exc_portal', label:'Portal', test:/(^|\/)portal\.html/i},
-    {id:'phone',          key:'rc_exceptions_v1',      label:'Phone',           test:/PhoneDashboard/i,
-     fresh:10*60000, max:10*60000,
-     detail:function(d){return d.mismatch+' mismatch, '+d.refused+' refused';}}
+    {id:'portal', key:'cv_exc_portal', label:'Portal', test:/(^|\/)portal\.html/i}
   ];
   var BY_ID={};
   SOURCES.forEach(function(s){BY_ID[s.id]=s;});
@@ -1261,7 +1252,7 @@ var EXC=(function(){
   else wire();
   setInterval(paint,15000);
   window.addEventListener('storage',function(e){
-    if(!e.key||e.key.indexOf('cv_exc_')===0||e.key==='rc_exceptions_v1')paint();
+    if(!e.key||e.key.indexOf('cv_exc_')===0)paint();
   });
   window.addEventListener('focus',paint);
 
