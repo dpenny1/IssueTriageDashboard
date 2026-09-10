@@ -930,7 +930,8 @@ function renderExcReason(issue){
   if(issue.assignees&&issue.assignees.length>0&&issue.pipeline&&(issue.pipeline.pipelineName==='New Issues'||issue.pipeline.pipelineName==='On Deck Priorities'))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Assigned issue in "'+esc(issue.pipeline.pipelineName)+'" — must be moved to In Progress</span>');
   if(isNIP(issue))parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Still in New Issues pipeline</span>');
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id))parts.push('<span class="badge" style="background:#fef3c7;color:#92400e">⚠ CS Item not in any tracking issue</span>');
-  if(!parts.length)parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Has CS label but no parent</span>');
+  if(!parts.length){var _csLbls=issue.labels.filter(function(l){return CS_LABELS.indexOf(l.toLowerCase())!==-1;});parts.push('<span class="badge" style="background:#fee2e2;color:#991b1b">⚠ Has CS label ('+esc(_csLbls.join(', '))+') but no parent</span>');}
+
   return parts.join('<div style="margin-top:4px"></div>');
 }
 
