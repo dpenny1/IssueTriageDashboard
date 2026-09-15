@@ -228,7 +228,7 @@ function isCsTaskItem(i){return i.labels.some(function(l){return l.toLowerCase()
 function isCsTaskItemNotTracking(i){return !!(S.zhToken&&isCsTaskItem(i)&&i.pipeline&&i.pipeline.pipelineName!=='CS Tracking Issues');}
 // Like isAssignedNotInProgress but also allows Review/QA as a valid pipeline for CS items.
 function isCsItemAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues'&&i.pipeline.pipelineName!=='Review/QA');}
-function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);if(isCsItem(i))return (isFinItem(i)&&!isReferencedInTrackingPS(i.id)&&!parentHasCsTracking(i))||isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isCsItemAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
+function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);if(isCsItem(i))return (isFinItem(i)&&!isReferencedInTrackingPS(i.id))||isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isCsItemAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
 function exceptionCount(issues){return issues.filter(issueHasException).length;}
 
 // ── Exceptions ────────────────────────────────────────────────────────────────
@@ -239,8 +239,7 @@ function getExceptions(){return notIgnoredOpen().filter(issueHasException);}
 function isClean(i){return !issueHasException(i);}
 
 function isCsItem(i){return (i.labels.some(function(l){return l.toLowerCase()==='cs item';})||isFinItem(i))&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
-function isReferencedInTrackingPS(issueId){var found=false;var all=S.issues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).concat(S.closedIssues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}); }));for(var i=0;i<all.length;i++){var lines=(all[i].body||'').split('\n');for(var j=0;j<lines.length;j++){var mm=lines[j].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!mm)continue;var rr=mm[1].match(/#(\d+)/);if(rr&&parseInt(rr[1])===issueId){found=true;break;}}if(found)break;}return found;}
-function parentHasCsTracking(i){if(!i.parent)return false;var pn=i.parent.issueNumber;var all=S.issues.concat(S.closedIssues);for(var k=0;k<all.length;k++){if(all[k].id===pn&&all[k].labels.some(function(l){return l.toLowerCase()==='cs tracking';}))return true;}return false;}
+function isReferencedInTrackingPS(issueId){var allIssues=S.issues.concat(S.closedIssues);var issue=allIssues.find(function(i){return i.id===issueId;});if(issue&&issue.parent){var pn=issue.parent.issueNumber;var parent=allIssues.find(function(i){return i.id===pn&&i.repo===issue.repo;});if(parent&&parent.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs tracking';}))return true;}var found=false;var taskItems=S.issues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).concat(S.closedIssues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}); }));for(var i=0;i<taskItems.length;i++){var lines=(taskItems[i].body||'').split('\n');for(var j=0;j<lines.length;j++){var mm=lines[j].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!mm)continue;var rr=mm[1].match(/#(\d+)/);if(rr&&parseInt(rr[1])===issueId){found=true;break;}}if(found)break;}return found;}
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
 function loadWarnDismissed(){try{var v=localStorage.getItem(PS_WARN_DISMISSED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveWarnDismissed(){try{localStorage.setItem(PS_WARN_DISMISSED_KEY,JSON.stringify(S.warnDismissed));}catch(e){}}
@@ -784,7 +783,7 @@ function issueRow(iss,showClosed,showRestore){
     if(isCsTaskItem(iss)){
       if(isCsTaskItemNotTracking(iss))warnings.push('⚠ CS Task Item not in CS Tracking Issues pipeline');
     }else{
-      if(isFinItem(iss)&&!isReferencedInTrackingPS(iss.id)&&!parentHasCsTracking(iss))warnings.push('⚠ Not in any CS tracking issue');
+      if(isFinItem(iss)&&!isReferencedInTrackingPS(iss.id))warnings.push('⚠ Not in any CS tracking issue');
       if(isMissingParent(iss))warnings.push('⚠ Has CS label but no parent');
       if(isNIP(iss))warnings.push('⚠ Still in New Issues pipeline');
       if(isAssignedInNIP(iss))warnings.push('⚠ Assigned but still in New Issues pipeline');
