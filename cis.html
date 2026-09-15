@@ -690,7 +690,7 @@ function isClosedException(issue){
   var hasCSLabel=lbls.some(function(l){return CS_LABELS.indexOf(l)!==-1;});
   if(!hasCSLabel)return false;
   if(hasCSItem&&!isReferencedInTracking(issue.id))return true;
-  if(hasCSItem&&!issue.parent)return true;
+  if(hasCSItem&&!issue.parent&&!isReferencedInTracking(issue.id))return true;
   if(hasCSLabel&&!hasTesting&&!issue.closedByPR&&!isReferencedInTracking(issue.id))return true;
   return false;
 }
