@@ -624,7 +624,7 @@ renderTileChips();
      to 24h, hidden after that.                                             -->
 <script>
 var EXC=(function(){
-  var HOUR=3600000, DAY=24*HOUR;
+  var HOUR=3600000, DAY=24*HOUR, MAX_AGE=3*DAY, STALE_AGE=2*HOUR;
   var SOURCES=[
     {id:'cis',            key:'cv_exc_cis',            label:'CIS',             test:/(^|\/)cis\.html/i},
     {id:'powersearch',    key:'cv_exc_powersearch',    label:'Power Search',    test:/(^|\/)powersearch\.html/i},
@@ -640,8 +640,8 @@ var EXC=(function(){
       var n=(typeof d.total==='number')?d.total:d.n;
       if(typeof n!=='number')return null;
       var age=Date.now()-d.ts;
-      if(age>(s.max||DAY))return null;
-      return {n:n,age:age,stale:age>(s.fresh||HOUR),data:d};
+      if(age>(s.max||MAX_AGE))return null;
+      return {n:n,age:age,stale:age>(s.fresh||STALE_AGE),data:d};
     }catch(e){ return null; }
   }
 
@@ -699,6 +699,7 @@ var EXC=(function(){
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wire);
   else wire();
+  setTimeout(paint,800);
   setInterval(paint,15000);
   window.addEventListener('storage',function(e){
     if(!e.key||e.key.indexOf('cv_exc_')===0)paint();
