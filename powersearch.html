@@ -239,12 +239,33 @@ function getExceptions(){return notIgnoredOpen().filter(issueHasException);}
 function isClean(i){return !issueHasException(i);}
 function loadClosedFinExcIgnored(){try{var v=localStorage.getItem(PS_CLOSED_FIN_EXC_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveClosedFinExcIgnored(){try{localStorage.setItem(PS_CLOSED_FIN_EXC_KEY,JSON.stringify(S.closedFinExcIgnored));}catch(e){}}
-function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S.closedFinExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;var ll=issue.labels.map(function(l){return l.toLowerCase();});if(!FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;}))return false;if(ll.indexOf('cs in testing')!==-1)return false;if(issue.hasApprovedComment)return false;return true;}
+function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S.closedFinExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;var ll=issue.labels.map(function(l){return l.toLowerCase();});if(ll.indexOf('cs task item')!==-1)return false;if(!FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;}))return false;if(ll.indexOf('cs in testing')!==-1)return false;if(issue.hasApprovedComment)return false;return true;}
 function getClosedFinExceptions(){return S.closedIssues.filter(function(i){return isClosedFinException(i);});}
 function ignoreClosedFinExc(key){if(S.closedFinExcIgnored.indexOf(key)===-1)S.closedFinExcIgnored.push(key);saveClosedFinExcIgnored();renderMain();}
 
 function isCsItem(i){return (i.labels.some(function(l){return l.toLowerCase()==='cs item';})||isFinItem(i))&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
-function isReferencedInTrackingPS(issueId){var allIssues=S.issues.concat(S.closedIssues);var issue=allIssues.find(function(i){return i.id===issueId;});if(issue&&issue.parent){var pn=issue.parent.issueNumber;var parent=allIssues.find(function(i){return i.id===pn&&i.repo===issue.repo;});if(parent&&parent.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs tracking';}))return true;}var found=false;var taskItems=S.issues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).concat(S.closedIssues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}); }));for(var i=0;i<taskItems.length;i++){var lines=(taskItems[i].body||'').split('\n');for(var j=0;j<lines.length;j++){var mm=lines[j].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!mm)continue;var rr=mm[1].match(/#(\d+)/);if(rr&&parseInt(rr[1])===issueId){found=true;break;}}if(found)break;}return found;}
+function isReferencedInTrackingPS(issueId){
+  var allIssues=S.issues.concat(S.closedIssues);
+  // Walk the ancestor chain up to 5 levels — dev sometimes nests issues under
+  // an intermediate parent that is not itself a CS Task Item.
+  var startIss=allIssues.find(function(i){return i.id===issueId;});
+  if(startIss){
+    var cur=startIss;var seen={};var depth=0;
+    while(cur&&cur.parent&&depth<5){
+      var curKey=cur.id+'_'+cur.repo;if(seen[curKey])break;seen[curKey]=true;
+      var pNum=cur.parent.issueNumber;var pRepo=cur.repo;
+      var par=allIssues.find(function(i){return i.id===pNum&&i.repo===pRepo;});
+      if(!par)break;
+      if(par.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs tracking';}))return true;
+      cur=par;depth++;
+    }
+  }
+  // Fallback: body checklist scan on all CS Task Items
+  var found=false;
+  var taskItems=S.issues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).concat(S.closedIssues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}); }));
+  for(var i=0;i<taskItems.length;i++){var lines=(taskItems[i].body||'').split('\n');for(var j=0;j<lines.length;j++){var mm=lines[j].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!mm)continue;var rr=mm[1].match(/#(\d+)/);if(rr&&parseInt(rr[1])===issueId){found=true;break;}}if(found)break;}
+  return found;
+}
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
 function loadWarnDismissed(){try{var v=localStorage.getItem(PS_WARN_DISMISSED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveWarnDismissed(){try{localStorage.setItem(PS_WARN_DISMISSED_KEY,JSON.stringify(S.warnDismissed));}catch(e){}}
@@ -1226,7 +1247,10 @@ function clearPsHistory(){if(!confirm('Clear all report history?'))return;localS
 function renderPsReport(){
   var snap=getPsCurrentSnapshot();
   var history=loadPsHistory();
-  var h='<div style="max-width:900px">';
+  var h='<div style="width:100%">';
+  // Scanner first
+  h+=renderPsMismatchPanel();
+  // Weekly snapshot
   h+='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #7c3aed">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
   h+='<div style="font-size:15px;font-weight:700;color:#1e1b4b">📊 Financials Weekly Snapshot</div>';
@@ -1239,7 +1263,7 @@ function renderPsReport(){
     h+='</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Tracking Issue</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th></tr></thead><tbody>';
     snap.rows.forEach(function(r){h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a> <span style="color:#374151">'+esc(r.title)+'</span></td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+r.closed+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+r.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';});
     h+='</tbody></table></div>';
-  }else{h+='<div style="color:#9ca3af;font-size:13px">No Financials CS Task Item issues found. Issues need "Financials Query" or "Financials Reports" labels AND "CS Task Item" label.</div>';}
+  }else{h+='<div style="color:#9ca3af;font-size:13px">No Financials CS Task Item issues found. Issues need "Financials Query" or "Financials Report" labels AND "CS Task Item" label.</div>';}
   h+='</div>';
   if(history.length){
     h+='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px">';
@@ -1248,7 +1272,6 @@ function renderPsReport(){
     history.slice().reverse().forEach(function(row,idx){var realIdx=history.length-1-idx;h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px;font-weight:600;color:#374151">'+esc(row.date)+'</td><td style="padding:8px 13px;text-align:center;font-weight:700">'+row.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+row.closed+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+row.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+row.noIssue+'</td><td style="padding:8px 13px"><button class="btn-d" style="padding:2px 8px;font-size:11px" onclick="delPsRptRow('+realIdx+')">✕</button></td></tr>';});
     h+='</tbody></table></div></div>';
   }
-  h+=renderPsMismatchPanel();
   h+='</div>';
   return h;
 }
