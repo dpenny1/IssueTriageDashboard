@@ -215,7 +215,7 @@ var S={
 };
 var STORAGE_KEY='ps_issues_cache_v1',PROFILES_KEY='ps_profiles_v1',IGNORED_KEY='ps_ignored_v1',PS_WARN_DISMISSED_KEY='ps_warn_dismissed_v1',PS_CLOSED_FIN_EXC_KEY='ps_closed_fin_exc_ignored_v1';
 var CS_LABELS_PS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
-var FIN_LABELS=['financials query','financials reports'];
+var FIN_LABELS=['financials query','financials report'];
 var PS_REPORT_HISTORY_KEY='ps_report_history_v1',PS_SCAN_DISMISSED_KEY='ps_scan_dismissed_v1';
 function isFinItem(i){return i.labels.some(function(l){return FIN_LABELS.indexOf(l.toLowerCase())!==-1;});}
 function hasCS(i){return i.labels.some(function(l){return CS_LABELS_PS.indexOf(l.toLowerCase())!==-1;});}
@@ -1130,15 +1130,29 @@ function showDiagModal(){
   document.getElementById('diagIssueNum').value='';
   var st=document.getElementById('diagResult');
   if(st){
-    st.innerHTML='<div style="font-size:12px;background:#f8faff;border:1px solid #e0e7ff;'+
+    // Closed financials exception pipeline breakdown
+  var cfHasFin=S.closedIssues.filter(function(i){var ll=i.labels.map(function(l){return l.toLowerCase();});return FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;});});
+  var cfNoTesting=cfHasFin.filter(function(i){return i.labels.map(function(l){return l.toLowerCase();}).indexOf('cs in testing')===-1;});
+  var cfNoApproved=cfNoTesting.filter(function(i){return !i.hasApprovedComment;});
+  var cfNotIgnored=cfNoApproved.filter(function(i){return S.closedFinExcIgnored.indexOf(i.id+'_'+i.repo)===-1;});
+  // Sample unique label names from closed issues (first 8 unique)
+  var closedLabelSample={};S.closedIssues.forEach(function(i){i.labels.forEach(function(l){closedLabelSample[l.toLowerCase()]=l;});});
+  var finRelated=Object.keys(closedLabelSample).filter(function(k){return k.indexOf('financ')!==-1||k.indexOf('report')!==-1;});
+  st.innerHTML='<div style="font-size:12px;background:#f8faff;border:1px solid #e0e7ff;'+
       'border-radius:8px;padding:10px 13px;margin-bottom:12px;line-height:1.7">'+
       '<strong>Tab state</strong><br>'+
       'open exceptions: <strong>'+getExceptions().length+'</strong> &nbsp;·&nbsp; '+
       'closed fin exceptions: <strong>'+getClosedFinExceptions().length+'</strong> &nbsp;·&nbsp; '+
-      'active tab: <strong>'+esc(S.activeTab)+'</strong> &nbsp;·&nbsp; '+
-      'auto-jump armed: <strong>'+(S._tabAuto?'yes':'no (you picked a tab)')+'</strong><br>'+
+      'active tab: <strong>'+esc(S.activeTab)+'</strong><br>'+
       'open issues: '+S.issues.length+' &nbsp;·&nbsp; closed issues: '+S.closedIssues.length+' &nbsp;·&nbsp; ZenHub: '+(S.zhConnected?'connected':'not connected')+
-      ' &nbsp;·&nbsp; ignored: '+S.ignored.length+' &nbsp;·&nbsp; dismissed: '+S.warnDismissed.length+
+      '</div>'+
+      '<div style="font-size:12px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;padding:10px 13px;margin-bottom:12px;line-height:1.9">'+
+      '<strong>Closed fin exception pipeline</strong> (looking for labels: '+FIN_LABELS.map(function(f){return '<code>'+esc(f)+'</code>';}).join(', ')+')<br>'+
+      '① Has financials label: <strong>'+cfHasFin.length+'</strong><br>'+
+      '② No "cs in testing": <strong>'+cfNoTesting.length+'</strong><br>'+
+      '③ No "CS Approved" comment: <strong>'+cfNoApproved.length+'</strong><br>'+
+      '④ Not dismissed: <strong>'+cfNotIgnored.length+'</strong> ← should match Exceptions tab count<br>'+
+      (finRelated.length?'Finance-related labels found in closed data: '+finRelated.map(function(l){return '<code>'+esc(closedLabelSample[l])+'</code>';}).join(', ')+'<br>':'<span style="color:#dc2626">⚠ No finance-related labels found in closed issues at all</span><br>')+
       '</div>';
   }
   document.getElementById('diagModal').style.display='flex';
