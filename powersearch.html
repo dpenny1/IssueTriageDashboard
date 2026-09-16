@@ -521,6 +521,26 @@ async function loadIssues(){
         milestone:iss.milestone?iss.milestone.title:null
       });
     });
+    // Fetch ALL closed financials issues regardless of age (since30 misses older ones)
+    var closedFinSeen={};closed.filter(function(c){return c.repo===repo;}).forEach(function(c){closedFinSeen[c.id]=true;});
+    for(var fli=0;fli<FIN_LABELS.length;fli++){
+      setLoMsg('Loading closed financials ('+FIN_LABELS[fli]+') from '+repo+'...');
+      var finCd=await ghFetchAll('/repos/'+repo+'/issues?state=closed&labels='+encodeURIComponent(FIN_LABELS[fli])+'&sort=updated&direction=desc',10);
+      finCd.forEach(function(iss){
+        if(iss.pull_request)return;
+        if(closedFinSeen[iss.number])return;
+        closedFinSeen[iss.number]=true;
+        closed.push({
+          id:iss.number,repo:repo,title:iss.title,
+          labels:iss.labels.map(function(l){return l.name;}),
+          assignees:iss.assignees.map(function(a){return a.login;}),
+          createdAt:iss.created_at,closedAt:iss.closed_at,
+          closedBy:(iss.closed_by&&iss.closed_by.login)||'',
+          url:iss.html_url,state:'closed',
+          milestone:iss.milestone?iss.milestone.title:null
+        });
+      });
+    }
   }
   S.issues=open;
   S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
@@ -582,7 +602,7 @@ async function doRefresh(){
   showLoadingOverlay('Refreshing...');
   try{
     S.labelColors={};S.labelNames={};
-    await loadLabelColors();await loadIssues();await loadSubIssueParents();
+    await loadLabelColors();await loadIssues();await loadSubIssueParents();await loadClosedFinComments();
     saveCache();populateFilters();buildTabs();renderMain();
     if(S.zhToken&&S.zhWorkspace)zhLoad();
     else setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
