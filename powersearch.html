@@ -725,6 +725,7 @@ function renderStats(){
     {n:csItemSrc.length,exc:0,l:'CS Items',c:'#0891b2',tab:'csitem'},
     {n:taskItems.length,exc:0,l:'CS Task Items',c:csColor,tab:'taskitem'},
     {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#059669',tab:'closed'},
+    {n:S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length,exc:0,l:'CS In Testing',c:'#0d9488',tab:'csintesting'},
     {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'},
     {n:finTrackingCount,exc:0,l:'Financials Report',c:'#7c3aed',tab:'report'}
   ];
@@ -752,8 +753,9 @@ var TAB_DEFS=[
   {id:'csitem',label:'CS Items',color:'#0891b2'},
   {id:'taskitem',label:'CS Task Items',color:'#16a34a'},
   {id:'closed',label:'Recently Closed',color:'#059669'},
-  {id:'ignored',label:'Ignored',color:'#6b7280'}
-  ,{id:'report',label:'Report',color:'#7c3aed'}
+  {id:'csintesting',label:'CS In Testing',color:'#0d9488'},
+  {id:'ignored',label:'Ignored',color:'#6b7280'},
+  {id:'report',label:'Report',color:'#7c3aed'}
 ];
 
 function tabCount(id){
@@ -762,6 +764,7 @@ function tabCount(id){
   if(id==='taskitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
   if(id==='csitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&isCsItem(i);}).length;
   if(id==='closed')return S.closedIssues.length;
+  if(id==='csintesting')return S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
   if(id==='ignored')return S.ignored.length;
   if(id==='report')return 0;
   return 0;
@@ -1067,6 +1070,28 @@ function renderMain(){
   if(tab==='closed'){
     var filtered=applyFilters(S.closedIssues);
     content.innerHTML=closedTable(filtered);
+    return;
+  }
+
+  if(tab==='csintesting'){
+    var csitIssues=S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});});
+    var filtered=applyFilters(csitIssues);
+    var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#0f766e,#0d9488)"><span class="gt">CS In Testing — Closed &amp; Approved <span class="gc">'+filtered.length+'</span></span></div>';
+    h+='<div class="tw2"><table><thead><tr>';
+    h+='<th onclick="thClick(\'id\')">No.'+thArrow('id')+'</th>';
+    h+='<th onclick="thClick(\'title\')">Title'+thArrow('title')+'</th>';
+    if(S.repos.length>1)h+='<th onclick="thClick(\'repo\')">Repo'+thArrow('repo')+'</th>';
+    h+='<th onclick="thClick(\'assignee\')">Assignee'+thArrow('assignee')+'</th>';
+    h+='<th onclick="thClick(\'closed\')">Closed'+thArrow('closed')+'</th>';
+    h+='<th>By</th>';
+    if(S.zhToken)h+='<th>Pipeline</th>';
+    h+='</tr></thead><tbody>';
+    if(!filtered.length){h+='<tr><td colspan="99" style="text-align:center;padding:24px;color:#9ca3af;font-style:italic">No closed CS In Testing issues found.</td></tr>';}
+    var prev=S.sortState;S.sortState={col:'closed',dir:-1};
+    sortIssues(filtered).forEach(function(iss){h+=issueRow(iss,true,false);});
+    S.sortState=prev;
+    h+='</tbody></table></div></div>';
+    content.innerHTML=h;
     return;
   }
 
