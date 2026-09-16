@@ -698,12 +698,14 @@ function renderStats(){
   var taskItems=clean.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
   var csItemSrc=clean.filter(isCsItem);
   var csColor='#'+(S.labelColors['cs task item']||'16a34a');
+  var finTrackingCount=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isFinItem(i);}).length;
   var stats=[
     {n:newSrc.length,exc:0,l:'New Issues',c:'#4338ca',tab:'all'},
     {n:csItemSrc.length,exc:0,l:'CS Items',c:'#0891b2',tab:'csitem'},
     {n:taskItems.length,exc:0,l:'CS Task Items',c:csColor,tab:'taskitem'},
     {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#059669',tab:'closed'},
-    {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'}
+    {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'},
+    {n:finTrackingCount,exc:0,l:'Financials Report',c:'#7c3aed',tab:'report'}
   ];
   // Exceptions lead the row, and only show up when there is something to fix
   var closedFinExc=getClosedFinExceptions();
@@ -1131,11 +1133,12 @@ function showDiagModal(){
     st.innerHTML='<div style="font-size:12px;background:#f8faff;border:1px solid #e0e7ff;'+
       'border-radius:8px;padding:10px 13px;margin-bottom:12px;line-height:1.7">'+
       '<strong>Tab state</strong><br>'+
-      'exceptions: <strong>'+getExceptions().length+'</strong> &nbsp;·&nbsp; '+
+      'open exceptions: <strong>'+getExceptions().length+'</strong> &nbsp;·&nbsp; '+
+      'closed fin exceptions: <strong>'+getClosedFinExceptions().length+'</strong> &nbsp;·&nbsp; '+
       'active tab: <strong>'+esc(S.activeTab)+'</strong> &nbsp;·&nbsp; '+
       'auto-jump armed: <strong>'+(S._tabAuto?'yes':'no (you picked a tab)')+'</strong><br>'+
-      'issues loaded: '+S.issues.length+' &nbsp;·&nbsp; ZenHub: '+(S.zhConnected?'connected':'not connected')+
-      ' &nbsp;·&nbsp; ignored: '+S.ignored.length+' &nbsp;·&nbsp; dismissed warnings: '+S.warnDismissed.length+
+      'open issues: '+S.issues.length+' &nbsp;·&nbsp; closed issues: '+S.closedIssues.length+' &nbsp;·&nbsp; ZenHub: '+(S.zhConnected?'connected':'not connected')+
+      ' &nbsp;·&nbsp; ignored: '+S.ignored.length+' &nbsp;·&nbsp; dismissed: '+S.warnDismissed.length+
       '</div>';
   }
   document.getElementById('diagModal').style.display='flex';
