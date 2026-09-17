@@ -737,10 +737,16 @@ function renderStats(){
   var h='';
   stats.forEach(function(s){
     h+='<div class="sc2" style="border-top-color:'+s.c+'" onclick="switchTab(\''+s.tab+'\')">';
-    h+='<div style="display:flex;align-items:flex-start;justify-content:center;gap:5px">';
-    h+='<div class="sn" style="color:'+s.c+'">'+s.n+'</div>';
-    if(s.exc>0)h+='<span style="background:#dc2626;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:2px 6px;margin-top:7px;line-height:1.4;white-space:nowrap">'+s.exc+'</span>';
-    h+='</div>';
+    if(s.tab==='report'){
+      h+='<div class="sn" style="color:'+s.c+';font-size:2rem;position:relative;display:inline-block">📋';
+      if(_psScanResults!==null&&_psScanResults.length>0)h+='<span style="position:absolute;top:-6px;right:-14px;background:#dc2626;color:#fff;font-size:11px;font-weight:800;padding:1px 6px;border-radius:999px;min-width:18px;text-align:center">'+_psScanResults.length+'</span>';
+      h+='</div>';
+    }else{
+      h+='<div style="display:flex;align-items:flex-start;justify-content:center;gap:5px">';
+      h+='<div class="sn" style="color:'+s.c+'">'+s.n+'</div>';
+      if(s.exc>0)h+='<span style="background:#dc2626;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:2px 6px;margin-top:7px;line-height:1.4;white-space:nowrap">'+s.exc+'</span>';
+      h+='</div>';
+    }
     h+='<div class="sl">'+s.l+'</div></div>';
   });
   document.getElementById('statGrid').innerHTML=h;
