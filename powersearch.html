@@ -213,7 +213,7 @@ var S={
   warnDismissed:[],
   _tabAuto:true
 };
-var STORAGE_KEY='ps_issues_cache_v1',PROFILES_KEY='ps_profiles_v1',IGNORED_KEY='ps_ignored_v1',PS_WARN_DISMISSED_KEY='ps_warn_dismissed_v1',PS_CLOSED_FIN_EXC_KEY='ps_closed_fin_exc_ignored_v1';
+var STORAGE_KEY='ps_issues_cache_v2',PROFILES_KEY='ps_profiles_v1',IGNORED_KEY='ps_ignored_v1',PS_WARN_DISMISSED_KEY='ps_warn_dismissed_v1',PS_CLOSED_FIN_EXC_KEY='ps_closed_fin_exc_ignored_v1';
 var CS_LABELS_PS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
 var FIN_LABELS=['financials query','financials report'];
 var PS_REPORT_HISTORY_KEY='ps_report_history_v1',PS_SCAN_DISMISSED_KEY='ps_scan_dismissed_v1';
@@ -480,7 +480,27 @@ async function ghFetch(path){
 async function ghPatch(path,body){var r=await fetch('https://api.github.com'+path,{method:'PATCH',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);return r.json();}
 async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{headers:{'X-Authentication-Token':S.zhToken}});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
 async function zhPost(path,data){var r=await fetch('https://api.zenhub.com'+path,{method:'POST',headers:{'X-Authentication-Token':S.zhToken,'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);if(r.status===204||r.headers.get('content-length')==='0')return{};var t=await r.text();return t?JSON.parse(t):{};}
-async function loadSubIssueParents(){var parents=S.issues.filter(function(i){return i.subIssuesTotal>0;});await Promise.all(parents.map(async function(p){try{var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');if(Array.isArray(subs)){subs.forEach(function(sub){var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});if(child&&!child.parent)child.parent={issueNumber:p.id};});}}catch(e){};}));}
+async function loadSubIssueParents(){
+  // sub_issues_summary is often absent from the GitHub list API, so subIssuesTotal is unreliable.
+  // Always query the /sub_issues endpoint for all open CS Task Items so we reliably find children.
+  var seen={};
+  var parents=S.issues.filter(function(i){
+    var k=i.id+'_'+i.repo;if(seen[k])return false;seen[k]=true;
+    return i.subIssuesTotal>0||i.labels.some(function(l){return l.toLowerCase()==='cs task item';});
+  });
+  await Promise.all(parents.map(async function(p){
+    try{
+      var subs=await ghFetch('/repos/'+p.repo+'/issues/'+p.id+'/sub_issues?per_page=100');
+      if(Array.isArray(subs)&&subs.length){
+        subs.forEach(function(sub){
+          var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})
+                    ||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});
+          if(child&&!child.parent)child.parent={issueNumber:p.id};
+        });
+      }
+    }catch(e){}
+  }));
+}
 async function loadClosedFinComments(){var candidates=S.closedIssues.filter(function(i){var ll=i.labels.map(function(l){return l.toLowerCase();});return FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;})&&ll.indexOf('cs in testing')===-1;});await Promise.all(candidates.map(async function(i){try{var comments=await ghFetch('/repos/'+i.repo+'/issues/'+i.id+'/comments?per_page=100');i.hasApprovedComment=Array.isArray(comments)&&comments.some(function(c){return (c.body||'').toLowerCase().indexOf('cs approved')!==-1;});}catch(e){i.hasApprovedComment=false;}}));}
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed to move pipeline: '+e.message);}}
 var _panelStore={};var _panelIdx=0;
