@@ -239,8 +239,12 @@ function getExceptions(){return notIgnoredOpen().filter(issueHasException);}
 function isClean(i){return !issueHasException(i);}
 function loadClosedFinExcIgnored(){try{var v=localStorage.getItem(PS_CLOSED_FIN_EXC_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveClosedFinExcIgnored(){try{localStorage.setItem(PS_CLOSED_FIN_EXC_KEY,JSON.stringify(S.closedFinExcIgnored));}catch(e){}}
-function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S.closedFinExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;var ll=issue.labels.map(function(l){return l.toLowerCase();});if(ll.indexOf('cs task item')!==-1)return false;if(!FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;}))return false;if(ll.indexOf('cs in testing')!==-1)return false;if(issue.hasApprovedComment)return false;// Not an exception if its parent tracking issue is still open — closed sub-issues are normal while the tracking issue is in flight
-if(issue.parent){var parentOpen=S.issues.find(function(i){return i.id===issue.parent.issueNumber&&i.repo===issue.repo&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});if(parentOpen)return false;}return true;}
+function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S.closedFinExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;var ll=issue.labels.map(function(l){return l.toLowerCase();});if(ll.indexOf('cs task item')!==-1)return false;if(!FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;}))return false;if(ll.indexOf('cs in testing')!==-1)return false;if(issue.hasApprovedComment)return false;// Not an exception while its parent tracking issue is still open.
+// Check 1: native sub-issues or body-parsed **Parent:** — parent field set by loadSubIssueParents or issue loading
+if(issue.parent){var parentOpen=S.issues.find(function(i){return i.id===issue.parent.issueNumber&&i.repo===issue.repo&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});if(parentOpen)return false;}
+// Check 2: reverse-scan open tracking issue body checklists (catches relationships recorded on the parent, not the child)
+var openTracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&i.repo===issue.repo;});for(var _ti=0;_ti<openTracking.length;_ti++){var _lines=(openTracking[_ti].body||'').split('\n');for(var _li=0;_li<_lines.length;_li++){var _mm=_lines[_li].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!_mm)continue;var _rr=_mm[1].match(/#(\d+)/);if(_rr&&parseInt(_rr[1])===issue.id)return false;}}
+return true;}
 function getClosedFinExceptions(){return S.closedIssues.filter(function(i){return isClosedFinException(i);});}
 function ignoreClosedFinExc(key){if(S.closedFinExcIgnored.indexOf(key)===-1)S.closedFinExcIgnored.push(key);saveClosedFinExcIgnored();renderMain();}
 
@@ -533,14 +537,17 @@ async function loadIssues(){
     var cd=await ghFetchAll('/repos/'+repo+'/issues?state=closed&sort=updated&direction=desc&since='+since30,5);
     cd.forEach(function(iss){
       if(iss.pull_request)return;
+      var bodyParent=null;if(iss.body){var _pm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(_pm)bodyParent={issueNumber:parseInt(_pm[1])};}
       closed.push({
         id:iss.number,repo:repo,title:iss.title,
+        body:iss.body||'',
         labels:iss.labels.map(function(l){return l.name;}),
         assignees:iss.assignees.map(function(a){return a.login;}),
         createdAt:iss.created_at,closedAt:iss.closed_at,
         closedBy:(iss.closed_by&&iss.closed_by.login)||'',
         url:iss.html_url,state:'closed',
-        milestone:iss.milestone?iss.milestone.title:null
+        milestone:iss.milestone?iss.milestone.title:null,
+        parent:bodyParent
       });
     });
     // Fetch ALL closed financials issues regardless of age (since30 misses older ones)
@@ -552,14 +559,17 @@ async function loadIssues(){
         if(iss.pull_request)return;
         if(closedFinSeen[iss.number])return;
         closedFinSeen[iss.number]=true;
+        var bodyParentFin=null;if(iss.body){var _pmf=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(_pmf)bodyParentFin={issueNumber:parseInt(_pmf[1])};}
         closed.push({
           id:iss.number,repo:repo,title:iss.title,
+          body:iss.body||'',
           labels:iss.labels.map(function(l){return l.name;}),
           assignees:iss.assignees.map(function(a){return a.login;}),
           createdAt:iss.created_at,closedAt:iss.closed_at,
           closedBy:(iss.closed_by&&iss.closed_by.login)||'',
           url:iss.html_url,state:'closed',
-          milestone:iss.milestone?iss.milestone.title:null
+          milestone:iss.milestone?iss.milestone.title:null,
+          parent:bodyParentFin
         });
       });
     }
