@@ -659,6 +659,15 @@ function applyFilters(issues){
 // ── Publish this page's exception count for the other dashboards ─────────────
 // Read by the exception-badge script at the bottom of every page.
 function publishExceptions(n){
+  // If ZenHub should be connected but hasn't finished loading yet, don't overwrite
+  // a recent known-good non-zero count with 0 — it would make other pages lose the badge
+  // for the duration of the ZenHub reload (several seconds on every bgRefresh).
+  if(n===0&&S.zhToken&&S.zhWorkspace&&!S.zhConnected){
+    try{
+      var _prev=JSON.parse(localStorage.getItem('cv_exc_portal')||'null');
+      if(_prev&&_prev.n>0&&(Date.now()-_prev.ts)<1800000)return; // keep if <30min old
+    }catch(e){}
+  }
   try{localStorage.setItem('cv_exc_portal',JSON.stringify({n:n,ts:Date.now()}));}catch(e){}
   if(typeof EXC!=='undefined')EXC.paint();
 }
@@ -678,7 +687,7 @@ function renderStats(){
     {n:csOtherSrc.length,exc:0,l:'CS Items',c:'#0891b2',tab:'csother'},
     {n:enhSrc.length,exc:0,l:'Enhancements',c:'#d97706',tab:'enhancement'},
     {n:epaSrc.length,exc:0,l:'Enh. Pending Approval',c:'#7c3aed',tab:'epa'},
-    {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#059669',tab:'closed'},
+    {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#0369a1',tab:'closed'},
     {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'}
   ];
   // Exceptions lead the row, and only show up when there is something to fix
@@ -703,7 +712,7 @@ var TAB_DEFS=[
   {id:'csother',label:'CS Items',color:'#0891b2'},
   {id:'enhancement',label:'Enhancements',color:'#d97706'},
   {id:'epa',label:'Enh. Pending Approval',color:'#7c3aed'},
-  {id:'closed',label:'Recently Closed',color:'#059669'},
+  {id:'closed',label:'Recently Closed',color:'#0369a1'},
   {id:'ignored',label:'Ignored',color:'#6b7280'}
 ];
 
@@ -1256,6 +1265,7 @@ var EXC=(function(){
     if(!e.key||e.key.indexOf('cv_exc_')===0)paint();
   });
   window.addEventListener('focus',paint);
+  window.addEventListener('pageshow',function(e){if(e.persisted)paint();});
 
   return {paint:paint,wire:wire};
 })();

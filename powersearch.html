@@ -239,7 +239,8 @@ function getExceptions(){return notIgnoredOpen().filter(issueHasException);}
 function isClean(i){return !issueHasException(i);}
 function loadClosedFinExcIgnored(){try{var v=localStorage.getItem(PS_CLOSED_FIN_EXC_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveClosedFinExcIgnored(){try{localStorage.setItem(PS_CLOSED_FIN_EXC_KEY,JSON.stringify(S.closedFinExcIgnored));}catch(e){}}
-function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S.closedFinExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;var ll=issue.labels.map(function(l){return l.toLowerCase();});if(ll.indexOf('cs task item')!==-1)return false;if(!FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;}))return false;if(ll.indexOf('cs in testing')!==-1)return false;if(issue.hasApprovedComment)return false;return true;}
+function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S.closedFinExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;var ll=issue.labels.map(function(l){return l.toLowerCase();});if(ll.indexOf('cs task item')!==-1)return false;if(!FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;}))return false;if(ll.indexOf('cs in testing')!==-1)return false;if(issue.hasApprovedComment)return false;// Not an exception if its parent tracking issue is still open — closed sub-issues are normal while the tracking issue is in flight
+if(issue.parent){var parentOpen=S.issues.find(function(i){return i.id===issue.parent.issueNumber&&i.repo===issue.repo&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});if(parentOpen)return false;}return true;}
 function getClosedFinExceptions(){return S.closedIssues.filter(function(i){return isClosedFinException(i);});}
 function ignoreClosedFinExc(key){if(S.closedFinExcIgnored.indexOf(key)===-1)S.closedFinExcIgnored.push(key);saveClosedFinExcIgnored();renderMain();}
 
@@ -724,7 +725,7 @@ function renderStats(){
     {n:newSrc.length,exc:0,l:'New Issues',c:'#4338ca',tab:'all'},
     {n:csItemSrc.length,exc:0,l:'CS Items',c:'#0891b2',tab:'csitem'},
     {n:taskItems.length,exc:0,l:'CS Task Items',c:csColor,tab:'taskitem'},
-    {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#059669',tab:'closed'},
+    {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#0369a1',tab:'closed'},
     {n:S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length,exc:0,l:'CS In Testing',c:'#0d9488',tab:'csintesting'},
     {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'},
     {n:finTrackingCount,exc:0,l:'Financials Report',c:'#7c3aed',tab:'report'}
@@ -758,7 +759,7 @@ var TAB_DEFS=[
   {id:'all',label:'New Issues',color:'#4338ca'},
   {id:'csitem',label:'CS Items',color:'#0891b2'},
   {id:'taskitem',label:'CS Task Items',color:'#16a34a'},
-  {id:'closed',label:'Recently Closed',color:'#059669'},
+  {id:'closed',label:'Recently Closed',color:'#0369a1'},
   {id:'csintesting',label:'CS In Testing',color:'#0d9488'},
   {id:'ignored',label:'Ignored',color:'#6b7280'},
   {id:'report',label:'Report',color:'#7c3aed'}
@@ -795,7 +796,9 @@ function buildTabs(){
     if(t.onlyIfAny&&!excN)return;
     var on=S.activeTab===t.id?' on':'';
     var cnt=tabCount(t.id);
-    h+='<button class="tab'+on+'" onclick="switchTab(\''+t.id+'\')" style="'+(on?' color:'+t.color+';border-top:2px solid '+t.color:'')+'">';
+    // Use the same dynamic label-color logic as renderStats for taskitem
+    var tColor=t.id==='taskitem'?'#'+(S.labelColors['cs task item']||'16a34a'):t.color;
+    h+='<button class="tab'+on+'" onclick="switchTab(\''+t.id+'\')" style="'+(on?' color:'+tColor+';border-top:2px solid '+tColor:'')+'">';
     h+=t.label+'<span class="tc">'+cnt+'</span></button>';
   });
   document.getElementById('tabsWrap').innerHTML=h;
