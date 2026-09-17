@@ -1274,24 +1274,75 @@ function getPsCurrentSnapshot(){
   var tracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isFinItem(i);});
   if(!tracking.length)return null;
   var allIssues=S.issues.concat(S.closedIssues);
-  var rows=[],totalAll=0,closedAll=0,openAll=0,noIssueAll=0,nums=[];
+
+  // Build a quick-lookup set of tracking issue keys
+  var trackingSet={};
+  tracking.forEach(function(t){trackingSet[t.id+'_'+t.repo]=true;});
+
+  // Group linked tracking issues: if tracking issue B's parent is tracking issue A,
+  // merge them into one snapshot row so they don't appear as separate lines.
+  var assigned={};  // key -> groupIndex
+  var groups=[];
+
+  // First pass: top-level tracking issues (parent is not another tracking issue)
   tracking.forEach(function(issue){
-    nums.push(issue.id);
-    // Use native sub-issues: any loaded issue whose parent points to this tracking issue
-    var subs=allIssues.filter(function(i){return i.parent&&i.parent.issueNumber===issue.id&&i.repo===issue.repo;});
-    var t=subs.length;
-    var c=subs.filter(function(i){
-      if(i.state!=='closed')return false;
-      var ll=i.labels.map(function(l){return l.toLowerCase();});
-      return ll.indexOf('cs in testing')!==-1||(i.hasApprovedComment===true);
-    }).length;
-    var o=subs.filter(function(i){return i.state==='open';}).length;
-    // No issue raised: body checklist lines without any issue reference
-    var n=0;
-    (issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(chk&&!/#\d+/.test(chk[1]))n++;});
-    var r={id:issue.id,title:issue.title,url:issue.url,total:t,closed:c,open:o,noIssue:n};
+    var key=issue.id+'_'+issue.repo;
+    var parentKey=issue.parent?(issue.parent.issueNumber+'_'+issue.repo):null;
+    if(!parentKey||!trackingSet[parentKey]){
+      assigned[key]=groups.length;
+      groups.push([issue]);
+    }
+  });
+
+  // Second pass: children whose parent IS a tracking issue — join that group
+  tracking.forEach(function(issue){
+    var key=issue.id+'_'+issue.repo;
+    if(assigned[key]!==undefined)return;
+    var parentKey=issue.parent?(issue.parent.issueNumber+'_'+issue.repo):null;
+    if(parentKey&&assigned[parentKey]!==undefined){
+      assigned[key]=assigned[parentKey];
+      groups[assigned[parentKey]].push(issue);
+    }
+  });
+
+  // Safety: any still-unassigned issue (deeper nesting) gets its own group
+  tracking.forEach(function(issue){
+    var key=issue.id+'_'+issue.repo;
+    if(assigned[key]===undefined){assigned[key]=groups.length;groups.push([issue]);}
+  });
+
+  var rows=[],totalAll=0,closedAll=0,openAll=0,noIssueAll=0,nums=[];
+
+  groups.forEach(function(group){
+    // Build a set of IDs in this group so we don't count sibling tracking issues as sub-issues
+    var groupIds={};
+    group.forEach(function(g){groupIds[g.id+'_'+g.repo]=true;nums.push(g.id);});
+
+    var t=0,c=0,o=0,n=0;
+    group.forEach(function(issue){
+      var subs=allIssues.filter(function(i){
+        return i.parent&&i.parent.issueNumber===issue.id&&i.repo===issue.repo
+               &&!groupIds[i.id+'_'+i.repo]; // exclude sibling tracking issues
+      });
+      t+=subs.length;
+      c+=subs.filter(function(i){
+        if(i.state!=='closed')return false;
+        var ll=i.labels.map(function(l){return l.toLowerCase();});
+        return ll.indexOf('cs in testing')!==-1||(i.hasApprovedComment===true);
+      }).length;
+      o+=subs.filter(function(i){return i.state==='open';}).length;
+      (issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(chk&&!/#\d+/.test(chk[1]))n++;});
+    });
+
+    // Primary issue = the one whose parent is not another member of this group
+    var groupIdNums=group.map(function(g){return g.id;});
+    var primary=group.find(function(g){return !g.parent||groupIdNums.indexOf(g.parent.issueNumber)===-1;})||group[0];
+    var linked=group.filter(function(g){return g!==primary;});
+
+    var r={id:primary.id,title:primary.title,url:primary.url,linked:linked,total:t,closed:c,open:o,noIssue:n};
     rows.push(r);totalAll+=t;closedAll+=c;openAll+=o;noIssueAll+=n;
   });
+
   rows.sort(function(a,b){return b.id-a.id;});
   return{date:todayStr(),tracking:nums.join('/'),total:totalAll,closed:closedAll,open:openAll,noIssue:noIssueAll,rows:rows};
 }
@@ -1317,7 +1368,7 @@ function renderPsReport(){
   h+='</div></div>';
   if(snap){
     h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Tracking Issue</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total Sub-Issues</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed &amp; Approved</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th></tr></thead><tbody>';
-    snap.rows.forEach(function(r){h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a> <span style="color:#374151">'+esc(r.title)+'</span></td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+r.closed+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+r.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';});
+    snap.rows.forEach(function(r){var lh='';if(r.linked&&r.linked.length){r.linked.forEach(function(li){lh+=' <a href="'+esc(li.url)+'" target="_blank" style="color:#9ca3af;font-size:11px;font-weight:600;white-space:nowrap" title="'+esc(li.title)+'">+#'+li.id+'</a>';});}h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span></td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+r.closed+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+r.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';});
     h+='</tbody></table></div>';
   }else{h+='<div style="color:#9ca3af;font-size:13px">No Financials CS Task Item issues found. Issues need "Financials Query" or "Financials Report" labels AND "CS Task Item" label.</div>';}
   h+='</div>';
