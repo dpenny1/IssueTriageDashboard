@@ -1308,40 +1308,31 @@ function getPsCurrentSnapshot(){
   if(!tracking.length)return null;
   var allIssues=S.issues.concat(S.closedIssues);
 
-  // Build a quick-lookup set of tracking issue keys
-  var trackingSet={};
-  tracking.forEach(function(t){trackingSet[t.id+'_'+t.repo]=true;});
+  // Build lookup maps for tracking issues
+  var trackingById={};
+  tracking.forEach(function(t){trackingById[t.id+'_'+t.repo]=t;});
 
-  // Group linked tracking issues: if tracking issue B's parent is tracking issue A,
-  // merge them into one snapshot row so they don't appear as separate lines.
-  var assigned={};  // key -> groupIndex
-  var groups=[];
-
-  // First pass: top-level tracking issues (parent is not another tracking issue)
-  tracking.forEach(function(issue){
-    var key=issue.id+'_'+issue.repo;
-    var parentKey=issue.parent?(issue.parent.issueNumber+'_'+issue.repo):null;
-    if(!parentKey||!trackingSet[parentKey]){
-      assigned[key]=groups.length;
-      groups.push([issue]);
+  // Walk parent chain up to the root tracking issue — handles arbitrary depth (A→B→C all tracking)
+  function rootOf(issue){
+    var cur=issue;var depth=0;var visited={};
+    while(cur.parent&&depth<20){
+      var pKey=cur.parent.issueNumber+'_'+cur.repo;
+      if(!trackingById[pKey])break;          // parent is not a tracking issue — stop here
+      if(visited[cur.id+'_'+cur.repo])break;  // cycle guard
+      visited[cur.id+'_'+cur.repo]=true;
+      cur=trackingById[pKey];depth++;
     }
-  });
+    return cur;
+  }
 
-  // Second pass: children whose parent IS a tracking issue — join that group
+  // Group every tracking issue under its root; order-independent, any depth
+  var assigned={};var groups=[];var rootMap={};
   tracking.forEach(function(issue){
-    var key=issue.id+'_'+issue.repo;
-    if(assigned[key]!==undefined)return;
-    var parentKey=issue.parent?(issue.parent.issueNumber+'_'+issue.repo):null;
-    if(parentKey&&assigned[parentKey]!==undefined){
-      assigned[key]=assigned[parentKey];
-      groups[assigned[parentKey]].push(issue);
-    }
-  });
-
-  // Safety: any still-unassigned issue (deeper nesting) gets its own group
-  tracking.forEach(function(issue){
-    var key=issue.id+'_'+issue.repo;
-    if(assigned[key]===undefined){assigned[key]=groups.length;groups.push([issue]);}
+    var root=rootOf(issue);
+    var rootKey=root.id+'_'+root.repo;
+    var issKey=issue.id+'_'+issue.repo;
+    if(rootMap[rootKey]===undefined){rootMap[rootKey]=groups.length;groups.push([]);}
+    if(assigned[issKey]===undefined){groups[rootMap[rootKey]].push(issue);assigned[issKey]=rootMap[rootKey];}
   });
 
   var rows=[],totalAll=0,closedAll=0,openAll=0,noIssueAll=0,nums=[];
@@ -1367,9 +1358,8 @@ function getPsCurrentSnapshot(){
       (issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(chk&&!/#\d+/.test(chk[1]))n++;});
     });
 
-    // Primary issue = the one whose parent is not another member of this group
-    var groupIdNums=group.map(function(g){return g.id;});
-    var primary=group.find(function(g){return !g.parent||groupIdNums.indexOf(g.parent.issueNumber)===-1;})||group[0];
+    // Primary = the root: the one whose parent is not a tracking issue in this group
+    var primary=group.find(function(g){return !g.parent||!trackingById[g.parent.issueNumber+'_'+g.repo];})||group[0];
     var linked=group.filter(function(g){return g!==primary;});
 
     var r={id:primary.id,title:primary.title,url:primary.url,linked:linked,total:t,closed:c,open:o,noIssue:n};
