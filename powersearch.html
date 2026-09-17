@@ -225,7 +225,14 @@ function isAssignedInNIP(i){return !!(S.zhToken&&i.assignees&&i.assignees.length
 function isAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues');}
 function isUnassignedNotOnDeck(i){return !!(S.zhToken&&(!i.assignees||i.assignees.length===0)&&i.pipeline&&i.pipeline.pipelineName!=='Product Backlog');}
 function isCsTaskItem(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
-function isCsTaskItemNotTracking(i){return !!(S.zhToken&&isCsTaskItem(i)&&i.pipeline&&i.pipeline.pipelineName!=='CS Tracking Issues');}
+function isCsTaskItemNotTracking(i){
+  if(!S.zhToken||!isCsTaskItem(i)||!i.pipeline)return false;
+  if(i.pipeline.pipelineName==='CS Tracking Issues')return false;
+  // Sub-tracking issues (CS Task Items whose parent is also a CS Task Item) are exempt —
+  // they don't need to be in the CS Tracking Issues pipeline themselves.
+  if(i.parent){var allIss=S.issues.concat(S.closedIssues);var par=allIss.find(function(p){return p.id===i.parent.issueNumber&&p.repo===i.repo;});if(par&&isCsTaskItem(par))return false;}
+  return true;
+}
 // Like isAssignedNotInProgress but also allows Review/QA as a valid pipeline for CS items.
 function isCsItemAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues'&&i.pipeline.pipelineName!=='Review/QA');}
 function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);if(isCsItem(i))return (isFinItem(i)&&!isReferencedInTrackingPS(i.id))||isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isCsItemAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
@@ -1391,7 +1398,7 @@ function renderPsReport(){
   h+='</div></div>';
   if(snap){
     h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Tracking Issue</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total Sub-Issues</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed &amp; Approved</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th></tr></thead><tbody>';
-    snap.rows.forEach(function(r){var lh='';if(r.linked&&r.linked.length){r.linked.forEach(function(li){lh+=' <a href="'+esc(li.url)+'" target="_blank" style="color:#9ca3af;font-size:11px;font-weight:600;white-space:nowrap" title="'+esc(li.title)+'">+#'+li.id+'</a>';});}h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span></td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+r.closed+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+r.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';});
+    snap.rows.forEach(function(r){var lh='';if(r.linked&&r.linked.length){r.linked.forEach(function(li){lh+=' <a href="'+esc(li.url)+'" target="_blank" style="color:#9ca3af;font-weight:600;white-space:nowrap" title="'+esc(li.title)+'">+#'+li.id+'</a>';});}h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span></td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+r.closed+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+r.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';});
     h+='</tbody></table></div>';
   }else{h+='<div style="color:#9ca3af;font-size:13px">No Financials CS Task Item issues found. Issues need "Financials Query" or "Financials Report" labels AND "CS Task Item" label.</div>';}
   h+='</div>';
