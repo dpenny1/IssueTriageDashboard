@@ -485,7 +485,7 @@ async function connect(){
       await Promise.all([loadLabelColors(),loadIssues()]);
       setLoMsg('Loading parent links & tracking bodies...');
       await Promise.all([loadSubIssueParents(),refreshTrackingBodies()]);
-      S.activeTab='exceptions';saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();
+      S.activeTab='exceptions';saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();zhLoad();setTimeout(function(){if(typeof EXC!=='undefined'&&EXC.crossRefresh)EXC.crossRefresh();},0);
       hideLoadingOverlay();
       setTimeout(function(){runMismatchScanBackground();},0);
     } catch(e) {
@@ -504,7 +504,7 @@ async function bgRefresh(){
     await Promise.all([loadLabelColors(),loadIssues()]);
     setLoMsg('Loading parent links & tracking bodies...');
     await Promise.all([loadSubIssueParents(),refreshTrackingBodies()]);
-    S.activeTab='exceptions';saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();
+    S.activeTab='exceptions';saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();setTimeout(function(){if(typeof EXC!=='undefined'&&EXC.crossRefresh)EXC.crossRefresh();},0);
   } catch(e) {
     setStatus('<span style="color:#fca5a5">✕ Refresh failed: '+esc(e.message)+'</span>');
   }
@@ -526,7 +526,7 @@ async function doRefresh(){
     await Promise.all([loadLabelColors(),loadIssues()]);
     setLoMsg('Loading parent links & tracking bodies...');
     await Promise.all([loadSubIssueParents(),refreshTrackingBodies()]);
-    S.activeTab='exceptions';saveCache();populateFilters();buildTabs();renderMain();
+    S.activeTab='exceptions';saveCache();populateFilters();buildTabs();renderMain();setTimeout(function(){if(typeof EXC!=='undefined'&&EXC.crossRefresh)EXC.crossRefresh();},0);
     if(S.zhToken&&S.zhWorkspace)zhLoad();
     else setStatus('<span style="color:#6ee7b7">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
   } catch(e){showErr('dashErr',e.message);}
@@ -1825,7 +1825,7 @@ function loadHistoricalData(){
         Promise.all([loadLabelColors(),loadIssues()])
           .then(function(){setLoMsg('Loading parent links...');return loadSubIssueParents();})
           .then(function(){setLoMsg('Loading tracking bodies...');return refreshTrackingBodies();})
-          .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();hideLoadingOverlay();runMismatchScanBackground();})
+          .then(function(){saveCache();populateFilters();buildTabs();renderMain();startAutoRefresh();zhLoad();hideLoadingOverlay();runMismatchScanBackground();setTimeout(function(){if(typeof EXC!=='undefined'&&EXC.crossRefresh)EXC.crossRefresh();},0);})
           .catch(function(e){hideLoadingOverlay();document.getElementById('mainContent').innerHTML='<div class="err">'+esc(e.message)+'</div>';});
       }
     }
@@ -1849,9 +1849,9 @@ function loadHistoricalData(){
 var EXC=(function(){
   var HOUR=3600000, DAY=24*HOUR, MAX_AGE=3*DAY, STALE_AGE=2*HOUR;
   var SOURCES=[
-    {id:'cis',            key:'cv_exc_cis',            label:'CIS',             test:/(^|\/)cis\.html/i},
-    {id:'powersearch',    key:'cv_exc_powersearch',    label:'Power Search',    test:/(^|\/)powersearch\.html/i},
-    {id:'portal', key:'cv_exc_portal', label:'Portal', test:/(^|\/)portal\.html/i}
+    {id:'cis',         key:'cv_exc_cis',         label:'CIS',          test:/(^|\/)cis\.html/i,         cacheKey:'cis_issues_cache_v1', ignoredKey:'cis_hub_ignored_v6'},
+    {id:'powersearch', key:'cv_exc_powersearch', label:'Power Search', test:/(^|\/)powersearch\.html/i, cacheKey:'ps_issues_cache_v2',  ignoredKey:'ps_ignored_v1'},
+    {id:'portal',      key:'cv_exc_portal',      label:'Portal',       test:/(^|\/)portal\.html/i,      cacheKey:'cp_issues_cache_v1',  ignoredKey:'cp_ignored_v1'}
   ];
   var BY_ID={};
   SOURCES.forEach(function(s){BY_ID[s.id]=s;});
@@ -1932,7 +1932,22 @@ var EXC=(function(){
   window.addEventListener('focus',paint);
   window.addEventListener('pageshow',function(e){if(e.persisted)paint();});
 
-  return {paint:paint,wire:wire};
+  var FIN_LBLS=['financials query','financials report'];
+  function estimateExceptions(issues,closedIssues,ignoredSet){
+    var open=(issues||[]).filter(function(i){if(ignoredSet.has(i.id+'_'+i.repo))return false;var ll=i._labelsLower||i.labels.map(function(l){return l.toLowerCase();});var isCS=ll.indexOf('cs item')!==-1||ll.indexOf('cs task item')!==-1;var isFin=ll.some(function(l){return FIN_LBLS.indexOf(l)!==-1;});if(!isCS&&!isFin)return false;return !i.parent;}).length;
+    var closed=(closedIssues||[]).filter(function(i){if(ignoredSet.has(i.id+'_'+i.repo))return false;var ll=i._labelsLower||i.labels.map(function(l){return l.toLowerCase();});if(!ll.some(function(l){return FIN_LBLS.indexOf(l)!==-1;}))return false;if(ll.indexOf('cs task item')!==-1)return false;if(ll.indexOf('cs in testing')!==-1)return false;if(i.hasApprovedComment)return false;return !i.parent;}).length;
+    return open+closed;
+  }
+  function crossRefresh(){
+    var here=location.pathname,now=Date.now(),FRESH=10*60*1000;
+    SOURCES.forEach(function(s){
+      if(s.test.test(here))return;if(!s.cacheKey)return;
+      try{var existing=JSON.parse(localStorage.getItem(s.key)||'null');if(existing&&existing.ts&&!existing.estimated&&(now-existing.ts)<FRESH)return;var cache=JSON.parse(localStorage.getItem(s.cacheKey)||'null');if(!cache||!cache.issues)return;var ignored=[];try{var ig=s.ignoredKey&&localStorage.getItem(s.ignoredKey);if(ig)ignored=JSON.parse(ig);}catch(e){}var ignoredSet=new Set(ignored);var count=estimateExceptions(cache.issues,cache.closedIssues,ignoredSet);if(count>0||(existing&&existing.n>0)){localStorage.setItem(s.key,JSON.stringify({n:count,ts:now,estimated:true}));}}catch(e){}
+    });
+    paint();
+  }
+
+  return {paint:paint,wire:wire,crossRefresh:crossRefresh};
 })();
 </script>
 </body>
