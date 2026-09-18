@@ -257,7 +257,7 @@ if(_psChildTrackingSet[issue.id+'_'+issue.repo])return false;
 // Check 1: parent field (set by loadSubIssueParents API or child body **Parent:** parsing)
 if(issue.parent){var parentOpen=S.issues.find(function(i){return i.id===issue.parent.issueNumber&&i.repo===issue.repo&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});if(parentOpen)return false;}
 // Check 2: live reverse-scan of open CS Task Item body checklists (final fallback)
-var openTracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&i.repo===issue.repo;});for(var _ti=0;_ti<openTracking.length;_ti++){var _lines=(openTracking[_ti].body||'').split('\n');for(var _li=0;_li<_lines.length;_li++){var _mm=_lines[_li].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!_mm)continue;var _rr=_mm[1].match(/#(\d+)/);if(_rr&&parseInt(_rr[1])===issue.id)return false;}}
+var openTracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&i.repo===issue.repo;});var _ref=new RegExp('(?:^|\\D)#'+issue.id+'(?:\\D|$)');for(var _ti=0;_ti<openTracking.length;_ti++){if(_ref.test(openTracking[_ti].body||''))return false;}
 return true;}
 function getClosedFinExceptions(){return S.closedIssues.filter(function(i){return isClosedFinException(i);});}
 function ignoreClosedFinExc(key){if(S.closedFinExcIgnored.indexOf(key)===-1)S.closedFinExcIgnored.push(key);saveClosedFinExcIgnored();renderMain();}
@@ -562,7 +562,7 @@ function showPsReleaseModal(){
   _psRelNotes=[];_psRelIssues=[];_psRelSelected={};_psRelCollabs=[];
   // Find "Release Notes" issues from loaded data (open + closed)
   var all=S.issues.concat(S.closedIssues);
-  _psRelNotes=all.filter(function(i){return /^release notes/i.test(i.title.trim());})
+  _psRelNotes=all.filter(function(i){return /^release notes/i.test(i.title.trim())&&/uat/i.test(i.title);})
                .sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'');});
   drawPsReleaseModal();
 }
