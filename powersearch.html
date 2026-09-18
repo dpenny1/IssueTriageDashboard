@@ -22,6 +22,8 @@ a{color:#4338ca;text-decoration:none}a:hover{text-decoration:underline}
 .hdr-act{background:transparent;border:none;color:#cbd5e1;cursor:pointer;padding:5px 10px;border-radius:5px;font-size:12px;font-weight:600;transition:all 0.15s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
 .hdr-act:hover{background:rgba(255,255,255,0.08);color:#fff}
 .hdr-act:disabled{opacity:0.4;cursor:not-allowed}
+.hdr-act-hi{background:rgba(99,102,241,0.15);color:#a5b4fc;border:1px solid rgba(99,102,241,0.25)}
+.hdr-act-hi:hover{background:rgba(99,102,241,0.28);color:#c7d2fe}
 .hdr-status{font-size:11px;color:#475569;white-space:nowrap;padding-left:4px}
 .main{padding:20px 24px 48px}
 .btn{border:none;border-radius:9px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all 0.15s}
@@ -177,6 +179,7 @@ tr:hover td{background:#f9fafb}
       <div class="hdr-sep"></div>
       <button class="hdr-act" id="refreshBtn" onclick="doRefresh()" title="Refresh"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
       <button class="hdr-act" onclick="showCfg()" title="Settings"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      <button class="hdr-act hdr-act-hi" onclick="showPsReleaseModal()" style="margin-left:4px">🚀 Release</button>
       <button class="hdr-act" onclick="showDiagModal()" title="Diagnostics" style="font-size:15px;padding:4px 8px">🧩</button>
       <div class="hdr-sep"></div>
       <span id="loadedAt" class="hdr-status"></span>
@@ -489,6 +492,7 @@ async function ghFetch(path){
   return r.json();
 }
 async function ghPatch(path,body){var r=await fetch('https://api.github.com'+path,{method:'PATCH',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);return r.json();}
+async function ghPost(path,body){var r=await fetch('https://api.github.com'+path,{method:'POST',headers:{'Authorization':'token '+S.ghToken,'Accept':'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error('GitHub '+r.status+': '+r.statusText);if(r.status===204||r.headers.get('content-length')==='0')return{};var t=await r.text();return t?JSON.parse(t):{};}
 async function zhGet(path){var r=await fetch('https://api.zenhub.com'+path,{headers:{'X-Authentication-Token':S.zhToken}});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);return r.json();}
 async function zhPost(path,data){var r=await fetch('https://api.zenhub.com'+path,{method:'POST',headers:{'X-Authentication-Token':S.zhToken,'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error('ZenHub '+r.status+': '+r.statusText);if(r.status===204||r.headers.get('content-length')==='0')return{};var t=await r.text();return t?JSON.parse(t):{};}
 async function loadSubIssueParents(){
@@ -531,6 +535,155 @@ async function loadSubIssueParents(){
     });
   });
 }
+// ── Remove Failed Testing label ───────────────────────────────────────────────
+async function removeFailedTestingLabel(id,repo){
+  if(!confirm('Remove "Failed Testing" label from #'+id+'?'))return;
+  try{
+    var issue=await ghFetch('/repos/'+repo+'/issues/'+id);
+    var newLabels=issue.labels.filter(function(l){return l.toLowerCase()!=='failed testing';}).map(function(l){return l.name||l;});
+    await ghPatch('/repos/'+repo+'/issues/'+id,{labels:newLabels});
+    var iss=S.issues.find(function(i){return i.id===id&&i.repo===repo;});
+    if(iss)iss.labels=newLabels;
+    buildTabs();renderMain();
+  }catch(e){alert('Failed to remove label: '+e.message);}
+}
+
+// ── Release Modal ─────────────────────────────────────────────────────────────
+var _psRelNotes=[],_psRelIssues=[],_psRelSelected={},_psRelAssignees=[],_psRelCollabs=[],_psRelDefaultAssignees=[];
+var PS_REL_ASSIGNEES_KEY='ps_release_assignees_v1';
+function loadPsRelDefaultAssignees(){try{var v=localStorage.getItem(PS_REL_ASSIGNEES_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
+function savePsRelDefaultAssignees(){try{localStorage.setItem(PS_REL_ASSIGNEES_KEY,JSON.stringify(_psRelDefaultAssignees));}catch(e){}}
+
+function showPsReleaseModal(){
+  if(!S.repos.length)return;
+  document.getElementById('psReleaseModal').style.display='block';
+  _psRelDefaultAssignees=loadPsRelDefaultAssignees();
+  _psRelAssignees=_psRelDefaultAssignees.slice();
+  _psRelNotes=[];_psRelIssues=[];_psRelSelected={};_psRelCollabs=[];
+  // Find "Release Notes" issues from loaded data (open + closed)
+  var all=S.issues.concat(S.closedIssues);
+  _psRelNotes=all.filter(function(i){return /^release notes/i.test(i.title.trim());})
+               .sort(function(a,b){return (b.createdAt||'').localeCompare(a.createdAt||'');});
+  drawPsReleaseModal();
+}
+function hidePsReleaseModal(){document.getElementById('psReleaseModal').style.display='none';}
+
+function drawPsReleaseModal(loadingHtml){
+  var el=document.getElementById('psReleaseModalContent');
+  if(loadingHtml){el.innerHTML=loadingHtml;return;}
+  var h='<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Release Notes Issue</div>';
+  h+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
+  h+='<select id="psRelPicker" style="flex:1;min-width:200px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;color:#374151">';
+  h+='<option value="">— Select a Release Notes issue —</option>';
+  _psRelNotes.forEach(function(n){h+='<option value="'+n.id+'_'+esc(n.repo)+'">'+esc(n.title)+' (#'+n.id+')</option>';});
+  h+='</select>';
+  h+='<button class="btn-p" onclick="loadPsReleaseIssues()">Load Issues</button></div></div>';
+  h+='<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Assignees</div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">';
+  _psRelAssignees.forEach(function(a){h+='<div style="display:inline-flex;align-items:center;gap:5px;background:#e0e7ff;border:1px solid #c7d2fe;border-radius:7px;padding:4px 10px;font-size:12px;font-weight:600;color:#3730a3">'+esc(a)+'<button onclick="removePsRelAssignee(\''+esc(a)+'\')" style="background:none;border:none;cursor:pointer;color:#6366f1;font-size:12px;line-height:1">✕</button></div>';});
+  if(!_psRelAssignees.length)h+='<span style="font-size:12px;color:#9ca3af">No assignees selected</span>';
+  h+='</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:relative">';
+  h+='<input type="text" id="psRelAssigneeSearch" placeholder="Search collaborators..." style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:13px;outline:none;width:220px" oninput="searchPsRelCollaborators(this.value)"/>';
+  h+='<div id="psRelCollabResults" style="display:none;position:absolute;top:38px;left:0;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:180px;overflow-y:auto;width:220px;z-index:200"></div>';
+  h+='<button class="btn-sm" style="border-color:#4338ca;color:#4338ca" onclick="savePsRelDefault()">💾 Save as Default</button></div></div>';
+  if(_psRelIssues.length){
+    var csIssues=_psRelIssues.filter(function(i){return i.isCS;}),nonCS=_psRelIssues.filter(function(i){return !i.isCS;});
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">';
+    h+='<div style="font-size:13px;font-weight:700;color:#1e1b4b">'+csIssues.length+' CS Issues found <span style="font-weight:400;color:#9ca3af">('+nonCS.length+' non-CS skipped)</span></div>';
+    h+='<div style="display:flex;gap:8px;align-items:center"><button class="btn-sm" onclick="selectAllPsRel(true)">Select All</button><button class="btn-sm" onclick="selectAllPsRel(false)">Deselect All</button><button class="btn-p" onclick="applyPsRelease()" id="applyPsReleaseBtn">✓ Apply to Selected</button></div></div>';
+    h+='<div id="psRelStatusBar" style="display:none;background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:10px 14px;margin-bottom:12px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span class="spin spd" id="psRelSpinner"></span><span id="psRelStatusText" style="font-size:13px;font-weight:600;color:#1e1b4b"></span></div><div style="background:#e5e7eb;border-radius:999px;height:6px;overflow:hidden"><div id="psRelProgressBar" style="background:#4338ca;height:6px;border-radius:999px;width:0%;transition:width 0.3s"></div></div></div>';
+    h+='<div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;max-height:360px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;width:36px"><input type="checkbox" onchange="selectAllPsRel(this.checked)" checked/></th><th style="padding:9px 13px;text-align:left">#</th><th style="padding:9px 13px;text-align:left">Title</th><th style="padding:9px 13px;text-align:left">Labels</th><th style="padding:9px 13px;text-align:left">Status</th></tr></thead><tbody>';
+    csIssues.forEach(function(issue){
+      var checked=_psRelSelected[issue.id]!==false,hasTesting=issue.labels.some(function(l){return l.toLowerCase()==='cs in testing';});
+      h+='<tr style="border-bottom:1px solid #f3f4f6'+(hasTesting?';background:#f0fdf4':'')+'">';
+      h+='<td style="padding:8px 13px"><input type="checkbox" '+(checked?'checked':'')+' onchange="togglePsRelIssue('+issue.id+',this.checked)"/></td>';
+      h+='<td style="padding:8px 13px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;font-weight:600">#'+issue.id+'</a></td>';
+      h+='<td style="padding:8px 13px;font-weight:600;color:#1e1b4b;min-width:160px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#1e1b4b;text-decoration:none">'+esc(issue.title)+'</a></td>';
+      h+='<td style="padding:8px 13px"><div style="display:flex;flex-wrap:wrap;gap:3px">';issue.labels.forEach(function(l){h+=lblBadge(l);});h+='</div></td>';
+      h+='<td style="padding:8px 13px" id="psRelRowStatus_'+issue.id+'">'+(hasTesting?'<span class="badge" style="background:#d1fae5;color:#065f46">✓ CS In Testing</span>':'<span style="font-size:12px;color:#9ca3af">Pending</span>')+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  el.innerHTML=h;
+}
+
+async function loadPsReleaseIssues(){
+  var sel=document.getElementById('psRelPicker');
+  var val=sel?sel.value:'';
+  if(!val)return;
+  var parts=val.split('_');
+  var relId=parseInt(parts[0]),relRepo=parts.slice(1).join('_');
+  var relNote=_psRelNotes.find(function(n){return n.id===relId&&n.repo===relRepo;});
+  if(!relNote)return;
+  drawPsReleaseModal('<div style="text-align:center;padding:30px;color:#9ca3af"><span class="spin spd"></span> Parsing release notes...</div>');
+  var body=relNote.body||'';
+  var matches=body.match(/#(\d+)/g)||[];
+  var ids=[...new Set(matches.map(function(m){return parseInt(m.replace('#',''));}))];
+  _psRelIssues=[];_psRelSelected={};
+  for(var i=0;i<ids.length;i++){
+    try{
+      var iss=await ghFetch('/repos/'+relRepo+'/issues/'+ids[i]);
+      if(iss.pull_request)continue;
+      var lbls=iss.labels.map(function(l){return l.name;});
+      var isCS=lbls.some(function(l){return CS_LABELS_PS.indexOf(l.toLowerCase())!==-1;});
+      _psRelIssues.push({id:iss.number,title:iss.title,url:iss.html_url,labels:lbls,isCS:isCS,repo:relRepo,assignees:iss.assignees.map(function(a){return a.login;})});
+      _psRelSelected[iss.number]=isCS;
+    }catch(e){}
+  }
+  drawPsReleaseModal();
+  setTimeout(function(){var s=document.getElementById('psRelPicker');if(s)s.value=val;},0);
+}
+
+async function searchPsRelCollaborators(q){
+  if(!S.repos.length)return;
+  var el=document.getElementById('psRelCollabResults');
+  if(!q){el.style.display='none';return;}
+  if(!_psRelCollabs.length){try{_psRelCollabs=await ghFetch('/repos/'+S.repos[0]+'/collaborators?per_page=100');}catch(e){return;}}
+  var filtered=_psRelCollabs.filter(function(c){return c.login.toLowerCase().indexOf(q.toLowerCase())!==-1;}).slice(0,8);
+  if(!filtered.length){el.style.display='none';return;}
+  el.style.display='block';
+  el.innerHTML=filtered.map(function(c){return '<div style="padding:8px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #f3f4f6" onmouseover="this.style.background=\'#f9fafb\'" onmouseout="this.style.background=\'#fff\'" onclick="addPsRelAssignee(\''+esc(c.login)+'\')"><img src="'+esc(c.avatar_url)+'" style="width:20px;height:20px;border-radius:50%"/> '+esc(c.login)+'</div>';}).join('');
+}
+function addPsRelAssignee(login){if(_psRelAssignees.indexOf(login)===-1)_psRelAssignees.push(login);var el=document.getElementById('psRelCollabResults');if(el)el.style.display='none';var inp=document.getElementById('psRelAssigneeSearch');if(inp)inp.value='';drawPsReleaseModal();}
+function removePsRelAssignee(login){_psRelAssignees=_psRelAssignees.filter(function(a){return a!==login;});drawPsReleaseModal();}
+function savePsRelDefault(){_psRelDefaultAssignees=_psRelAssignees.slice();savePsRelDefaultAssignees();alert('Default assignees saved!');}
+function togglePsRelIssue(id,checked){_psRelSelected[id]=checked;}
+function selectAllPsRel(checked){_psRelIssues.filter(function(i){return i.isCS;}).forEach(function(i){_psRelSelected[i.id]=checked;});drawPsReleaseModal();}
+
+async function applyPsRelease(){
+  var selected=_psRelIssues.filter(function(i){return i.isCS&&_psRelSelected[i.id]!==false;});
+  if(!selected.length){alert('No issues selected.');return;}
+  if(!_psRelAssignees.length&&!confirm('No assignees selected. Continue with just adding the CS In Testing label?')){return;}
+  var btn=document.getElementById('applyPsReleaseBtn');
+  if(btn){btn.disabled=true;btn.textContent='Applying...';}
+  var bar=document.getElementById('psRelStatusBar');if(bar)bar.style.display='block';
+  var prog=document.getElementById('psRelProgressBar'),txt=document.getElementById('psRelStatusText'),spinner=document.getElementById('psRelSpinner');
+  var done=0,failed=0,total=selected.length;
+  function updateProgress(){var pct=Math.round(((done+failed)/total)*100);if(prog)prog.style.width=pct+'%';if(txt)txt.textContent='Processing '+(done+failed)+' of '+total+'...';}
+  updateProgress();
+  for(var i=0;i<selected.length;i++){
+    var issue=selected[i];
+    var rowEl=document.getElementById('psRelRowStatus_'+issue.id);
+    if(rowEl)rowEl.innerHTML='<span style="font-size:12px;color:#6b7280"><span class="spin spd"></span> Processing...</span>';
+    try{
+      var newLabels=issue.labels.slice(),hasLabel=newLabels.some(function(l){return l.toLowerCase()==='cs in testing';});
+      if(!hasLabel){var labelName=S.labelNames['cs in testing']||'CS In Testing';newLabels.push(labelName);await ghPatch('/repos/'+issue.repo+'/issues/'+issue.id,{labels:newLabels});issue.labels=newLabels;}
+      if(_psRelAssignees.length){await ghPost('/repos/'+issue.repo+'/issues/'+issue.id+'/assignees',{assignees:_psRelAssignees});issue.assignees=_psRelAssignees.slice();}
+      done++;
+      if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#d1fae5;color:#065f46">✓ Done</span>';
+    }catch(e){
+      failed++;
+      if(rowEl)rowEl.innerHTML='<span class="badge" style="background:#fee2e2;color:#991b1b" title="'+esc(e.message)+'">✕ Failed</span>';
+    }
+    updateProgress();
+  }
+  if(prog){prog.style.width='100%';prog.style.background=failed?'#f59e0b':'#059669';}
+  if(spinner)spinner.style.display='none';
+  if(txt){txt.style.color=failed?'#d97706':'#059669';txt.textContent=done+' issue'+(done!==1?'s':'')+' updated'+(failed?' · '+failed+' failed':'')+'!';}
+  if(btn){btn.disabled=false;btn.textContent='✓ Apply to Selected';}
+  doRefresh();
+}
+
 async function loadClosedFinComments(){var candidates=S.closedIssues.filter(function(i){var ll=i.labels.map(function(l){return l.toLowerCase();});return FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;})&&ll.indexOf('cs in testing')===-1;});await Promise.all(candidates.map(async function(i){try{var comments=await ghFetch('/repos/'+i.repo+'/issues/'+i.id+'/comments?per_page=100');i.hasApprovedComment=Array.isArray(comments)&&comments.some(function(c){return (c.body||'').toLowerCase().indexOf('cs approved')!==-1;});}catch(e){i.hasApprovedComment=false;}}));}
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed to move pipeline: '+e.message);}}
 var _panelStore={};var _panelIdx=0;
@@ -790,6 +943,8 @@ function renderStats(){
     {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'},
     {n:finTrackingCount,exc:0,l:'Financials Report',c:'#7c3aed',tab:'report'}
   ];
+  var failedTestSrc=notIgnored.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='failed testing';});});
+  if(failedTestSrc.length)stats.push({n:failedTestSrc.length,exc:0,l:'Failed Testing',c:'#c2410c',tab:'failedtesting'});
   // Exceptions lead the row, and only show up when there is something to fix
   var closedFinExc=getClosedFinExceptions();
   var totalExc=excSrc.length+closedFinExc.length;
@@ -822,7 +977,8 @@ var TAB_DEFS=[
   {id:'closed',label:'Recently Closed',color:'#0369a1'},
   {id:'csintesting',label:'CS In Testing',color:'#0d9488'},
   {id:'ignored',label:'Ignored',color:'#6b7280'},
-  {id:'report',label:'Report',color:'#7c3aed'}
+  {id:'report',label:'Report',color:'#7c3aed'},
+  {id:'failedtesting',label:'Failed Testing',color:'#c2410c'}
 ];
 
 function tabCount(id){
@@ -834,6 +990,7 @@ function tabCount(id){
   if(id==='csintesting')return S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
   if(id==='ignored')return S.ignored.length;
   if(id==='report')return 0;
+  if(id==='failedtesting')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='failed testing';});}).length;
   return 0;
 }
 
@@ -854,6 +1011,7 @@ function buildTabs(){
   var h='';
   TAB_DEFS.forEach(function(t){
     if(t.onlyIfAny&&!excN)return;
+    if(t.id==='failedtesting'&&tabCount('failedtesting')===0)return;
     var on=S.activeTab===t.id?' on':'';
     var cnt=tabCount(t.id);
     // Use the same dynamic label-color logic as renderStats for taskitem
@@ -943,7 +1101,8 @@ function issueRow(iss,showClosed,showRestore){
       if(srp.length){h+='<td><select class="ps" onchange="movePipeline('+iss.id+',\''+esc(iss.repo)+'\',this.value)"><option value="">'+esc(curN)+'</option>';srp.forEach(function(p){h+='<option value="'+esc(p.id)+'"'+(p.id===cur?' selected':'')+'>'+esc(p.name)+'</option>';});h+='</select></td>';}
       else h+='<td style="font-size:12px;color:#6b7280;white-space:nowrap">'+(iss.pipeline?esc(curN):'<span style="color:#d1d5db">—</span>')+'</td>';
     }
-    if(showRestore)h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';
+    if(S.activeTab==='failedtesting')h+='<td><button class="btn-sm" style="border-color:#c2410c;color:#c2410c" onclick="removeFailedTestingLabel('+iss.id+',\''+esc(iss.repo)+'\')">✓ Remove Label</button></td>';
+    else if(showRestore)h+='<td><button class="btn-sm" onclick="unignoreIssue(\''+ikey+'\')">Restore</button></td>';
     else h+='<td><button class="btn-ig" onclick="ignoreIssue(\''+ikey+'\')">Ignore</button></td>';
   }
   h+='</tr>';
@@ -1183,6 +1342,15 @@ function renderMain(){
 
   if(tab==='report'){
     try{content.innerHTML=renderPsReport();}catch(e){console.error('[PS] renderPsReport failed:',e);content.innerHTML='<div class="es">Report failed to render — check browser console for details.</div>';}
+    return;
+  }
+
+  if(tab==='failedtesting'){
+    var filtered=applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='failed testing';});}));
+    var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#9a3412,#c2410c)"><span class="gt">Failed Testing <span class="gc">'+filtered.length+'</span></span></div>';
+    h+=openTable(filtered,'No failed testing issues.',false,'failedtesting');
+    h+='</div>';
+    content.innerHTML=h;
     return;
   }
 
@@ -1459,6 +1627,17 @@ function renderPsMismatchPanel(){var h='<div style="background:#fff;border-radiu
       <button class="btn-p" onclick="runDiag()" style="white-space:nowrap">Run Check</button>
     </div>
     <div id="diagResult"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="psReleaseModal">
+  <div class="modal-box" style="max-width:700px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-size:15px;font-weight:700;color:#1e1b4b">🚀 Release — Apply CS In Testing</span>
+      <button class="btn-sm" onclick="hidePsReleaseModal()">✕ Close</button>
+    </div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:16px">Select a "Release Notes" issue to load the fixed issue list, then apply the CS In Testing label and assignees.</div>
+    <div id="psReleaseModalContent"></div>
   </div>
 </div>
 
