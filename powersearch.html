@@ -224,7 +224,7 @@ var STORAGE_KEY='ps_issues_cache_v2',PROFILES_KEY='ps_profiles_v1',IGNORED_KEY='
 var _psChildTrackingSet={}; // issue keys (id_repo) that are sub-issues of another CS Task Item; populated by loadSubIssueParents
 var CS_LABELS_PS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
 var FIN_LABELS=['financials query','financials report'];
-var PS_REPORT_HISTORY_KEY='ps_report_history_v1',PS_SCAN_DISMISSED_KEY='ps_scan_dismissed_v1';
+var PS_REPORT_HISTORY_KEY='ps_report_history_v1';
 function isFinItem(i){return i.labels.some(function(l){return FIN_LABELS.indexOf(l.toLowerCase())!==-1;});}
 function hasCS(i){return i.labels.some(function(l){return CS_LABELS_PS.indexOf(l.toLowerCase())!==-1;});}
 function isNIP(issue){return !!(issue.pipeline&&issue.pipeline.pipelineName==='New Issues');}
@@ -244,55 +244,47 @@ function isCsTaskItemNotTracking(i){
 }
 // Like isAssignedNotInProgress but also allows Review/QA as a valid pipeline for CS items.
 function isCsItemAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues'&&i.pipeline.pipelineName!=='Review/QA');}
-function issueHasException(i){var ikey=i.id+'_'+i.repo;if(S.warnDismissed.indexOf(ikey)!==-1)return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);if(isCsItem(i))return (isFinItem(i)&&!isReferencedInTrackingPS(i.id))||isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isCsItemAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
+function issueHasException(i){var ikey=i._key||i.id+'_'+i.repo;if(_warnDismissedSet.has(ikey))return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);if(isCsItem(i))return (isFinItem(i)&&!isReferencedInTrackingPS(i.id))||isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isCsItemAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
 function exceptionCount(issues){return issues.filter(issueHasException).length;}
 
 // ── Exceptions ────────────────────────────────────────────────────────────────
 // Exceptions are pulled out of the other tabs (same model as CIS) so they are
 // visible on load instead of hiding one click deep inside a tile.
-function notIgnoredOpen(){return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});}
-function getExceptions(){return notIgnoredOpen().filter(issueHasException);}
+// ── Performance: O(1) lookup sets and render-cycle caches ─────────────────────
+var _ignoredSet=new Set(),_warnDismissedSet=new Set();
+function _syncIgnoredSet(){_ignoredSet=new Set(S.ignored);}
+function _syncWarnDismissedSet(){_warnDismissedSet=new Set(S.warnDismissed);}
+var _excCache=null,_closedFinExcCache=null,_refInTrackingCache={};
+function _clearExcCaches(){_excCache=null;_closedFinExcCache=null;}
+
+function notIgnoredOpen(){return S.issues.filter(function(i){return !_ignoredSet.has(i._key||i.id+'_'+i.repo);});}
+function isReferencedInTrackingPS(issueId){
+  if(issueId in _refInTrackingCache)return _refInTrackingCache[issueId];
+  var result=_isReferencedInTrackingPS_inner(issueId);
+  _refInTrackingCache[issueId]=result;
+  return result;
+}
+function _isReferencedInTrackingPS_inner(issueId){var allIssues=S.issues.concat(S.closedIssues);var startIss=allIssues.find(function(i){return i.id===issueId;});if(startIss){var cur=startIss;var seen={};var depth=0;while(cur&&cur.parent&&depth<5){var curKey=cur.id+'_'+cur.repo;if(seen[curKey])break;seen[curKey]=true;var pNum=cur.parent.issueNumber;var pRepo=cur.repo;var par=allIssues.find(function(i){return i.id===pNum&&i.repo===pRepo;});if(!par)break;if(par.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs tracking';}))return true;cur=par;depth++;}}var found=false;var taskItems=S.issues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).concat(S.closedIssues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}); }));for(var i=0;i<taskItems.length;i++){var lines=(taskItems[i].body||'').split('\n');for(var j=0;j<lines.length;j++){var mm=lines[j].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!mm)continue;var rr=mm[1].match(/#(\d+)/);if(rr&&parseInt(rr[1])===issueId){found=true;break;}}if(found)break;}return found;}
+function getExceptions(){if(!_excCache)_excCache=notIgnoredOpen().filter(issueHasException);return _excCache;}
+function getClosedFinExceptions(){if(!_closedFinExcCache)_closedFinExcCache=S.closedIssues.filter(function(i){return isClosedFinException(i);});return _closedFinExcCache;}
 function isClean(i){return !issueHasException(i);}
 function loadClosedFinExcIgnored(){try{var v=localStorage.getItem(PS_CLOSED_FIN_EXC_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveClosedFinExcIgnored(){try{localStorage.setItem(PS_CLOSED_FIN_EXC_KEY,JSON.stringify(S.closedFinExcIgnored));}catch(e){}}
-function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S.closedFinExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;var ll=issue.labels.map(function(l){return l.toLowerCase();});if(ll.indexOf('cs task item')!==-1)return false;if(!FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;}))return false;if(ll.indexOf('cs in testing')!==-1)return false;if(issue.hasApprovedComment)return false;
+function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S.closedFinExcIgnored.indexOf(issue._key||issue.id+'_'+issue.repo)!==-1)return false;var ll=issue._labelsLower||issue.labels.map(function(l){return l.toLowerCase();});if(ll.indexOf('cs task item')!==-1)return false;if(!FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;}))return false;if(ll.indexOf('cs in testing')!==-1)return false;if(issue.hasApprovedComment)return false;
 // Check 0: pre-computed set from sub_issues API + body scans (fastest path)
-if(_psChildTrackingSet[issue.id+'_'+issue.repo])return false;
+if(_psChildTrackingSet[issue._key||issue.id+'_'+issue.repo])return false;
 // Check 1: parent field (set by loadSubIssueParents API or child body **Parent:** parsing)
 if(issue.parent){var parentOpen=S.issues.find(function(i){return i.id===issue.parent.issueNumber&&i.repo===issue.repo&&i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});});if(parentOpen)return false;}
 // Check 2: live reverse-scan of open CS Task Item / CS Item body (final fallback)
 var openTracking=S.issues.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';})&&i.repo===issue.repo;});var _ref=new RegExp('(?:^|\\D)#'+issue.id+'(?:\\D|$)');for(var _ti=0;_ti<openTracking.length;_ti++){if(_ref.test(openTracking[_ti].body||''))return false;}
 return true;}
-function getClosedFinExceptions(){return S.closedIssues.filter(function(i){return isClosedFinException(i);});}
-function ignoreClosedFinExc(key){if(S.closedFinExcIgnored.indexOf(key)===-1)S.closedFinExcIgnored.push(key);saveClosedFinExcIgnored();renderMain();}
+function ignoreClosedFinExc(key){if(S.closedFinExcIgnored.indexOf(key)===-1)S.closedFinExcIgnored.push(key);saveClosedFinExcIgnored();_clearExcCaches();renderMain();}
 
 function isCsItem(i){return (i.labels.some(function(l){return l.toLowerCase()==='cs item';})||isFinItem(i))&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}
-function isReferencedInTrackingPS(issueId){
-  var allIssues=S.issues.concat(S.closedIssues);
-  // Walk the ancestor chain up to 5 levels — dev sometimes nests issues under
-  // an intermediate parent that is not itself a CS Task Item.
-  var startIss=allIssues.find(function(i){return i.id===issueId;});
-  if(startIss){
-    var cur=startIss;var seen={};var depth=0;
-    while(cur&&cur.parent&&depth<5){
-      var curKey=cur.id+'_'+cur.repo;if(seen[curKey])break;seen[curKey]=true;
-      var pNum=cur.parent.issueNumber;var pRepo=cur.repo;
-      var par=allIssues.find(function(i){return i.id===pNum&&i.repo===pRepo;});
-      if(!par)break;
-      if(par.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs tracking';}))return true;
-      cur=par;depth++;
-    }
-  }
-  // Fallback: body checklist scan on all CS Task Items
-  var found=false;
-  var taskItems=S.issues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).concat(S.closedIssues.filter(function(ti){return ti.labels.some(function(l){return l.toLowerCase()==='cs task item';}); }));
-  for(var i=0;i<taskItems.length;i++){var lines=(taskItems[i].body||'').split('\n');for(var j=0;j<lines.length;j++){var mm=lines[j].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!mm)continue;var rr=mm[1].match(/#(\d+)/);if(rr&&parseInt(rr[1])===issueId){found=true;break;}}if(found)break;}
-  return found;
-}
 function parentLink(issue){if(!issue.parent)return '';var url='https://github.com/'+issue.repo+'/issues/'+issue.parent.issueNumber;return ' <a href="'+esc(url)+'" target="_blank" style="font-size:11px;color:#059669;font-weight:600;text-decoration:none" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">🔗#'+issue.parent.issueNumber+'</a>';}
 function loadWarnDismissed(){try{var v=localStorage.getItem(PS_WARN_DISMISSED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveWarnDismissed(){try{localStorage.setItem(PS_WARN_DISMISSED_KEY,JSON.stringify(S.warnDismissed));}catch(e){}}
-function dismissWarning(k){if(S.warnDismissed.indexOf(k)===-1)S.warnDismissed.push(k);saveWarnDismissed();renderMain();}
+function dismissWarning(k){if(S.warnDismissed.indexOf(k)===-1)S.warnDismissed.push(k);saveWarnDismissed();_syncWarnDismissedSet();_clearExcCaches();renderMain();}
 
 // ── Loading overlay ───────────────────────────────────────────────────────────
 function showLoadingOverlay(msg){var o=document.getElementById('loadingOverlay');if(o)o.style.display='flex';var m=document.getElementById('loMsg');if(m)m.textContent=msg||'Loading...';}
@@ -413,8 +405,8 @@ function saveCache(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({issues
 function loadCache(){try{var v=localStorage.getItem(STORAGE_KEY);return v?JSON.parse(v):null;}catch(e){return null;}}
 function loadIgnored(){try{var v=localStorage.getItem(IGNORED_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveIgnored(){try{localStorage.setItem(IGNORED_KEY,JSON.stringify(S.ignored));}catch(e){}}
-function ignoreIssue(k){if(S.ignored.indexOf(k)===-1)S.ignored.push(k);saveIgnored();buildTabs();renderMain();}
-function unignoreIssue(k){S.ignored=S.ignored.filter(function(x){return x!==k;});saveIgnored();buildTabs();renderMain();}
+function ignoreIssue(k){if(S.ignored.indexOf(k)===-1)S.ignored.push(k);saveIgnored();_syncIgnoredSet();_clearExcCaches();buildTabs();renderMain();}
+function unignoreIssue(k){S.ignored=S.ignored.filter(function(x){return x!==k;});saveIgnored();_syncIgnoredSet();_clearExcCaches();buildTabs();renderMain();}
 // ── Label editing ─────────────────────────────────────────────────────────────
 function lsort(a,b){return a.toLowerCase().localeCompare(b.toLowerCase());}
 var _openLabelPanel=null;
@@ -728,10 +720,14 @@ async function loadIssues(){
     od.forEach(function(iss){
       if(iss.pull_request)return;
       var bodyParent=null;if(iss.body){var _pm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(_pm)bodyParent={issueNumber:parseInt(_pm[1])};}
+      var _lbls=iss.labels.map(function(l){return l.name;});
       open.push({
         id:iss.number,repo:repo,title:iss.title,
         body:iss.body||'',
-        labels:iss.labels.map(function(l){return l.name;}),
+        labels:_lbls,
+        _labelsLower:_lbls.map(function(l){return l.toLowerCase();}),
+        _key:iss.number+'_'+repo,
+        _createdAtMs:new Date(iss.created_at).getTime(),
         assignees:iss.assignees.map(function(a){return a.login;}),
         createdAt:iss.created_at,url:iss.html_url,state:'open',
         milestone:iss.milestone?iss.milestone.title:null,
@@ -744,10 +740,14 @@ async function loadIssues(){
     cd.forEach(function(iss){
       if(iss.pull_request)return;
       var bodyParent=null;if(iss.body){var _pm=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(_pm)bodyParent={issueNumber:parseInt(_pm[1])};}
+      var _lbls=iss.labels.map(function(l){return l.name;});
       closed.push({
         id:iss.number,repo:repo,title:iss.title,
         body:iss.body||'',
-        labels:iss.labels.map(function(l){return l.name;}),
+        labels:_lbls,
+        _labelsLower:_lbls.map(function(l){return l.toLowerCase();}),
+        _key:iss.number+'_'+repo,
+        _createdAtMs:new Date(iss.created_at).getTime(),
         assignees:iss.assignees.map(function(a){return a.login;}),
         createdAt:iss.created_at,closedAt:iss.closed_at,
         closedBy:(iss.closed_by&&iss.closed_by.login)||'',
@@ -766,10 +766,14 @@ async function loadIssues(){
         if(closedFinSeen[iss.number])return;
         closedFinSeen[iss.number]=true;
         var bodyParentFin=null;if(iss.body){var _pmf=iss.body.match(/\*\*Parent:\*\*\s*#(\d+)/);if(_pmf)bodyParentFin={issueNumber:parseInt(_pmf[1])};}
+        var _lblsFin=iss.labels.map(function(l){return l.name;});
         closed.push({
           id:iss.number,repo:repo,title:iss.title,
           body:iss.body||'',
-          labels:iss.labels.map(function(l){return l.name;}),
+          labels:_lblsFin,
+          _labelsLower:_lblsFin.map(function(l){return l.toLowerCase();}),
+          _key:iss.number+'_'+repo,
+          _createdAtMs:new Date(iss.created_at).getTime(),
           assignees:iss.assignees.map(function(a){return a.login;}),
           createdAt:iss.created_at,closedAt:iss.closed_at,
           closedBy:(iss.closed_by&&iss.closed_by.login)||'',
@@ -782,6 +786,7 @@ async function loadIssues(){
   }
   S.issues=open;
   S.closedIssues=closed.sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
+  _refInTrackingCache={};_clearExcCaches();
   document.getElementById('dashTitle').textContent='CentralView GitHub Issue Triage — Power Search';
   document.getElementById('dashMeta').textContent=S.repos.join(', ')+' — '+open.length+' open issues';
 }
@@ -795,7 +800,7 @@ async function connect(){
   if(!rp){showErr('setupErr','Please select a project.');return;}
   S.ghToken=tok;
   S.repos=rp.split(',').map(function(r){return r.trim().replace(/\/+$/,'');}).filter(Boolean);
-  S.ignored=loadIgnored();S.warnDismissed=loadWarnDismissed();S.closedFinExcIgnored=loadClosedFinExcIgnored();
+  S.ignored=loadIgnored();S.warnDismissed=loadWarnDismissed();S.closedFinExcIgnored=loadClosedFinExcIgnored();_syncIgnoredSet();_syncWarnDismissedSet();
   var btn=document.getElementById('connectBtn');btn.disabled=true;btn.innerHTML='<span class="spin spd"></span>Loading...';
   var cache=loadCache();
   if(cache&&cache.issues&&cache.parentsLoaded){
@@ -960,9 +965,7 @@ function renderStats(){
     var isActive=S.activeTab===s.tab;
     h+='<div class="sc2" style="border-top-color:'+s.c+';'+(isActive?'box-shadow:0 0 0 2px '+s.c+';':'')+'" onclick="switchTab(\''+s.tab+'\')">';
     if(s.tab==='report'){
-      h+='<div class="sn" style="color:'+s.c+';font-size:2rem;position:relative;display:inline-block">📋';
-      if(_psScanResults!==null&&_psScanResults.length>0)h+='<span style="position:absolute;top:-6px;right:-14px;background:#dc2626;color:#fff;font-size:11px;font-weight:800;padding:1px 6px;border-radius:999px;min-width:18px;text-align:center">'+_psScanResults.length+'</span>';
-      h+='</div>';
+      h+='<div class="sn" style="color:'+s.c+';font-size:2rem">📋</div>';
     }else{
       h+='<div style="display:flex;align-items:flex-start;justify-content:center;gap:5px">';
       h+='<div class="sn" style="color:'+s.c+'">'+s.n+'</div>';
@@ -991,12 +994,12 @@ var TAB_DEFS=[
 
 function tabCount(id){
   if(id==='exceptions')return getExceptions().length+getClosedFinExceptions().length;
-  if(id==='all')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&!isFinItem(i)&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});}).length;
-  if(id==='prod')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length;
-  if(id==='uat')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length;
-  if(id==='failedtesting')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='failed testing';});}).length;
-  if(id==='taskitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
-  if(id==='csitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&isCsItem(i);}).length;
+  if(id==='all')return S.issues.filter(function(i){return !_ignoredSet.has(i._key||i.id+'_'+i.repo)&&isClean(i)&&!isFinItem(i)&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});}).length;
+  if(id==='prod')return S.issues.filter(function(i){return !_ignoredSet.has(i._key||i.id+'_'+i.repo)&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length;
+  if(id==='uat')return S.issues.filter(function(i){return !_ignoredSet.has(i._key||i.id+'_'+i.repo)&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length;
+  if(id==='failedtesting')return S.issues.filter(function(i){return !_ignoredSet.has(i._key||i.id+'_'+i.repo)&&i.labels.some(function(l){return l.toLowerCase()==='failed testing';});}).length;
+  if(id==='taskitem')return S.issues.filter(function(i){return !_ignoredSet.has(i._key||i.id+'_'+i.repo)&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
+  if(id==='csitem')return S.issues.filter(function(i){return !_ignoredSet.has(i._key||i.id+'_'+i.repo)&&isClean(i)&&isCsItem(i);}).length;
   if(id==='closed')return S.closedIssues.length;
   if(id==='csintesting')return S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
   if(id==='ignored')return S.ignored.length;
@@ -1005,10 +1008,9 @@ function tabCount(id){
 }
 
 function buildTabs(){
-  var excN=getExceptions().length+getClosedFinExceptions().length;
-  var pN=tabCount('prod');
-  var uN=tabCount('uat');
-  var fN=tabCount('failedtesting');
+  _clearExcCaches();
+  var counts={};TAB_DEFS.forEach(function(t){counts[t.id]=tabCount(t.id);});
+  var excN=counts['exceptions'],pN=counts['prod'],uN=counts['uat'],fN=counts['failedtesting'];
   // Until you pick a tab yourself, the page keeps landing on Exceptions
   // whenever there are any. This re-asserts on every render rather than firing
   // once, because a background refresh drops the ZenHub pipelines that most
@@ -1027,7 +1029,7 @@ function buildTabs(){
   TAB_DEFS.forEach(function(t){
     if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0)||(t.id==='failedtesting'&&fN===0))return;
     var on=S.activeTab===t.id?' on':'';
-    var cnt=tabCount(t.id);
+    var cnt=counts[t.id];
     var tColor=t.id==='taskitem'?'#'+(S.labelColors['cs task item']||'7c3aed'):t.color;
     h+='<button class="tab'+on+'" onclick="switchTab(\''+t.id+'\')" style="'+(on?' color:'+tColor+';border-top:2px solid '+tColor:'')+'">';
     h+=t.label+'<span class="tc">'+cnt+'</span></button>';
@@ -1349,6 +1351,7 @@ function renderGlobalSearch(){
 
 // ── Main render ───────────────────────────────────────────────────────────────
 function renderMain(){
+  _clearExcCaches();
   _panelStore={};
   // Belt and braces: several callers reach renderMain() without going through
   // buildTabs() (pipeline moves, dismissing a warning, filters, sorting). While
@@ -1479,7 +1482,7 @@ function renderMain(){
   else if(profile.zhWorkspace){S.zhWorkspace=profile.zhWorkspace;}
   var dtEl=document.getElementById('dashTitle');
   if(dtEl)dtEl.textContent='CentralView GitHub Issue Triage — Power Search';
-  S.ignored=loadIgnored();S.warnDismissed=loadWarnDismissed();S.closedFinExcIgnored=loadClosedFinExcIgnored();
+  S.ignored=loadIgnored();S.warnDismissed=loadWarnDismissed();S.closedFinExcIgnored=loadClosedFinExcIgnored();_syncIgnoredSet();_syncWarnDismissedSet();
   var cache=loadCache();
   if(cache&&cache.issues&&cache.parentsLoaded){
     S.issues=cache.issues;S.closedIssues=cache.closedIssues||[];S.labelColors=cache.labelColors||{};S.labelNames=cache.labelNames||{};
@@ -1593,7 +1596,6 @@ function renderDiag(steps,out){
 function loadPsHistory(){try{var v=localStorage.getItem(PS_REPORT_HISTORY_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function savePsHistory(h){try{localStorage.setItem(PS_REPORT_HISTORY_KEY,JSON.stringify(h));}catch(e){}}
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function parsePsSnapshotIssue(issue){var t=0,c=0,o=0,n=0;(issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i),unk=line.match(/^\s*-\s*\[\s\]\s*(.+)/i);if(!chk&&!unk)return;var text=(chk||unk)[1].trim();if(!/#\d+/.test(text)){n++;}else{t++;if(chk)c++;else o++;}});return{id:issue.id,title:issue.title,url:issue.url,total:t,closed:c,open:o,noIssue:n};}
 function getPsCurrentSnapshot(){
   var tracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isFinItem(i);});
   if(!tracking.length)return null;
@@ -1665,8 +1667,6 @@ function renderPsReport(){
   var snap=getPsCurrentSnapshot();
   var history=loadPsHistory();
   var h='<div style="width:100%">';
-  // Scanner first
-  h+=renderPsMismatchPanel();
   // Weekly snapshot
   h+='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #7c3aed">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
@@ -1693,15 +1693,6 @@ function renderPsReport(){
   h+='</div>';
   return h;
 }
-// ── Scanner ───────────────────────────────────────────────────────────────────
-var _psScanResults=null,_psScanning=false,_psScanDismissed={},_psLastScanTime=null;
-function loadPsScanDismissed(){try{var v=localStorage.getItem(PS_SCAN_DISMISSED_KEY);_psScanDismissed=v?JSON.parse(v):{};}catch(e){_psScanDismissed={};}}
-function savePsScanDismissed(){try{localStorage.setItem(PS_SCAN_DISMISSED_KEY,JSON.stringify(_psScanDismissed));}catch(e){}}
-function dismissPsScan(k){_psScanDismissed[k]=true;savePsScanDismissed();renderMain();}
-function reinstatePsScan(k){delete _psScanDismissed[k];savePsScanDismissed();renderMain();}
-async function scanPsCheckedIssue(track,issueNum,ref,mismatches){var data=null;try{data=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum);}catch(e){mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:'(could not load)',childUrl:'https://github.com/'+track.repo+'/issues/'+issueNum,lineText:ref,closedButChecked:false,fetchError:true});return;}if(data.state==='open'){mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:false});}else if(data.state==='closed'){var closedByPR=false,cbUser='',cbAt=data.closed_at||'';if(data.closed_by&&data.closed_by.login){cbUser=data.closed_by.login;}try{var tl=await ghFetch('/repos/'+track.repo+'/issues/'+issueNum+'/timeline?per_page=100');if(Array.isArray(tl)){for(var k=0;k<tl.length;k++){if(tl[k].event==='closed'&&tl[k].commit_id)closedByPR=true;if(tl[k].event==='referenced'&&tl[k].commit_url)closedByPR=true;}}}catch(e){}mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:data.title,childUrl:data.html_url,lineText:ref,closedButChecked:true,closedByPR:closedByPR,closedByUser:cbUser,closedAt:cbAt});}}
-async function runPsScan(){if(_psScanning)return;_psScanning=true;_psScanResults=null;loadPsScanDismissed();var tracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isFinItem(i);});var mismatches=[];for(var ti=0;ti<tracking.length;ti++){var track=tracking[ti];var lines=(track.body||'').split('\n');for(var li=0;li<lines.length;li++){var line=lines[li];var chk=line.match(/^\s*-\s*\[x\]\s*(.+)/i);if(chk){var ref=chk[1].trim(),mm=ref.match(/#(\d+)/);if(mm){var issueNum=parseInt(mm[1]),dkey=String(track.id)+'_'+String(issueNum);if(!_psScanDismissed[dkey]){var openIssue=S.issues.find(function(i){return i.id===issueNum&&i.repo===track.repo;});if(openIssue){mismatches.push({trackingIssue:track,childId:issueNum,childRepo:track.repo,childTitle:openIssue.title,childUrl:openIssue.url,lineText:ref,closedButChecked:false});}else{await scanPsCheckedIssue(track,issueNum,ref,mismatches);}}}}}}  _psScanning=false;_psScanResults=mismatches;_psLastScanTime=new Date();if(S.activeTab==='report')renderMain();}
-function renderPsMismatchPanel(){var h='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #f59e0b">';h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;gap:8px"><div><div style="font-size:15px;font-weight:700;color:#1e1b4b">🔍 Checked Box Mismatch Scanner</div><div style="font-size:12px;color:#9ca3af;margin-top:2px">Scans Financials CS Task Items for checked boxes that may need review</div>';if(_psLastScanTime){h+='<div style="font-size:12px;color:#6b7280;margin-top:4px">Last scan: <span style="font-weight:600;color:#374151">'+_psLastScanTime.toLocaleDateString()+' at '+_psLastScanTime.toLocaleTimeString()+'</span></div>';}else if(_psScanning){h+='<div style="font-size:12px;color:#6b7280;margin-top:4px"><span style="display:inline-block;width:11px;height:11px;border:2px solid #e5e7eb;border-top-color:#6366f1;border-radius:50%;animation:sp 0.7s linear infinite"></span> Scanning...</div>';}else{h+='<div style="font-size:12px;color:#9ca3af;margin-top:4px">Not yet run this session</div>';}h+='</div><button class="btn-sm" style="border-color:#f59e0b;color:#92400e" onclick="runPsScan()">▶ Run Scan</button></div>';if(_psScanResults===null&&!_psScanning){h+='<div style="font-size:13px;color:#9ca3af">Click Run Scan to check Financials tracking issues for mismatches.</div>';}else if(_psScanning){h+='<div style="font-size:13px;color:#9ca3af;display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:11px;height:11px;border:2px solid #e5e7eb;border-top-color:#6366f1;border-radius:50%;animation:sp 0.7s linear infinite"></span> Scanning...</div>';}else if(!_psScanResults.length){h+='<div style="background:#f0fdf4;border:1px solid #a7f3d0;border-radius:8px;padding:12px 16px;font-size:13px;color:#065f46">✅ No mismatches found — all checked boxes look good.</div>';}else{h+='<div style="font-size:13px;font-weight:600;color:#92400e;margin-bottom:10px">⚠ '+_psScanResults.length+' item'+((_psScanResults.length===1)?'':'s')+' may need review</div><div style="display:flex;flex-direction:column;gap:8px">';_psScanResults.forEach(function(m){var dkey=String(m.trackingIssue.id)+'_'+String(m.childId);var statusBadge=m.fetchError?'<span class="badge" style="background:#fee2e2;color:#991b1b">Load error</span>':m.closedButChecked?(m.closedByPR?'<span class="badge" style="background:#d1fae5;color:#065f46">Closed by PR</span>':'<span class="badge" style="background:#fef3c7;color:#92400e">Closed manually</span>'):'<span class="badge" style="background:#dbeafe;color:#1e40af">Still open</span>';h+='<div style="background:#fff8ee;border:1px solid #fde68a;border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div style="font-size:12px;color:#6b7280;margin-bottom:4px">Tracking: <a href="'+esc(m.trackingIssue.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+m.trackingIssue.id+'</a> '+esc(m.trackingIssue.title)+'</div><div style="font-size:13px;font-weight:600"><a href="'+esc(m.childUrl)+'" target="_blank" style="color:#1e1b4b">#'+m.childId+' '+esc(m.childTitle)+'</a></div>';if(m.closedAt)h+='<div style="font-size:12px;color:#6b7280;margin-top:3px">Closed: '+new Date(m.closedAt).toLocaleDateString()+(m.closedByUser?' by '+esc(m.closedByUser):'')+'</div>';h+='<div style="margin-top:5px">'+statusBadge+'</div></div><button class="btn-sm" style="font-size:11px;flex-shrink:0" onclick="dismissPsScan(\''+esc(dkey)+'\')">Dismiss</button></div>';});h+='</div>';}h+='</div>';return h;}
 </script>
 
 <div class="modal-overlay" id="diagModal">
