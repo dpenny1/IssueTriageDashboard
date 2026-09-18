@@ -182,21 +182,15 @@ tr:hover td{background:#f9fafb}
     <div class="sgrid" id="statGrid"></div>
     <div class="tw" id="tabsWrap"></div>
     <div class="sb" id="searchBar">
-      <input type="text" id="searchInput" placeholder="🔍 Search..." style="width:280px" oninput="renderMain()"/>
+      <input type="text" id="searchInput" placeholder="🔍 Search..." style="width:220px" oninput="renderMain()"/>
       <select id="filterLabel" onchange="renderMain()"><option value="">All labels</option></select>
       <select id="filterRepo" onchange="renderMain()"><option value="">All repos</option></select>
       <select id="filterPipeline" onchange="renderMain()"><option value="">All pipelines</option></select>
       <button onclick="clearFilters()" style="font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;text-decoration:underline;font-weight:600">Clear</button>
-    </div>
-    <div class="sb" id="globalSearchBar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-      <input type="text" id="globalSearchInput" placeholder="🔍 Search all issues — title, #number, label, assignee, repo…" style="flex:1;min-width:300px" oninput="renderMain()"/>
-      <select id="globalFilterState" onchange="renderMain()" style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:13px;background:#fff;outline:none;color:#374151">
-        <option value="">Open + Closed</option>
-        <option value="open">Open only</option>
-        <option value="closed">Closed only</option>
-      </select>
-      <select id="globalFilterRepo" onchange="renderMain()" style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:13px;background:#fff;outline:none;color:#374151"><option value="">All repos</option></select>
-      <button onclick="clearGlobalSearch()" style="font-size:12px;color:#ef4444;background:none;border:none;cursor:pointer;text-decoration:underline;font-weight:600">Clear</button>
+      <div style="width:1px;height:24px;background:#e5e7eb;margin:0 6px;flex-shrink:0"></div>
+      <input type="text" id="globalSearchInput" placeholder="🌐 Search all tabs…" style="width:180px" oninput="renderMain()"/>
+      <select id="globalFilterState" onchange="renderMain()" style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-size:13px;background:#fff;outline:none;color:#374151"><option value="">Open + Closed</option><option value="open">Open only</option><option value="closed">Closed only</option></select>
+      <button onclick="clearGlobalSearch()" style="font-size:12px;color:#6b7280;background:none;border:none;cursor:pointer;text-decoration:underline;font-weight:600">Clear</button>
     </div>
     <div id="dashErr" style="display:none;margin-bottom:12px"></div>
     <div id="mainContent"></div>
@@ -255,8 +249,7 @@ var TAB_DEFS=[
   {id:'taskitem',label:'CS Task Items',color:'#7c3aed',labelKey:'cs task item'},
   {id:'closed',label:'Recently Closed',color:'#374151'},
   {id:'ignored',label:'Ignored',color:'#6b7280'},
-  {id:'report',label:'Weekly Report',color:'#1e1b4b'},
-  {id:'global',label:'🔍 Global Search',color:'#0369a1'}
+  {id:'report',label:'Weekly Report',color:'#1e1b4b'}
 ];
 
 // ── Loading overlay ───────────────────────────────────────────────────────────
@@ -711,9 +704,9 @@ function isException(issue){
   if(hasCS(issue))return true;
   return false;
 }
-function populateFilters(){var ls={},rs={},ps={};S.issues.concat(S.closedIssues).forEach(function(i){i.labels.forEach(function(l){ls[l]=1;});rs[i.repo]=1;if(i.pipeline)ps[i.pipeline.pipelineName]=1;});var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');fl.innerHTML='<option value="">All labels</option>';Object.keys(ls).sort(lsort).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});fr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});fp.innerHTML='<option value="">All pipelines</option>';Object.keys(ps).sort(lsort).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});var gfr=document.getElementById('globalFilterRepo');if(gfr){gfr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){gfr.innerHTML+='<option>'+esc(r)+'</option>';});}}
+function populateFilters(){var ls={},rs={},ps={};S.issues.concat(S.closedIssues).forEach(function(i){i.labels.forEach(function(l){ls[l]=1;});rs[i.repo]=1;if(i.pipeline)ps[i.pipeline.pipelineName]=1;});var fl=document.getElementById('filterLabel'),fr=document.getElementById('filterRepo'),fp=document.getElementById('filterPipeline');fl.innerHTML='<option value="">All labels</option>';Object.keys(ls).sort(lsort).forEach(function(l){fl.innerHTML+='<option>'+esc(l)+'</option>';});fr.innerHTML='<option value="">All repos</option>';Object.keys(rs).sort(lsort).forEach(function(r){fr.innerHTML+='<option>'+esc(r)+'</option>';});fp.innerHTML='<option value="">All pipelines</option>';Object.keys(ps).sort(lsort).forEach(function(p){fp.innerHTML+='<option>'+esc(p)+'</option>';});}
 function clearFilters(){['searchInput','filterLabel','filterRepo','filterPipeline'].forEach(function(id){document.getElementById(id).value='';});renderMain();}
-function clearGlobalSearch(){['globalSearchInput','globalFilterState','globalFilterRepo'].forEach(function(id){document.getElementById(id).value='';});renderMain();}
+function clearGlobalSearch(){['globalSearchInput','globalFilterState'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});renderMain();}
 function getExceptions(){return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isException(i);});}
 function getTabIssues(tab){
   var t=tab||S.activeTab;
@@ -830,11 +823,6 @@ function buildTabs(){
   var h='';
   TAB_DEFS.forEach(function(t){
     if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0)||(t.id==='failedtesting'&&fN===0))return;
-    if(t.id==='global'){
-      var active=S.activeTab==='global',c=tabColor(t);
-      h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\'global\')" style="'+(active?'color:'+c+';border-top:2px solid '+c:'')+'">🔍 Global Search</button>';
-      return;
-    }
     var cnt=getTabIssues(t.id).length,active=S.activeTab===t.id,c=tabColor(t);
     h+='<button class="tab'+(active?' on':'')+'" onclick="switchTab(\''+t.id+'\')" style="'+(active?'color:'+c+';border-top:2px solid '+c:'')+'">'+esc(t.label)+'<span class="tc">'+cnt+'</span></button>';
   });
@@ -842,11 +830,8 @@ function buildTabs(){
 }
 function switchTab(name){
   S.activeTab=name;
-  document.getElementById('searchBar').style.display=(name==='report'||name==='global')?'none':'flex';
-  document.getElementById('globalSearchBar').style.display=name==='global'?'flex':'none';
   if(name==='closed')S.sortState={col:'closed',dir:-1};
   buildTabs();renderMain();
-  if(name==='global')setTimeout(function(){var gi=document.getElementById('globalSearchInput');if(gi)gi.focus();},60);
 }
 function ignoreIssue(k){if(S.ignored.indexOf(k)===-1)S.ignored.push(k);saveIgnored();buildTabs();renderMain();}
 function unignoreIssue(k){S.ignored=S.ignored.filter(function(x){return x!==k;});saveIgnored();buildTabs();renderMain();}
@@ -1160,8 +1145,8 @@ async function bulkMove(tab,pipelineId,sel){if(!pipelineId)return;var list=getTa
 function renderMain(){
   _panelStore={};
   renderStats();buildTabs();hideErr('dashErr');
+  if((document.getElementById('globalSearchInput').value||'').trim()){renderGlobalSearch();return;}
   if(S.activeTab==='report'){renderReport();}
-  else if(S.activeTab==='global'){renderGlobalSearch();}
   else if(S.activeTab==='csitems'&&S.zhToken){
     var csNormal=applyFilters(getTabIssues('csitems'));
     // Also include CS-labeled exceptions so they appear in the Exceptions panel
@@ -1189,7 +1174,7 @@ function renderMain(){
 function renderGlobalSearch(){
   var q=(document.getElementById('globalSearchInput').value||'').trim().toLowerCase();
   var filterState=(document.getElementById('globalFilterState').value||'');
-  var filterRepo=(document.getElementById('globalFilterRepo').value||'');
+  var filterRepo=(document.getElementById('filterRepo').value||'');
   var mc=document.getElementById('mainContent');
 
   if(!q&&!filterState&&!filterRepo){
