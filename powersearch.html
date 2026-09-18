@@ -1626,25 +1626,22 @@ function getPsCurrentSnapshot(){
     if(assigned[issKey]===undefined){groups[rootMap[rootKey]].push(issue);assigned[issKey]=rootMap[rootKey];}
   });
 
-  var rows=[],totalAll=0,closedAll=0,openAll=0,noIssueAll=0,nums=[];
+  var rows=[],totalAll=0,closedAll=0,closedApprovedAll=0,closedPendingAll=0,openAll=0,noIssueAll=0,nums=[];
 
   groups.forEach(function(group){
     // Build a set of IDs in this group so we don't count sibling tracking issues as sub-issues
     var groupIds={};
     group.forEach(function(g){groupIds[g.id+'_'+g.repo]=true;nums.push(g.id);});
 
-    var t=0,c=0,o=0,n=0;
+    var t=0,ca=0,cp=0,o=0,n=0;
     group.forEach(function(issue){
       var subs=allIssues.filter(function(i){
         return i.parent&&i.parent.issueNumber===issue.id&&i.repo===issue.repo
                &&!groupIds[i.id+'_'+i.repo]; // exclude sibling tracking issues
       });
       t+=subs.length;
-      c+=subs.filter(function(i){
-        if(i.state!=='closed')return false;
-        var ll=i.labels.map(function(l){return l.toLowerCase();});
-        return ll.indexOf('cs in testing')!==-1||(i.hasApprovedComment===true);
-      }).length;
+      ca+=subs.filter(function(i){return i.state==='closed'&&i.hasApprovedComment===true;}).length;
+      cp+=subs.filter(function(i){if(i.state!=='closed')return false;var ll=i.labels.map(function(l){return l.toLowerCase();});return ll.indexOf('cs in testing')!==-1&&!i.hasApprovedComment;}).length;
       o+=subs.filter(function(i){return i.state==='open';}).length;
       (issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(chk&&!/#\d+/.test(chk[1]))n++;});
     });
@@ -1653,16 +1650,16 @@ function getPsCurrentSnapshot(){
     var primary=group.find(function(g){return !g.parent||!trackingById[g.parent.issueNumber+'_'+g.repo];})||group[0];
     var linked=group.filter(function(g){return g!==primary;});
 
-    var r={id:primary.id,title:primary.title,url:primary.url,linked:linked,total:t,closed:c,open:o,noIssue:n};
-    rows.push(r);totalAll+=t;closedAll+=c;openAll+=o;noIssueAll+=n;
+    var r={id:primary.id,title:primary.title,url:primary.url,linked:linked,total:t,closedApproved:ca,closedPending:cp,closed:ca+cp,open:o,noIssue:n};
+    rows.push(r);totalAll+=t;closedAll+=ca+cp;closedApprovedAll+=ca;closedPendingAll+=cp;openAll+=o;noIssueAll+=n;
   });
 
   rows.sort(function(a,b){return b.id-a.id;});
-  return{date:todayStr(),tracking:nums.join('/'),total:totalAll,closed:closedAll,open:openAll,noIssue:noIssueAll,rows:rows};
+  return{date:todayStr(),tracking:nums.join('/'),total:totalAll,closed:closedAll,closedApproved:closedApprovedAll,closedPending:closedPendingAll,open:openAll,noIssue:noIssueAll,rows:rows};
 }
 function savePsSnap(){var snap=getPsCurrentSnapshot();if(!snap){alert('No Financials CS Task Item issues found.');return;}var history=loadPsHistory();if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}else history.push(snap);savePsHistory(history);renderMain();}
 function delPsRptRow(idx){if(!confirm('Remove this row?'))return;var h=loadPsHistory();h.splice(idx,1);savePsHistory(h);renderMain();}
-function exportPsCSV(){var history=loadPsHistory(),rows=['Date,Tracking Issues,Total,Closed,Open,No Issue Raised'];history.forEach(function(row){rows.push([row.date,row.tracking,row.total,row.closed,row.open,row.noIssue||0].join(','));});var blob=new Blob([rows.join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='financials_report.csv';a.click();}
+function exportPsCSV(){var history=loadPsHistory(),rows=['Date,Tracking Issues,Total,Closed Approved,Closed Pending,Open,No Issue Raised'];history.forEach(function(row){rows.push([row.date,row.tracking,row.total,row.closedApproved||0,row.closedPending||0,row.open,row.noIssue||0].join(','));});var blob=new Blob([rows.join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='financials_report.csv';a.click();}
 function clearPsHistory(){if(!confirm('Clear all report history?'))return;localStorage.removeItem(PS_REPORT_HISTORY_KEY);renderMain();}
 function renderPsReport(){
   var snap=getPsCurrentSnapshot();
@@ -1681,16 +1678,16 @@ function renderPsReport(){
   if(history.length){h+='<button class="btn-sm" onclick="exportPsCSV()">⬇ Export CSV</button><button class="btn-sm" style="border-color:#fca5a5;color:#dc2626" onclick="clearPsHistory()">🗑 Clear History</button>';}
   h+='</div></div>';
   if(snap){
-    h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Tracking Issue</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total Sub-Issues</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed &amp; Approved</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th></tr></thead><tbody>';
-    snap.rows.forEach(function(r){var lh='';if(r.linked&&r.linked.length){r.linked.forEach(function(li){lh+=' <a href="'+esc(li.url)+'" target="_blank" style="color:#7c3aed;font-weight:600;white-space:nowrap" title="'+esc(li.title)+'">+#'+li.id+'</a>';});}h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span></td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+r.closed+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+r.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';});
+    h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Tracking Issue</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total Sub-Issues</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed Approved</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#0891b2">Closed Pending</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th></tr></thead><tbody>';
+    snap.rows.forEach(function(r){var lh='';if(r.linked&&r.linked.length){r.linked.forEach(function(li){lh+=' <a href="'+esc(li.url)+'" target="_blank" style="color:#7c3aed;font-weight:600;white-space:nowrap" title="'+esc(li.title)+'">+#'+li.id+'</a>';});}h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span></td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+r.closedApproved+'</td><td style="padding:8px 13px;text-align:center;color:#0891b2;font-weight:600">'+r.closedPending+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+r.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';});
     h+='</tbody></table></div>';
   }else{h+='<div style="color:#9ca3af;font-size:13px">No Financials CS Task Item issues found. Issues need "Financials Query" or "Financials Report" labels AND "CS Task Item" label.</div>';}
   h+='</div>';
   if(history.length){
     h+='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px">';
     h+='<div style="font-size:15px;font-weight:700;color:#1e1b4b;margin-bottom:14px">📈 History</div>';
-    h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Date</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th><th style="padding:9px 13px"></th></tr></thead><tbody>';
-    history.slice().reverse().forEach(function(row,idx){var realIdx=history.length-1-idx;h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px;font-weight:600;color:#374151">'+esc(row.date)+'</td><td style="padding:8px 13px;text-align:center;font-weight:700">'+row.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+row.closed+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+row.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+row.noIssue+'</td><td style="padding:8px 13px"><button class="btn-d" style="padding:2px 8px;font-size:11px" onclick="delPsRptRow('+realIdx+')">✕</button></td></tr>';});
+    h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Date</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed Approved</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#0891b2">Closed Pending</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th><th style="padding:9px 13px"></th></tr></thead><tbody>';
+    history.slice().reverse().forEach(function(row,idx){var realIdx=history.length-1-idx;h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px;font-weight:600;color:#374151">'+esc(row.date)+'</td><td style="padding:8px 13px;text-align:center;font-weight:700">'+row.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+(row.closedApproved!==undefined?row.closedApproved:row.closed)+'</td><td style="padding:8px 13px;text-align:center;color:#0891b2;font-weight:600">'+(row.closedPending!==undefined?row.closedPending:'-')+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+row.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+row.noIssue+'</td><td style="padding:8px 13px"><button class="btn-d" style="padding:2px 8px;font-size:11px" onclick="delPsRptRow('+realIdx+')">✕</button></td></tr>';});
     h+='</tbody></table></div></div>';
   }
   h+='</div>';
