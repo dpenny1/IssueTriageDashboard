@@ -248,10 +248,12 @@ function getExceptions(){return notIgnoredOpen().filter(issueHasException);}
 function isClean(i){return !issueHasException(i);}
 function loadClosedFinExcIgnored(){try{var v=localStorage.getItem(PS_CLOSED_FIN_EXC_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveClosedFinExcIgnored(){try{localStorage.setItem(PS_CLOSED_FIN_EXC_KEY,JSON.stringify(S.closedFinExcIgnored));}catch(e){}}
-function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S.closedFinExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;var ll=issue.labels.map(function(l){return l.toLowerCase();});if(ll.indexOf('cs task item')!==-1)return false;if(!FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;}))return false;if(ll.indexOf('cs in testing')!==-1)return false;if(issue.hasApprovedComment)return false;// Not an exception while its parent tracking issue is still open.
-// Check 1: native sub-issues or body-parsed **Parent:** — parent field set by loadSubIssueParents or issue loading
+function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S.closedFinExcIgnored.indexOf(issue.id+'_'+issue.repo)!==-1)return false;var ll=issue.labels.map(function(l){return l.toLowerCase();});if(ll.indexOf('cs task item')!==-1)return false;if(!FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;}))return false;if(ll.indexOf('cs in testing')!==-1)return false;if(issue.hasApprovedComment)return false;
+// Check 0: pre-computed set from sub_issues API + body scans (fastest path)
+if(_psChildTrackingSet[issue.id+'_'+issue.repo])return false;
+// Check 1: parent field (set by loadSubIssueParents API or child body **Parent:** parsing)
 if(issue.parent){var parentOpen=S.issues.find(function(i){return i.id===issue.parent.issueNumber&&i.repo===issue.repo&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});if(parentOpen)return false;}
-// Check 2: reverse-scan open tracking issue body checklists (catches relationships recorded on the parent, not the child)
+// Check 2: live reverse-scan of open CS Task Item body checklists (final fallback)
 var openTracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&i.repo===issue.repo;});for(var _ti=0;_ti<openTracking.length;_ti++){var _lines=(openTracking[_ti].body||'').split('\n');for(var _li=0;_li<_lines.length;_li++){var _mm=_lines[_li].match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(!_mm)continue;var _rr=_mm[1].match(/#(\d+)/);if(_rr&&parseInt(_rr[1])===issue.id)return false;}}
 return true;}
 function getClosedFinExceptions(){return S.closedIssues.filter(function(i){return isClosedFinException(i);});}
@@ -513,6 +515,8 @@ async function loadSubIssueParents(){
     }catch(e){}
   }));
   // Fallback: also populate from body checklists (catches relationships when sub_issues API is unavailable)
+  // We add ALL referenced issues (open or closed, any type) so isClosedFinException can use the set too.
+  var allForScan=S.issues.concat(S.closedIssues);
   S.issues.filter(function(p){return isCsTaskItem(p);}).forEach(function(p){
     (p.body||'').split('\n').forEach(function(line){
       var mm=line.match(/^\s*-\s*\[[ x]\]\s*(.+)/i);  // two-step: capture full rest of line first
@@ -520,11 +524,10 @@ async function loadSubIssueParents(){
       var rr=mm[1].match(/#(\d+)/);                    // then extract issue number from it
       if(!rr)return;
       var childId=parseInt(rr[1]);
-      var child=S.issues.find(function(iss){return iss.id===childId&&iss.repo===p.repo;});
-      if(child&&isCsTaskItem(child)){
-        _psChildTrackingSet[childId+'_'+p.repo]=true;
-        if(!child.parent)child.parent={issueNumber:p.id};
-      }
+      var childKey=childId+'_'+p.repo;
+      _psChildTrackingSet[childKey]=true;               // mark ALL body-referenced issues as children
+      var child=allForScan.find(function(iss){return iss.id===childId&&iss.repo===p.repo;});
+      if(child&&!child.parent)child.parent={issueNumber:p.id};
     });
   });
 }
