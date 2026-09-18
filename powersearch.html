@@ -259,9 +259,9 @@ function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S
 // Check 0: pre-computed set from sub_issues API + body scans (fastest path)
 if(_psChildTrackingSet[issue.id+'_'+issue.repo])return false;
 // Check 1: parent field (set by loadSubIssueParents API or child body **Parent:** parsing)
-if(issue.parent){var parentOpen=S.issues.find(function(i){return i.id===issue.parent.issueNumber&&i.repo===issue.repo&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});if(parentOpen)return false;}
-// Check 2: live reverse-scan of open CS Task Item body checklists (final fallback)
-var openTracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&i.repo===issue.repo;});var _ref=new RegExp('(?:^|\\D)#'+issue.id+'(?:\\D|$)');for(var _ti=0;_ti<openTracking.length;_ti++){if(_ref.test(openTracking[_ti].body||''))return false;}
+if(issue.parent){var parentOpen=S.issues.find(function(i){return i.id===issue.parent.issueNumber&&i.repo===issue.repo&&i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});});if(parentOpen)return false;}
+// Check 2: live reverse-scan of open CS Task Item / CS Item body (final fallback)
+var openTracking=S.issues.filter(function(i){return i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';})&&i.repo===issue.repo;});var _ref=new RegExp('(?:^|\\D)#'+issue.id+'(?:\\D|$)');for(var _ti=0;_ti<openTracking.length;_ti++){if(_ref.test(openTracking[_ti].body||''))return false;}
 return true;}
 function getClosedFinExceptions(){return S.closedIssues.filter(function(i){return isClosedFinException(i);});}
 function ignoreClosedFinExc(key){if(S.closedFinExcIgnored.indexOf(key)===-1)S.closedFinExcIgnored.push(key);saveClosedFinExcIgnored();renderMain();}
@@ -506,7 +506,7 @@ async function loadSubIssueParents(){
   var seen={};
   var parents=S.issues.filter(function(i){
     var k=i.id+'_'+i.repo;if(seen[k])return false;seen[k]=true;
-    return i.subIssuesTotal>0||i.labels.some(function(l){return l.toLowerCase()==='cs task item';});
+    return i.subIssuesTotal>0||i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});
   });
   await Promise.all(parents.map(async function(p){
     try{
@@ -517,7 +517,7 @@ async function loadSubIssueParents(){
                     ||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});
           if(child&&!child.parent)child.parent={issueNumber:p.id};
           // Track all sub-issues of CS Task Items so isCsTaskItemNotTracking can exempt them
-          if(isCsTaskItem(p))_psChildTrackingSet[sub.number+'_'+p.repo]=true;
+          if(isCsTaskItem(p)||p.labels.some(function(l){return l.toLowerCase()==='cs item';}))_psChildTrackingSet[sub.number+'_'+p.repo]=true;
         });
       }
     }catch(e){}
@@ -525,7 +525,7 @@ async function loadSubIssueParents(){
   // Fallback: scan ALL #N references in each CS Task Item body (not just checklists).
   // Broader than checklist-only: catches plain text, tables, and non-standard formats.
   var allForScan=S.issues.concat(S.closedIssues);
-  S.issues.filter(function(p){return isCsTaskItem(p);}).forEach(function(p){
+  S.issues.filter(function(p){return isCsTaskItem(p)||p.labels.some(function(l){return l.toLowerCase()==='cs item';});}).forEach(function(p){
     var refs=((p.body||'').match(/#(\d+)/g)||[]);
     var seen={};
     refs.forEach(function(ref){
