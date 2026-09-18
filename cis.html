@@ -949,10 +949,10 @@ function renderTable(issues,tab,def){
   if(isTesting)h+='<th>Status</th>';
   if(isExc)h+='<th>Exception Reason</th>';
   if(S.zhToken)h+='<th>Pipeline</th>';
-  h+=(isClosed?mkTh('closed','Closed')+'<th>Closed By</th>':mkTh('age','Age'))+'<th></th></tr></thead><tbody>';
+  h+=(isClosed?mkTh('closed','Closed')+'<th>Closed By</th>':isTesting?mkTh('age','Days Closed'):mkTh('age','Age'))+'<th></th></tr></thead><tbody>';
   if(!issues.length)h+='<tr><td colspan="99" class="er">No issues found.</td></tr>';
   issues.forEach(function(issue){
-    var ikey=issue.id+'_'+issue.repo,days=issue.state==='closed'?null:ageDays(issue.createdAt),isOT=isTesting&&issue.state==='open';
+    var ikey=issue.id+'_'+issue.repo,days=issue.state==='closed'?(isTesting&&issue.closedAt?ageDays(issue.closedAt):null):ageDays(issue.createdAt),isOT=isTesting&&issue.state==='open';
     h+='<tr'+(isOT||isExc?' style="background:#fff5f5"':'')+'>'; 
     h+='<td style="font-size:12px"><a href="'+esc(issue.url)+'" target="_blank" style="color:#6b7280;text-decoration:none;font-weight:600" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#'+issue.id+'</a></td>';
     h+='<td style="min-width:200px"><a href="'+esc(issue.url)+'" target="_blank" style="font-weight:600;color:#1e1b4b">'+esc(issue.title)+'</a>'+parentLink(issue)+'</td>';
