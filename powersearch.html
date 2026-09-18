@@ -926,33 +926,36 @@ function publishExceptions(n){
 function renderStats(){
   var notIgnored=S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1;});
   var excSrc=notIgnored.filter(issueHasException);
-  // Everything else is counted on the clean set — an exception belongs to the
-  // Exceptions tile only, so the per-tile red sub-badges are always 0 now.
   var clean=notIgnored.filter(isClean);
   var newSrc=clean.filter(function(i){return !isFinItem(i)&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});});
-  var taskItems=clean.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
-  var csItemSrc=clean.filter(isCsItem);
-  var csColor='#'+(S.labelColors['cs task item']||'16a34a');
-  var finTrackingCount=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isFinItem(i);}).length;
-  var stats=[
-    {n:newSrc.length,exc:0,l:'New Issues',c:'#4338ca',tab:'all'},
-    {n:csItemSrc.length,exc:0,l:'CS Items',c:'#0891b2',tab:'csitem'},
-    {n:taskItems.length,exc:0,l:'CS Task Items',c:csColor,tab:'taskitem'},
-    {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#0369a1',tab:'closed'},
-    {n:S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length,exc:0,l:'CS In Testing',c:'#0d9488',tab:'csintesting'},
-    {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'},
-    {n:finTrackingCount,exc:0,l:'Financials Report',c:'#7c3aed',tab:'report'}
-  ];
+  var prodSrc=clean.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='production patch';});});
+  var uatSrc=clean.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='uat patch';});});
   var failedTestSrc=notIgnored.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='failed testing';});});
-  if(failedTestSrc.length)stats.push({n:failedTestSrc.length,exc:0,l:'Failed Testing',c:'#c2410c',tab:'failedtesting'});
-  // Exceptions lead the row, and only show up when there is something to fix
+  var csItemSrc=clean.filter(isCsItem);
+  var taskItems=clean.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
+  var csColor='#'+(S.labelColors['cs task item']||'7c3aed');
+  var finTrackingCount=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isFinItem(i);}).length;
   var closedFinExc=getClosedFinExceptions();
   var totalExc=excSrc.length+closedFinExc.length;
-  if(totalExc)stats.unshift({n:totalExc,exc:0,l:'Exceptions',c:'#b91c1c',tab:'exceptions'});
+  var stats=[
+    {n:newSrc.length,exc:0,l:'New Issues',c:'#0891b2',tab:'all'},
+    {n:totalExc,exc:0,l:'Exceptions',c:'#b91c1c',tab:'exceptions'},
+    {n:prodSrc.length,exc:0,l:'Production Patch',c:'#dc2626',tab:'prod'},
+    {n:uatSrc.length,exc:0,l:'UAT Patch',c:'#d97706',tab:'uat'},
+    {n:failedTestSrc.length,exc:0,l:'Failed Testing',c:'#c2410c',tab:'failedtesting'},
+    {n:csItemSrc.length,exc:0,l:'CS Items',c:'#4338ca',tab:'csitem'},
+    {n:S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length,exc:0,l:'CS In Testing',c:'#059669',tab:'csintesting'},
+    {n:taskItems.length,exc:0,l:'CS Task Items',c:csColor,tab:'taskitem'},
+    {n:S.closedIssues.length,exc:0,l:'Recently Closed',c:'#374151',tab:'closed'},
+    {n:S.ignored.length,exc:0,l:'Ignored',c:'#6b7280',tab:'ignored'},
+    {n:finTrackingCount,exc:0,l:'Financials Report',c:'#1e1b4b',tab:'report'}
+  ];
   publishExceptions(totalExc);
   var h='';
   stats.forEach(function(s){
-    h+='<div class="sc2" style="border-top-color:'+s.c+'" onclick="switchTab(\''+s.tab+'\')">';
+    if((s.tab==='prod'||s.tab==='uat'||s.tab==='failedtesting')&&s.n===0)return;
+    var isActive=S.activeTab===s.tab;
+    h+='<div class="sc2" style="border-top-color:'+s.c+';'+(isActive?'box-shadow:0 0 0 2px '+s.c+';':'')+'" onclick="switchTab(\''+s.tab+'\')">';
     if(s.tab==='report'){
       h+='<div class="sn" style="color:'+s.c+';font-size:2rem;position:relative;display:inline-block">📋';
       if(_psScanResults!==null&&_psScanResults.length>0)h+='<span style="position:absolute;top:-6px;right:-14px;background:#dc2626;color:#fff;font-size:11px;font-weight:800;padding:1px 6px;border-radius:999px;min-width:18px;text-align:center">'+_psScanResults.length+'</span>';
@@ -970,32 +973,39 @@ function renderStats(){
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 var TAB_DEFS=[
-  {id:'exceptions',label:'Exceptions',color:'#b91c1c',onlyIfAny:true},
-  {id:'all',label:'New Issues',color:'#4338ca'},
-  {id:'csitem',label:'CS Items',color:'#0891b2'},
-  {id:'taskitem',label:'CS Task Items',color:'#16a34a'},
-  {id:'closed',label:'Recently Closed',color:'#0369a1'},
-  {id:'csintesting',label:'CS In Testing',color:'#0d9488'},
+  {id:'all',label:'New Issues',color:'#0891b2'},
+  {id:'exceptions',label:'Exceptions',color:'#b91c1c'},
+  {id:'prod',label:'Production Patch',color:'#dc2626'},
+  {id:'uat',label:'UAT Patch',color:'#d97706'},
+  {id:'failedtesting',label:'Failed Testing',color:'#c2410c'},
+  {id:'csitem',label:'CS Items',color:'#4338ca'},
+  {id:'csintesting',label:'CS In Testing',color:'#059669'},
+  {id:'taskitem',label:'CS Task Items',color:'#7c3aed'},
+  {id:'closed',label:'Recently Closed',color:'#374151'},
   {id:'ignored',label:'Ignored',color:'#6b7280'},
-  {id:'report',label:'Report',color:'#7c3aed'},
-  {id:'failedtesting',label:'Failed Testing',color:'#c2410c'}
+  {id:'report',label:'Financials Report',color:'#1e1b4b'}
 ];
 
 function tabCount(id){
   if(id==='exceptions')return getExceptions().length+getClosedFinExceptions().length;
   if(id==='all')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&!isFinItem(i)&&!i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});}).length;
+  if(id==='prod')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}).length;
+  if(id==='uat')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}).length;
+  if(id==='failedtesting')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='failed testing';});}).length;
   if(id==='taskitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='cs task item';});}).length;
   if(id==='csitem')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&isCsItem(i);}).length;
   if(id==='closed')return S.closedIssues.length;
   if(id==='csintesting')return S.closedIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs in testing';});}).length;
   if(id==='ignored')return S.ignored.length;
   if(id==='report')return 0;
-  if(id==='failedtesting')return S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&i.labels.some(function(l){return l.toLowerCase()==='failed testing';});}).length;
   return 0;
 }
 
 function buildTabs(){
   var excN=getExceptions().length+getClosedFinExceptions().length;
+  var pN=tabCount('prod');
+  var uN=tabCount('uat');
+  var fN=tabCount('failedtesting');
   // Until you pick a tab yourself, the page keeps landing on Exceptions
   // whenever there are any. This re-asserts on every render rather than firing
   // once, because a background refresh drops the ZenHub pipelines that most
@@ -1006,16 +1016,16 @@ function buildTabs(){
     // the tile shows a count, so land on it unfiltered.
     resetFilterInputs();
   }
-  // Never sit on the Exceptions tab once it has emptied out
-  if(S.activeTab==='exceptions'&&!excN)S.activeTab='all';
+  // Redirect away from hidden conditional tabs when they empty out
+  if(S.activeTab==='prod'&&pN===0)S.activeTab='all';
+  if(S.activeTab==='uat'&&uN===0)S.activeTab='all';
+  if(S.activeTab==='failedtesting'&&fN===0)S.activeTab='all';
   var h='';
   TAB_DEFS.forEach(function(t){
-    if(t.onlyIfAny&&!excN)return;
-    if(t.id==='failedtesting'&&tabCount('failedtesting')===0)return;
+    if((t.id==='prod'&&pN===0)||(t.id==='uat'&&uN===0)||(t.id==='failedtesting'&&fN===0))return;
     var on=S.activeTab===t.id?' on':'';
     var cnt=tabCount(t.id);
-    // Use the same dynamic label-color logic as renderStats for taskitem
-    var tColor=t.id==='taskitem'?'#'+(S.labelColors['cs task item']||'16a34a'):t.color;
+    var tColor=t.id==='taskitem'?'#'+(S.labelColors['cs task item']||'7c3aed'):t.color;
     h+='<button class="tab'+on+'" onclick="switchTab(\''+t.id+'\')" style="'+(on?' color:'+tColor+';border-top:2px solid '+tColor:'')+'">';
     h+=t.label+'<span class="tc">'+cnt+'</span></button>';
   });
@@ -1298,6 +1308,24 @@ function renderMain(){
   if(tab==='closed'){
     var filtered=applyFilters(S.closedIssues);
     content.innerHTML=closedTable(filtered);
+    return;
+  }
+
+  if(tab==='prod'){
+    var filtered=applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='production patch';});}));
+    var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#991b1b,#dc2626)"><span class="gt">Production Patch <span class="gc">'+filtered.length+'</span></span></div>';
+    h+=openTable(filtered,'No production patch issues.',false,'prod');
+    h+='</div>';
+    content.innerHTML=h;
+    return;
+  }
+
+  if(tab==='uat'){
+    var filtered=applyFilters(S.issues.filter(function(i){return S.ignored.indexOf(i.id+'_'+i.repo)===-1&&isClean(i)&&i.labels.some(function(l){return l.toLowerCase()==='uat patch';});}));
+    var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#78350f,#d97706)"><span class="gt">UAT Patch <span class="gc">'+filtered.length+'</span></span></div>';
+    h+=openTable(filtered,'No UAT patch issues.',false,'uat');
+    h+='</div>';
+    content.innerHTML=h;
     return;
   }
 
