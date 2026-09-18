@@ -214,6 +214,7 @@ var S={
   _tabAuto:true
 };
 var STORAGE_KEY='ps_issues_cache_v2',PROFILES_KEY='ps_profiles_v1',IGNORED_KEY='ps_ignored_v1',PS_WARN_DISMISSED_KEY='ps_warn_dismissed_v1',PS_CLOSED_FIN_EXC_KEY='ps_closed_fin_exc_ignored_v1';
+var _psChildTrackingSet={}; // issue keys (id_repo) that are sub-issues of another CS Task Item; populated by loadSubIssueParents
 var CS_LABELS_PS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
 var FIN_LABELS=['financials query','financials report'];
 var PS_REPORT_HISTORY_KEY='ps_report_history_v1',PS_SCAN_DISMISSED_KEY='ps_scan_dismissed_v1';
@@ -228,8 +229,9 @@ function isCsTaskItem(i){return i.labels.some(function(l){return l.toLowerCase()
 function isCsTaskItemNotTracking(i){
   if(!S.zhToken||!isCsTaskItem(i)||!i.pipeline)return false;
   if(i.pipeline.pipelineName==='CS Tracking Issues')return false;
-  // Sub-tracking issues (CS Task Items whose parent is also a CS Task Item) are exempt —
-  // they don't need to be in the CS Tracking Issues pipeline themselves.
+  // Exempt: sub-issue of another CS Task Item (populated by loadSubIssueParents via API + body scan)
+  if(_psChildTrackingSet[i.id+'_'+i.repo])return false;
+  // Fallback: parent field (set by loadSubIssueParents or body parsing)
   if(i.parent){var allIss=S.issues.concat(S.closedIssues);var par=allIss.find(function(p){return p.id===i.parent.issueNumber&&p.repo===i.repo;});if(par&&isCsTaskItem(par))return false;}
   return true;
 }
@@ -490,6 +492,7 @@ async function zhPost(path,data){var r=await fetch('https://api.zenhub.com'+path
 async function loadSubIssueParents(){
   // sub_issues_summary is often absent from the GitHub list API, so subIssuesTotal is unreliable.
   // Always query the /sub_issues endpoint for all open CS Task Items so we reliably find children.
+  _psChildTrackingSet={};
   var seen={};
   var parents=S.issues.filter(function(i){
     var k=i.id+'_'+i.repo;if(seen[k])return false;seen[k]=true;
@@ -503,10 +506,25 @@ async function loadSubIssueParents(){
           var child=S.issues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;})
                     ||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});
           if(child&&!child.parent)child.parent={issueNumber:p.id};
+          // Track all sub-issues of CS Task Items so isCsTaskItemNotTracking can exempt them
+          if(isCsTaskItem(p))_psChildTrackingSet[sub.number+'_'+p.repo]=true;
         });
       }
     }catch(e){}
   }));
+  // Fallback: also populate from body checklists (catches relationships when sub_issues API is unavailable)
+  S.issues.filter(function(p){return isCsTaskItem(p);}).forEach(function(p){
+    (p.body||'').split('\n').forEach(function(line){
+      var mm=line.match(/^\s*-\s*\[[ x]\]\s*.+#(\d+)/i);
+      if(!mm)return;
+      var childId=parseInt(mm[1]);
+      var child=S.issues.find(function(iss){return iss.id===childId&&iss.repo===p.repo;});
+      if(child&&isCsTaskItem(child)){
+        _psChildTrackingSet[childId+'_'+p.repo]=true;
+        if(!child.parent)child.parent={issueNumber:p.id};
+      }
+    });
+  });
 }
 async function loadClosedFinComments(){var candidates=S.closedIssues.filter(function(i){var ll=i.labels.map(function(l){return l.toLowerCase();});return FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;})&&ll.indexOf('cs in testing')===-1;});await Promise.all(candidates.map(async function(i){try{var comments=await ghFetch('/repos/'+i.repo+'/issues/'+i.id+'/comments?per_page=100');i.hasApprovedComment=Array.isArray(comments)&&comments.some(function(c){return (c.body||'').toLowerCase().indexOf('cs approved')!==-1;});}catch(e){i.hasApprovedComment=false;}}));}
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed to move pipeline: '+e.message);}}
@@ -1398,7 +1416,7 @@ function renderPsReport(){
   h+='</div></div>';
   if(snap){
     h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Tracking Issue</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total Sub-Issues</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed &amp; Approved</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th></tr></thead><tbody>';
-    snap.rows.forEach(function(r){var lh='';if(r.linked&&r.linked.length){r.linked.forEach(function(li){lh+=' <a href="'+esc(li.url)+'" target="_blank" style="color:#9ca3af;font-weight:600;white-space:nowrap" title="'+esc(li.title)+'">+#'+li.id+'</a>';});}h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span></td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+r.closed+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+r.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';});
+    snap.rows.forEach(function(r){var lh='';if(r.linked&&r.linked.length){r.linked.forEach(function(li){lh+=' <a href="'+esc(li.url)+'" target="_blank" style="color:#7c3aed;opacity:0.55;font-weight:600;white-space:nowrap" title="'+esc(li.title)+'">+#'+li.id+'</a>';});}h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span></td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+r.closed+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+r.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';});
     h+='</tbody></table></div>';
   }else{h+='<div style="color:#9ca3af;font-size:13px">No Financials CS Task Item issues found. Issues need "Financials Query" or "Financials Report" labels AND "CS Task Item" label.</div>';}
   h+='</div>';
