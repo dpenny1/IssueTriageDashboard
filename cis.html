@@ -1934,7 +1934,7 @@ var EXC=(function(){
 
   var FIN_LBLS=['financials query','financials report'];
   function estimateExceptions(issues,closedIssues,ignoredSet){
-    var open=(issues||[]).filter(function(i){if(ignoredSet.has(i.id+'_'+i.repo))return false;var ll=i._labelsLower||i.labels.map(function(l){return l.toLowerCase();});var isCS=ll.indexOf('cs item')!==-1||ll.indexOf('cs task item')!==-1;var isFin=ll.some(function(l){return FIN_LBLS.indexOf(l)!==-1;});if(!isCS&&!isFin)return false;return !i.parent;}).length;
+    var open=(issues||[]).filter(function(i){if(ignoredSet.has(i.id+'_'+i.repo))return false;var ll=i._labelsLower||i.labels.map(function(l){return l.toLowerCase();});if(!ll.some(function(l){return FIN_LBLS.indexOf(l)!==-1;}))return false;if(ll.indexOf('cs task item')!==-1)return false;if(ll.indexOf('cs in testing')!==-1)return false;if(i.hasApprovedComment)return false;return !i.parent;}).length;
     var closed=(closedIssues||[]).filter(function(i){if(ignoredSet.has(i.id+'_'+i.repo))return false;var ll=i._labelsLower||i.labels.map(function(l){return l.toLowerCase();});if(!ll.some(function(l){return FIN_LBLS.indexOf(l)!==-1;}))return false;if(ll.indexOf('cs task item')!==-1)return false;if(ll.indexOf('cs in testing')!==-1)return false;if(i.hasApprovedComment)return false;return !i.parent;}).length;
     return open+closed;
   }
