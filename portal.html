@@ -1314,12 +1314,12 @@ var EXC=(function(){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wire);
   else wire();
   setTimeout(paint,800);
-  setInterval(paint,15000);
+  setInterval(crossRefresh,15000);
   window.addEventListener('storage',function(e){
     if(!e.key||e.key.indexOf('cv_exc_')===0)paint();
   });
-  window.addEventListener('focus',paint);
-  window.addEventListener('pageshow',function(e){if(e.persisted)paint();});
+  window.addEventListener('focus',crossRefresh);
+  window.addEventListener('pageshow',function(e){if(e.persisted)crossRefresh();});
 
   var FIN_LBLS=['financials query','financials report'];
   function estimateExceptions(issues,closedIssues,ignoredSet){
