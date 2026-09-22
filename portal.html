@@ -1327,11 +1327,33 @@ var EXC=(function(){
     var closed=(closedIssues||[]).filter(function(i){if(ignoredSet.has(i.id+'_'+i.repo))return false;var ll=i._labelsLower||i.labels.map(function(l){return l.toLowerCase();});if(!ll.some(function(l){return FIN_LBLS.indexOf(l)!==-1;}))return false;if(ll.indexOf('cs task item')!==-1)return false;if(ll.indexOf('cs in testing')!==-1)return false;if(i.hasApprovedComment)return false;return !i.parent;}).length;
     return open+closed;
   }
+  function estimatePortal(issues,ignoredSet){
+    var EPA_MS='Orbit One Enhancements Pending Approval';
+    return (issues||[]).filter(function(i){
+      if(ignoredSet.has(i.id+'_'+i.repo))return false;
+      var ll=i._labelsLower||i.labels.map(function(l){return l.toLowerCase();});
+      var isEPA=ll.indexOf('enhancement pending approval')!==-1;
+      var isCsTask=ll.indexOf('cs task item')!==-1;
+      var hasCsItem=ll.indexOf('cs item')!==-1;
+      var pip=i.pipeline?i.pipeline.pipelineName:null;
+      if(pip!==null){
+        if(isCsTask)return pip!=='CS Tracking Issues';
+        if(isEPA)return pip!=='New Issues'||(hasCsItem&&i.milestone!==EPA_MS)||(i.milestone===EPA_MS&&!hasCsItem);
+        var assigned=!!(i.assignees&&i.assignees.length>0);
+        if(pip==='New Issues')return true;
+        if(assigned&&pip!=='In Progress')return true;
+        if(!assigned&&!isEPA&&pip!=='On Deck Priorities')return true;
+        return false;
+      }
+      if(isEPA)return (hasCsItem&&i.milestone!==EPA_MS)||(i.milestone===EPA_MS&&!hasCsItem);
+      return false;
+    }).length;
+  }
   function crossRefresh(){
     var here=location.pathname,now=Date.now(),FRESH=10*60*1000;
     SOURCES.forEach(function(s){
       if(s.test.test(here))return;if(!s.cacheKey)return;
-      try{var existing=JSON.parse(localStorage.getItem(s.key)||'null');if(existing&&existing.ts&&!existing.estimated&&(now-existing.ts)<FRESH)return;var cache=JSON.parse(localStorage.getItem(s.cacheKey)||'null');if(!cache||!cache.issues)return;var ignored=[];try{var ig=s.ignoredKey&&localStorage.getItem(s.ignoredKey);if(ig)ignored=JSON.parse(ig);}catch(e){}var ignoredSet=new Set(ignored);var count=estimateExceptions(cache.issues,cache.closedIssues,ignoredSet);if(count>0||(existing&&existing.n>0)){localStorage.setItem(s.key,JSON.stringify({n:count,ts:now,estimated:true}));}}catch(e){}
+      try{var existing=JSON.parse(localStorage.getItem(s.key)||'null');if(existing&&existing.ts&&!existing.estimated)return;var cache=JSON.parse(localStorage.getItem(s.cacheKey)||'null');if(!cache||!cache.issues)return;var ignored=[];try{var ig=s.ignoredKey&&localStorage.getItem(s.ignoredKey);if(ig)ignored=JSON.parse(ig);}catch(e){}var ignoredSet=new Set(ignored);var count=s.id==='portal'?estimatePortal(cache.issues,ignoredSet):estimateExceptions(cache.issues,cache.closedIssues,ignoredSet);if(count>0||(existing&&existing.n>0)){localStorage.setItem(s.key,JSON.stringify({n:count,ts:now,estimated:true}));}}catch(e){}
     });
     paint();
   }
