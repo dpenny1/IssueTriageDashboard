@@ -701,6 +701,8 @@ function isException(issue){
   if(issue.parent)return false;
   if(isNIP(issue))return true;
   if(issue.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!isReferencedInTracking(issue.id))return true;
+  var _ll=issue.labels.map(function(l){return l.toLowerCase();});
+  if(_ll.indexOf('uat patch')!==-1&&_ll.indexOf('cs item')===-1)return false;
   if(hasCS(issue))return true;
   return false;
 }
