@@ -497,8 +497,11 @@ async function loadSubIssueParents(){
   // Always query the /sub_issues endpoint for all open CS Task Items so we reliably find children.
   _psChildTrackingSet={};_csCsItemChildSet={};
   var seen={};
-  var parents=S.issues.filter(function(i){
+  // Closed Financials CS Task Items are also parents (Weekly Snapshot tracks their children)
+  var _closedFinTasks=S.closedIssues.filter(function(i){return isCsTaskItem(i)&&isFinItem(i);});
+  var parents=S.issues.concat(_closedFinTasks).filter(function(i){
     var k=i.id+'_'+i.repo;if(seen[k])return false;seen[k]=true;
+    if(i.state==='closed')return true;
     return i.subIssuesTotal>0||i.labels.some(function(l){var ll=l.toLowerCase();return ll==='cs task item'||ll==='cs item';});
   });
   await Promise.all(parents.map(async function(p){
@@ -510,9 +513,10 @@ async function loadSubIssueParents(){
                     ||S.closedIssues.find(function(iss){return iss.id===sub.number&&iss.repo===p.repo;});
           if(child&&!child.parent)child.parent={issueNumber:p.id};
           // Track all sub-issues of CS Task Items so isCsTaskItemNotTracking can exempt them
-          if(isCsTaskItem(p)||p.labels.some(function(l){return l.toLowerCase()==='cs item';}))_psChildTrackingSet[sub.number+'_'+p.repo]=true;
+          // (open parents only — closed task items must not affect exception logic)
+          if(p.state!=='closed'&&(isCsTaskItem(p)||p.labels.some(function(l){return l.toLowerCase()==='cs item';})))_psChildTrackingSet[sub.number+'_'+p.repo]=true;
           // Track sub-issues of CS Items only (not CS Task Items) for closed-fin exception suppression
-          if(!isCsTaskItem(p)&&p.labels.some(function(l){return l.toLowerCase()==='cs item';}))_csCsItemChildSet[sub.number+'_'+p.repo]=true;
+          if(p.state!=='closed'&&!isCsTaskItem(p)&&p.labels.some(function(l){return l.toLowerCase()==='cs item';}))_csCsItemChildSet[sub.number+'_'+p.repo]=true;
         });
       }
     }catch(e){}
@@ -530,6 +534,16 @@ async function loadSubIssueParents(){
       var childKey=childId+'_'+p.repo;
       _psChildTrackingSet[childKey]=true;
       if(_pIsCsItem)_csCsItemChildSet[childKey]=true;
+      var child=allForScan.find(function(iss){return iss.id===childId&&iss.repo===p.repo;});
+      if(child&&!child.parent)child.parent={issueNumber:p.id};
+    });
+  });
+  // Body scan for closed Financials CS Task Items — sets parent only (no tracking sets)
+  _closedFinTasks.forEach(function(p){
+    var seenC={};
+    ((p.body||'').match(/#(\d+)/g)||[]).forEach(function(ref){
+      var childId=parseInt(ref.slice(1));
+      if(seenC[childId]||childId===p.id)return;seenC[childId]=true;
       var child=allForScan.find(function(iss){return iss.id===childId&&iss.repo===p.repo;});
       if(child&&!child.parent)child.parent={issueNumber:p.id};
     });
@@ -1602,9 +1616,10 @@ function loadPsHistory(){try{var v=localStorage.getItem(PS_REPORT_HISTORY_KEY);r
 function savePsHistory(h){try{localStorage.setItem(PS_REPORT_HISTORY_KEY,JSON.stringify(h));}catch(e){}}
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function getPsCurrentSnapshot(){
-  var tracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isFinItem(i);});
-  if(!tracking.length)return null;
   var allIssues=S.issues.concat(S.closedIssues);
+  // Open AND closed Financials CS Task Items — the snapshot tracks status of their child items
+  var tracking=allIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isFinItem(i);});
+  if(!tracking.length)return null;
 
   // Build lookup maps for tracking issues
   var trackingById={};
@@ -1640,16 +1655,18 @@ function getPsCurrentSnapshot(){
     var groupIds={};
     group.forEach(function(g){groupIds[g.id+'_'+g.repo]=true;nums.push(g.id);});
 
-    var t=0,ca=0,cp=0,o=0,n=0;
+    var t=0,ca=0,cp=0,o=0,n=0,items={ca:[],cp:[],o:[]};
     group.forEach(function(issue){
       var subs=allIssues.filter(function(i){
         return i.parent&&i.parent.issueNumber===issue.id&&i.repo===issue.repo
                &&!groupIds[i.id+'_'+i.repo]; // exclude sibling tracking issues
       });
       t+=subs.length;
-      ca+=subs.filter(function(i){return i.state==='closed'&&i.hasApprovedComment===true;}).length;
-      cp+=subs.filter(function(i){if(i.state!=='closed')return false;var ll=i.labels.map(function(l){return l.toLowerCase();});return ll.indexOf('cs in testing')!==-1&&!i.hasApprovedComment;}).length;
-      o+=subs.filter(function(i){return i.state==='open';}).length;
+      var _caL=subs.filter(function(i){return i.state==='closed'&&i.hasApprovedComment===true;});
+      var _cpL=subs.filter(function(i){if(i.state!=='closed')return false;var ll=i.labels.map(function(l){return l.toLowerCase();});return ll.indexOf('cs in testing')!==-1&&!i.hasApprovedComment;});
+      var _oL=subs.filter(function(i){return i.state==='open';});
+      ca+=_caL.length;cp+=_cpL.length;o+=_oL.length;
+      items.ca=items.ca.concat(_caL);items.cp=items.cp.concat(_cpL);items.o=items.o.concat(_oL);
       (issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(chk&&!/#\d+/.test(chk[1]))n++;});
     });
 
@@ -1657,14 +1674,16 @@ function getPsCurrentSnapshot(){
     var primary=group.find(function(g){return !g.parent||!trackingById[g.parent.issueNumber+'_'+g.repo];})||group[0];
     var linked=group.filter(function(g){return g!==primary;});
 
-    var r={id:primary.id,title:primary.title,url:primary.url,linked:linked,total:t,closedApproved:ca,closedPending:cp,closed:ca+cp,open:o,noIssue:n};
+    var r={id:primary.id,title:primary.title,url:primary.url,linked:linked,total:t,closedApproved:ca,closedPending:cp,closed:ca+cp,open:o,noIssue:n,isClosed:primary.state==='closed',items:items};
     rows.push(r);totalAll+=t;closedAll+=ca+cp;closedApprovedAll+=ca;closedPendingAll+=cp;openAll+=o;noIssueAll+=n;
   });
 
   rows.sort(function(a,b){return b.id-a.id;});
   return{date:todayStr(),tracking:nums.join('/'),total:totalAll,closed:closedAll,closedApproved:closedApprovedAll,closedPending:closedPendingAll,open:openAll,noIssue:noIssueAll,rows:rows};
 }
-function savePsSnap(){var snap=getPsCurrentSnapshot();if(!snap){alert('No Financials CS Task Item issues found.');return;}var history=loadPsHistory();if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}else history.push(snap);savePsHistory(history);renderMain();}
+var _psDrill=null; // {id:rowId,cat:'ca'|'cp'|'o'}
+function psDrill(id,cat){_psDrill=(_psDrill&&_psDrill.id===id&&_psDrill.cat===cat)?null:{id:id,cat:cat};renderMain();}
+function savePsSnap(){var snap=getPsCurrentSnapshot();if(!snap){alert('No Financials CS Task Item issues found.');return;}snap.rows=snap.rows.map(function(r){var c={};Object.keys(r).forEach(function(k){if(k!=='items')c[k]=r[k];});return c;});var history=loadPsHistory();if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}else history.push(snap);savePsHistory(history);renderMain();}
 function delPsRptRow(idx){if(!confirm('Remove this row?'))return;var h=loadPsHistory();h.splice(idx,1);savePsHistory(h);renderMain();}
 function exportPsCSV(){var history=loadPsHistory(),rows=['Date,Tracking Issues,Total,Closed Approved,Closed Pending,Open,No Issue Raised'];history.forEach(function(row){rows.push([row.date,row.tracking,row.total,row.closedApproved||0,row.closedPending||0,row.open,row.noIssue||0].join(','));});var blob=new Blob([rows.join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='financials_report.csv';a.click();}
 function clearPsHistory(){if(!confirm('Clear all report history?'))return;localStorage.removeItem(PS_REPORT_HISTORY_KEY);renderMain();}
@@ -1684,7 +1703,9 @@ function renderPsReport(){
   h+='</div></div>';
   if(snap){
     h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Tracking Issue</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total Sub-Issues</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed Approved</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#0891b2">Closed Pending</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th></tr></thead><tbody>';
-    snap.rows.forEach(function(r){var lh='';if(r.linked&&r.linked.length){r.linked.forEach(function(li){lh+=' <a href="'+esc(li.url)+'" target="_blank" style="color:#7c3aed;font-weight:600;white-space:nowrap" title="'+esc(li.title)+'">+#'+li.id+'</a>';});}h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span></td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td><td style="padding:8px 13px;text-align:center;color:#059669;font-weight:600">'+r.closedApproved+'</td><td style="padding:8px 13px;text-align:center;color:#0891b2;font-weight:600">'+r.closedPending+'</td><td style="padding:8px 13px;text-align:center;color:#d97706;font-weight:600">'+r.open+'</td><td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';});
+    snap.rows.forEach(function(r){var lh='';if(r.linked&&r.linked.length){r.linked.forEach(function(li){lh+=' <a href="'+esc(li.url)+'" target="_blank" style="color:#7c3aed;font-weight:600;white-space:nowrap" title="'+esc(li.title)+'">+#'+li.id+'</a>';});}var _dc=function(cat,n,color){var on=_psDrill&&_psDrill.id===r.id&&_psDrill.cat===cat;if(!n)return '<td style="padding:8px 13px;text-align:center;color:'+color+';font-weight:600">'+n+'</td>';return '<td style="padding:8px 13px;text-align:center"><a href="javascript:void(0)" onclick="psDrill('+r.id+',\''+cat+'\')" title="Show items" style="color:'+color+';font-weight:700;text-decoration:underline;'+(on?'background:#f3f4f6;border-radius:6px;padding:2px 8px':'')+'">'+n+'</a></td>';};
+      h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span>'+(r.isClosed?' <span style="font-size:10px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:4px;padding:1px 6px;text-transform:uppercase">Closed</span>':'')+'</td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td>'+_dc('ca',r.closedApproved,'#059669')+_dc('cp',r.closedPending,'#0891b2')+_dc('o',r.open,'#d97706')+'<td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';
+      if(_psDrill&&_psDrill.id===r.id&&r.items){var _lst=r.items[_psDrill.cat]||[];var _ttl={ca:'Closed Approved',cp:'Closed Pending',o:'Open'}[_psDrill.cat];h+='<tr style="background:#faf5ff"><td colspan="6" style="padding:10px 13px 12px 28px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:6px">'+_ttl+' ('+_lst.length+')</div>';_lst.forEach(function(it){h+='<div style="padding:3px 0;font-size:13px"><a href="'+esc(it.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+it.id+'</a> <span style="color:#374151">'+esc(it.title)+'</span>'+(it.pipeline&&it.pipeline.pipelineName?' <span style="font-size:11px;color:#6b7280">· '+esc(it.pipeline.pipelineName)+'</span>':'')+'</div>';});h+='</td></tr>';}});
     h+='</tbody></table></div>';
   }else{h+='<div style="color:#9ca3af;font-size:13px">No Financials CS Task Item issues found. Issues need "Financials Query" or "Financials Report" labels AND "CS Task Item" label.</div>';}
   h+='</div>';
