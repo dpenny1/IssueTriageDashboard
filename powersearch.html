@@ -1655,7 +1655,7 @@ function getPsCurrentSnapshot(){
     var groupIds={};
     group.forEach(function(g){groupIds[g.id+'_'+g.repo]=true;nums.push(g.id);});
 
-    var t=0,ca=0,cp=0,o=0,n=0,items={ca:[],cp:[],o:[]};
+    var t=0,ca=0,cp=0,co=0,o=0,n=0,items={ca:[],cp:[],co:[],o:[]};
     group.forEach(function(issue){
       var subs=allIssues.filter(function(i){
         return i.parent&&i.parent.issueNumber===issue.id&&i.repo===issue.repo
@@ -1665,8 +1665,9 @@ function getPsCurrentSnapshot(){
       var _caL=subs.filter(function(i){return i.state==='closed'&&i.hasApprovedComment===true;});
       var _cpL=subs.filter(function(i){if(i.state!=='closed')return false;var ll=i.labels.map(function(l){return l.toLowerCase();});return ll.indexOf('cs in testing')!==-1&&!i.hasApprovedComment;});
       var _oL=subs.filter(function(i){return i.state==='open';});
-      ca+=_caL.length;cp+=_cpL.length;o+=_oL.length;
-      items.ca=items.ca.concat(_caL);items.cp=items.cp.concat(_cpL);items.o=items.o.concat(_oL);
+      var _coL=subs.filter(function(i){if(i.state!=='closed')return false;if(i.hasApprovedComment===true)return false;var ll=i.labels.map(function(l){return l.toLowerCase();});return ll.indexOf('cs in testing')===-1;});
+      ca+=_caL.length;cp+=_cpL.length;co+=_coL.length;o+=_oL.length;
+      items.ca=items.ca.concat(_caL);items.cp=items.cp.concat(_cpL);items.co=items.co.concat(_coL);items.o=items.o.concat(_oL);
       (issue.body||'').split('\n').forEach(function(line){var chk=line.match(/^\s*-\s*\[[ x]\]\s*(.+)/i);if(chk&&!/#\d+/.test(chk[1]))n++;});
     });
 
@@ -1674,7 +1675,7 @@ function getPsCurrentSnapshot(){
     var primary=group.find(function(g){return !g.parent||!trackingById[g.parent.issueNumber+'_'+g.repo];})||group[0];
     var linked=group.filter(function(g){return g!==primary;});
 
-    var r={id:primary.id,title:primary.title,url:primary.url,linked:linked,total:t,closedApproved:ca,closedPending:cp,closed:ca+cp,open:o,noIssue:n,isClosed:primary.state==='closed',items:items};
+    var r={id:primary.id,title:primary.title,url:primary.url,linked:linked,total:t,closedApproved:ca,closedPending:cp,closedOther:co,closed:ca+cp,open:o,noIssue:n,isClosed:primary.state==='closed',items:items};
     rows.push(r);totalAll+=t;closedAll+=ca+cp;closedApprovedAll+=ca;closedPendingAll+=cp;openAll+=o;noIssueAll+=n;
   });
 
@@ -1702,10 +1703,10 @@ function renderPsReport(){
   if(history.length){h+='<button class="btn-sm" onclick="exportPsCSV()">⬇ Export CSV</button><button class="btn-sm" style="border-color:#fca5a5;color:#dc2626" onclick="clearPsHistory()">🗑 Clear History</button>';}
   h+='</div></div>';
   if(snap){
-    h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Tracking Issue</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total Sub-Issues</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed Approved</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#0891b2">Closed Pending</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th></tr></thead><tbody>';
+    h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Tracking Issue</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total Sub-Issues</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed Approved</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#0891b2">Closed Pending</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#7c3aed">Other Closed</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th></tr></thead><tbody>';
     snap.rows.forEach(function(r){var lh='';if(r.linked&&r.linked.length){r.linked.forEach(function(li){lh+=' <a href="'+esc(li.url)+'" target="_blank" style="color:#7c3aed;font-weight:600;white-space:nowrap" title="'+esc(li.title)+'">+#'+li.id+'</a>';});}var _dc=function(cat,n,color){var on=_psDrill&&_psDrill.id===r.id&&_psDrill.cat===cat;if(!n)return '<td style="padding:8px 13px;text-align:center;color:'+color+';font-weight:600">'+n+'</td>';return '<td style="padding:8px 13px;text-align:center"><a href="javascript:void(0)" onclick="psDrill('+r.id+',\''+cat+'\')" title="Show items" style="color:'+color+';font-weight:700;text-decoration:underline;'+(on?'background:#f3f4f6;border-radius:6px;padding:2px 8px':'')+'">'+n+'</a></td>';};
-      h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span>'+(r.isClosed?' <span style="font-size:10px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:4px;padding:1px 6px;text-transform:uppercase">Closed</span>':'')+'</td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td>'+_dc('ca',r.closedApproved,'#059669')+_dc('cp',r.closedPending,'#0891b2')+_dc('o',r.open,'#d97706')+'<td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';
-      if(_psDrill&&_psDrill.id===r.id&&r.items){var _lst=r.items[_psDrill.cat]||[];var _ttl={ca:'Closed Approved',cp:'Closed Pending',o:'Open'}[_psDrill.cat];h+='<tr style="background:#faf5ff"><td colspan="6" style="padding:10px 13px 12px 28px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:6px">'+_ttl+' ('+_lst.length+')</div>';_lst.forEach(function(it){h+='<div style="padding:3px 0;font-size:13px"><a href="'+esc(it.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+it.id+'</a> <span style="color:#374151">'+esc(it.title)+'</span>'+(it.pipeline&&it.pipeline.pipelineName?' <span style="font-size:11px;color:#6b7280">· '+esc(it.pipeline.pipelineName)+'</span>':'')+'</div>';});h+='</td></tr>';}});
+      h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span>'+(r.isClosed?' <span style="font-size:10px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:4px;padding:1px 6px;text-transform:uppercase">Closed</span>':'')+'</td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td>'+_dc('ca',r.closedApproved,'#059669')+_dc('cp',r.closedPending,'#0891b2')+_dc('co',r.closedOther||0,'#7c3aed')+_dc('o',r.open,'#d97706')+'<td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';
+      if(_psDrill&&_psDrill.id===r.id&&r.items){var _lst=r.items[_psDrill.cat]||[];var _ttl={ca:'Closed Approved',cp:'Closed Pending',co:'Other Closed (no approval, no cs in testing label)',o:'Open'}[_psDrill.cat];h+='<tr style="background:#faf5ff"><td colspan="7" style="padding:10px 13px 12px 28px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:6px">'+_ttl+' ('+_lst.length+')</div>';_lst.forEach(function(it){h+='<div style="padding:3px 0;font-size:13px"><a href="'+esc(it.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+it.id+'</a> <span style="color:#374151">'+esc(it.title)+'</span>'+(it.pipeline&&it.pipeline.pipelineName?' <span style="font-size:11px;color:#6b7280">· '+esc(it.pipeline.pipelineName)+'</span>':'')+'</div>';});h+='</td></tr>';}});
     h+='</tbody></table></div>';
   }else{h+='<div style="color:#9ca3af;font-size:13px">No Financials CS Task Item issues found. Issues need "Financials Query" or "Financials Report" labels AND "CS Task Item" label.</div>';}
   h+='</div>';
