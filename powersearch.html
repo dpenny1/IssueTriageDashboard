@@ -1083,7 +1083,7 @@ function sortIssues(issues){
   });
 }
 
-function thClick(col){if(S.sortState.col===col)S.sortState.dir*=-1;else{S.sortState.col=col;S.sortState.dir=1;}renderMain();}
+function thClick(col){S._sortClicked=true;if(S.sortState.col===col)S.sortState.dir*=-1;else{S.sortState.col=col;S.sortState.dir=1;}renderMain();}
 function thArrow(col){if(S.sortState.col!==col)return '<span class="si">↕</span>';return '<span class="si">'+(S.sortState.dir===1?'↑':'↓')+'</span>';}
 function thCls(col){return S.sortState.col===col?' class="sorted"':'';}
 
@@ -1276,6 +1276,8 @@ function csByPipelineGroupView(issues){
 function renderPsExceptionsView(){
   var openExc=applyFilters(getExceptions());
   var closedExc=getClosedFinExceptions();
+  // Default to issue-number order unless the user has clicked a column header
+  if(!S._sortClicked){var _ps=S.sortState;S.sortState={col:'id',dir:1};try{var _oh=openTable(openExc,'No open exceptions — all clear!',false,'exceptions');}finally{S.sortState=_ps;}return _oh+'<div style="margin-top:24px"></div>'+renderPsExcClosedTable(closedExc);}
   var openH=openTable(openExc,'No open exceptions — all clear!',false,'exceptions');
   var closedH=renderPsExcClosedTable(closedExc);
   return openH+'<div style="margin-top:24px"></div>'+closedH;
@@ -1288,7 +1290,7 @@ function renderPsExcClosedTable(issues){
   h+='<th>Assignee</th><th>Reason</th><th onclick="thClick(\'closed\')"'+thCls('closed')+'>Closed'+thArrow('closed')+'</th><th>By</th><th></th>';
   h+='</tr></thead><tbody>';
   if(!issues.length){h+='<tr><td colspan="99" style="text-align:center;padding:24px;color:#9ca3af;font-style:italic">No closed financials exceptions.</td></tr>';}
-  var sorted=issues.slice().sort(function(a,b){return new Date(b.closedAt)-new Date(a.closedAt);});
+  var sorted=issues.slice().sort(function(a,b){return a.id-b.id;});
   sorted.forEach(function(iss){
     var ikey=iss.id+'_'+iss.repo;
     var asgn=iss.assignees.length?iss.assignees.join(', '):'—';
@@ -1696,7 +1698,10 @@ function renderPsReport(){
   h+='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px;border-left:4px solid #7c3aed">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">';
   h+='<div style="font-size:15px;font-weight:700;color:#1e1b4b">📊 Financials Weekly Snapshot</div>';
-  var _hasExc=(getExceptions().length+getClosedFinExceptions().length)>0;
+  // Closed fin exceptions that already appear in a "Closed Other" bucket are counted in the snapshot, so they don't skew it
+  var _coKeys={};if(snap)snap.rows.forEach(function(r){(r.items&&r.items.co||[]).forEach(function(i){_coKeys[i.id+'_'+i.repo]=true;});});
+  var _blockClosed=getClosedFinExceptions().filter(function(i){return !_coKeys[i.id+'_'+i.repo];});
+  var _hasExc=(getExceptions().length+_blockClosed.length)>0;
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
   h+='<button class="btn-sm"'+(_hasExc?' disabled title="Resolve all exceptions before saving a snapshot"':'')+' onclick="savePsSnap()">💾 Save Snapshot</button>';
   if(_hasExc)h+='<span style="font-size:12px;color:#b91c1c;font-weight:600">⚠ Exceptions must be resolved before saving</span>';
