@@ -274,10 +274,11 @@ function isClean(i){return !issueHasException(i);}
 function loadClosedFinExcIgnored(){try{var v=localStorage.getItem(PS_CLOSED_FIN_EXC_KEY);return v?JSON.parse(v):[];}catch(e){return[];}}
 function saveClosedFinExcIgnored(){try{localStorage.setItem(PS_CLOSED_FIN_EXC_KEY,JSON.stringify(S.closedFinExcIgnored));}catch(e){}}
 function isClosedFinException(issue){if(issue.state!=='closed')return false;if(S.closedFinExcIgnored.indexOf(issue._key||issue.id+'_'+issue.repo)!==-1)return false;var ll=issue._labelsLower||issue.labels.map(function(l){return l.toLowerCase();});if(ll.indexOf('cs task item')!==-1)return false;if(!FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;}))return false;if(ll.indexOf('cs in testing')!==-1)return false;if(issue.hasApprovedComment)return false;
+// Check 1: parent field — only exempt when parent is a CS Item (CS Task Item parents still flag).
+// If the issue has a known parent that is NOT an open CS Item, a mere #mention in some CS Item body must not exempt it.
+if(issue.parent){var parentOpen=S.issues.find(function(i){return i.id===issue.parent.issueNumber&&i.repo===issue.repo&&i.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});if(parentOpen)return false;return true;}
 // Check 0: pre-computed set — child of an open CS Item (not CS Task Item) → not a fin exception
 if(_csCsItemChildSet[issue._key||issue.id+'_'+issue.repo])return false;
-// Check 1: parent field — only exempt when parent is a CS Item (CS Task Item parents still flag)
-if(issue.parent){var parentOpen=S.issues.find(function(i){return i.id===issue.parent.issueNumber&&i.repo===issue.repo&&i.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});if(parentOpen)return false;}
 // Check 2: live reverse-scan of open CS Item body only (CS Task Item parents still flag)
 var openTracking=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs item';})&&!i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&i.repo===issue.repo;});var _ref=new RegExp('(?:^|\\D)#'+issue.id+'(?:\\D|$)');for(var _ti=0;_ti<openTracking.length;_ti++){if(_ref.test(openTracking[_ti].body||''))return false;}
 return true;}
