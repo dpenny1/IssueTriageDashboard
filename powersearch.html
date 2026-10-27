@@ -225,6 +225,8 @@ var _psChildTrackingSet={}; // issue keys (id_repo) that are sub-issues of a CS 
 var _csCsItemChildSet={}; // issue keys (id_repo) that are sub-issues of a CS Item specifically (not CS Task Item); used by closed-fin exception
 var CS_LABELS_PS=['cs tracking','uat patch','production patch','cs in testing','cs task item','cs item'];
 var FIN_LABELS=['financials query','financials report'];
+var SNAP_LABELS=FIN_LABELS.concat(['financials dashboard']); // labels that qualify a CS Task Item for the Financials Weekly Snapshot
+function isSnapFinItem(i){return i.labels.some(function(l){return SNAP_LABELS.indexOf(l.toLowerCase())!==-1;});}
 var PS_REPORT_HISTORY_KEY='ps_report_history_v1';
 function isFinItem(i){return i.labels.some(function(l){return FIN_LABELS.indexOf(l.toLowerCase())!==-1;});}
 function hasCS(i){return i.labels.some(function(l){return CS_LABELS_PS.indexOf(l.toLowerCase())!==-1;});}
@@ -498,7 +500,7 @@ async function loadSubIssueParents(){
   _psChildTrackingSet={};_csCsItemChildSet={};
   var seen={};
   // Closed Financials CS Task Items are also parents (Weekly Snapshot tracks their children)
-  var _closedFinTasks=S.closedIssues.filter(function(i){return isCsTaskItem(i)&&isFinItem(i);});
+  var _closedFinTasks=S.closedIssues.filter(function(i){return isCsTaskItem(i)&&isSnapFinItem(i);});
   var parents=S.issues.concat(_closedFinTasks).filter(function(i){
     var k=i.id+'_'+i.repo;if(seen[k])return false;seen[k]=true;
     if(i.state==='closed')return true;
@@ -698,7 +700,7 @@ async function applyPsRelease(){
   doRefresh();
 }
 
-async function loadClosedFinComments(){var candidates=S.closedIssues.filter(function(i){var ll=i.labels.map(function(l){return l.toLowerCase();});return FIN_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;})&&ll.indexOf('cs in testing')===-1;});await Promise.all(candidates.map(async function(i){try{var comments=await ghFetch('/repos/'+i.repo+'/issues/'+i.id+'/comments?per_page=100');i.hasApprovedComment=Array.isArray(comments)&&comments.some(function(c){return (c.body||'').toLowerCase().indexOf('cs approved')!==-1;});}catch(e){i.hasApprovedComment=false;}}));}
+async function loadClosedFinComments(){var candidates=S.closedIssues.filter(function(i){var ll=i.labels.map(function(l){return l.toLowerCase();});return SNAP_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;})&&ll.indexOf('cs in testing')===-1;});await Promise.all(candidates.map(async function(i){try{var comments=await ghFetch('/repos/'+i.repo+'/issues/'+i.id+'/comments?per_page=100');i.hasApprovedComment=Array.isArray(comments)&&comments.some(function(c){return (c.body||'').toLowerCase().indexOf('cs approved')!==-1;});}catch(e){i.hasApprovedComment=false;}}));}
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed to move pipeline: '+e.message);}}
 var _panelStore={};var _panelIdx=0;
 function registerPanel(grp){var k='p'+(++_panelIdx);_panelStore[k]=grp;return k;}
@@ -777,9 +779,9 @@ async function loadIssues(){
     });
     // Fetch ALL closed financials issues regardless of age (since30 misses older ones)
     var closedFinSeen={};closed.filter(function(c){return c.repo===repo;}).forEach(function(c){closedFinSeen[c.id]=true;});
-    for(var fli=0;fli<FIN_LABELS.length;fli++){
-      setLoMsg('Loading closed financials ('+FIN_LABELS[fli]+') from '+repo+'...');
-      var finCd=await ghFetchAll('/repos/'+repo+'/issues?state=closed&labels='+encodeURIComponent(FIN_LABELS[fli])+'&sort=updated&direction=desc',10);
+    for(var fli=0;fli<SNAP_LABELS.length;fli++){
+      setLoMsg('Loading closed financials ('+SNAP_LABELS[fli]+') from '+repo+'...');
+      var finCd=await ghFetchAll('/repos/'+repo+'/issues?state=closed&labels='+encodeURIComponent(SNAP_LABELS[fli])+'&sort=updated&direction=desc',10);
       finCd.forEach(function(iss){
         if(iss.pull_request)return;
         if(closedFinSeen[iss.number])return;
@@ -961,7 +963,7 @@ function renderStats(){
   var csItemSrc=clean.filter(isCsItem);
   var taskItems=clean.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';});});
   var csColor='#'+(S.labelColors['cs task item']||'7c3aed');
-  var finTrackingCount=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isFinItem(i);}).length;
+  var finTrackingCount=S.issues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isSnapFinItem(i);}).length;
   var closedFinExc=getClosedFinExceptions();
   var totalExc=excSrc.length+closedFinExc.length;
   var stats=[
@@ -1620,7 +1622,7 @@ function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMont
 function getPsCurrentSnapshot(){
   var allIssues=S.issues.concat(S.closedIssues);
   // Open AND closed Financials CS Task Items — the snapshot tracks status of their child items
-  var tracking=allIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isFinItem(i);});
+  var tracking=allIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isSnapFinItem(i);});
   if(!tracking.length)return null;
 
   // Build lookup maps for tracking issues
@@ -1713,7 +1715,7 @@ function renderPsReport(){
       h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span>'+(r.isClosed?' <span style="font-size:10px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:4px;padding:1px 6px;text-transform:uppercase">Closed</span>':'')+'</td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td>'+_dc('ca',r.closedApproved,'#059669')+_dc('cp',r.closedPending,'#0891b2')+_dc('co',r.closedOther||0,'#7c3aed')+_dc('o',r.open,'#d97706')+'<td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';
       if(_psDrill&&_psDrill.id===r.id&&r.items){var _lst=(r.items[_psDrill.cat]||[]).slice().sort(function(a,b){return a.id-b.id;});var _ttl={ca:'Closed Approved',cp:'Closed Pending',co:'Closed Other (no approval, no cs in testing label)',o:'Open'}[_psDrill.cat];h+='<tr style="background:#faf5ff"><td colspan="7" style="padding:10px 13px 12px 28px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:6px">'+_ttl+' ('+_lst.length+')</div>';_lst.forEach(function(it){h+='<div style="padding:4px 0;font-size:13px"><a href="'+esc(it.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+it.id+'</a> <span style="color:#374151">'+esc(it.title)+'</span>'+(it.pipeline&&it.pipeline.pipelineName?' <span style="font-size:11px;color:#6b7280">· '+esc(it.pipeline.pipelineName)+'</span>':'')+'<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">'+(it.labels||[]).map(lblBadge).join('')+'</div></div>';});h+='</td></tr>';}});
     h+='</tbody></table></div>';
-  }else{h+='<div style="color:#9ca3af;font-size:13px">No Financials CS Task Item issues found. Issues need "Financials Query" or "Financials Report" labels AND "CS Task Item" label.</div>';}
+  }else{h+='<div style="color:#9ca3af;font-size:13px">No Financials CS Task Item issues found. Issues need "Financials Query", "Financials Report" or "Financials Dashboard" labels AND "CS Task Item" label.</div>';}
   h+='</div>';
   if(history.length){
     h+='<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.07);margin-bottom:20px">';
