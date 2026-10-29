@@ -551,6 +551,26 @@ async function loadSubIssueParents(){
       if(child&&!child.parent)child.parent={issueNumber:p.id};
     });
   });
+  // Descendants of Financials tracking issues (children split into sub-issues, to any depth up to 5).
+  // /sub_issues is queried for every descendant not already queried above, so open AND closed children are covered.
+  var _queried={};parents.forEach(function(p){_queried[p.id+'_'+p.repo]=true;});
+  var _byKey={};allForScan.forEach(function(i){_byKey[i.id+'_'+i.repo]=i;});
+  var _level=allForScan.filter(function(i){return isCsTaskItem(i)&&isSnapFinItem(i);});
+  var _visited={};_level.forEach(function(i){_visited[i.id+'_'+i.repo]=true;});
+  for(var _d=0;_d<5&&_level.length;_d++){
+    var _bp={};allForScan.forEach(function(i){if(i.parent){var k=i.parent.issueNumber+'_'+i.repo;(_bp[k]=_bp[k]||[]).push(i);}});
+    var _next=[];
+    _level.forEach(function(l){(_bp[l.id+'_'+l.repo]||[]).forEach(function(c){var ck=c.id+'_'+c.repo;if(_visited[ck])return;_visited[ck]=true;_next.push(c);});});
+    await Promise.all(_next.filter(function(c){return !_queried[c.id+'_'+c.repo];}).map(async function(c){
+      _queried[c.id+'_'+c.repo]=true;
+      try{
+        var subs2=await ghFetch('/repos/'+c.repo+'/issues/'+c.id+'/sub_issues?per_page=100');
+        if(Array.isArray(subs2))subs2.forEach(function(sub){var ch=_byKey[sub.number+'_'+c.repo];if(ch&&!ch.parent)ch.parent={issueNumber:c.id};});
+      }catch(e){}
+    }));
+    // children of this level may have just gained sub-issues: recompute them as the next level
+    _level=_next;
+  }
 }
 // ── Remove Failed Testing label ───────────────────────────────────────────────
 async function removeFailedTestingLabel(id,repo){
@@ -1634,6 +1654,7 @@ function savePsHistory(h){try{localStorage.setItem(PS_REPORT_HISTORY_KEY,JSON.st
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function getPsCurrentSnapshot(){
   var allIssues=S.issues.concat(S.closedIssues);
+  var byParentSnap={};allIssues.forEach(function(i){if(i.parent){var _pk=i.parent.issueNumber+'_'+i.repo;(byParentSnap[_pk]=byParentSnap[_pk]||[]).push(i);}});
   // Open AND closed Financials CS Task Items — the snapshot tracks status of their child items
   var tracking=allIssues.filter(function(i){return i.labels.some(function(l){return l.toLowerCase()==='cs task item';})&&isSnapFinItem(i);});
   if(!tracking.length)return null;
@@ -1672,12 +1693,19 @@ function getPsCurrentSnapshot(){
     var groupIds={};
     group.forEach(function(g){groupIds[g.id+'_'+g.repo]=true;nums.push(g.id);});
 
-    var t=0,ca=0,cp=0,co=0,o=0,n=0,items={ca:[],cp:[],co:[],o:[]};
+    var t=0,ca=0,cp=0,co=0,o=0,n=0,items={ca:[],cp:[],co:[],o:[]},meta={};
     group.forEach(function(issue){
-      var subs=allIssues.filter(function(i){
-        return i.parent&&i.parent.issueNumber===issue.id&&i.repo===issue.repo
-               &&!groupIds[i.id+'_'+i.repo]; // exclude sibling tracking issues
-      });
+      // Direct children plus all their descendants (sub-issues of sub-issues), each counted once
+      var subs=[];
+      (function walk(parent,depth){
+        (byParentSnap[parent.id+'_'+parent.repo]||[]).forEach(function(c){
+          var ck=c.id+'_'+c.repo;
+          if(groupIds[ck]||meta[ck])return; // skip sibling tracking issues / already collected
+          meta[ck]={depth:depth,parentKey:parent.id+'_'+parent.repo,parentId:parent.id};
+          subs.push(c);
+          if(depth<6)walk(c,depth+1);
+        });
+      })(issue,0);
       t+=subs.length;
       var _caL=subs.filter(function(i){return i.state==='closed'&&i.hasApprovedComment===true;});
       var _cpL=subs.filter(function(i){if(i.state!=='closed')return false;var ll=i.labels.map(function(l){return l.toLowerCase();});return ll.indexOf('cs in testing')!==-1&&!i.hasApprovedComment;});
@@ -1692,7 +1720,7 @@ function getPsCurrentSnapshot(){
     var primary=group.find(function(g){return !g.parent||!trackingById[g.parent.issueNumber+'_'+g.repo];})||group[0];
     var linked=group.filter(function(g){return g!==primary;});
 
-    var r={id:primary.id,title:primary.title,url:primary.url,linked:linked,total:t,closedApproved:ca,closedPending:cp,closedOther:co,closed:ca+cp,open:o,noIssue:n,isClosed:primary.state==='closed',items:items};
+    var r={id:primary.id,title:primary.title,url:primary.url,linked:linked,total:t,closedApproved:ca,closedPending:cp,closedOther:co,closed:ca+cp,open:o,noIssue:n,isClosed:primary.state==='closed',items:items,meta:meta};
     rows.push(r);totalAll+=t;closedAll+=ca+cp;closedApprovedAll+=ca;closedPendingAll+=cp;closedOtherAll+=co;openAll+=o;noIssueAll+=n;
   });
 
@@ -1701,7 +1729,7 @@ function getPsCurrentSnapshot(){
 }
 var _psDrill=null; // {id:rowId,cat:'ca'|'cp'|'o'}
 function psDrill(id,cat){_psDrill=(_psDrill&&_psDrill.id===id&&_psDrill.cat===cat)?null:{id:id,cat:cat};renderMain();}
-function savePsSnap(){var snap=getPsCurrentSnapshot();if(!snap){alert('No Financials CS Task Item issues found.');return;}snap.rows=snap.rows.map(function(r){var c={};Object.keys(r).forEach(function(k){if(k!=='items')c[k]=r[k];});return c;});var history=loadPsHistory();if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}else history.push(snap);savePsHistory(history);renderMain();}
+function savePsSnap(){var snap=getPsCurrentSnapshot();if(!snap){alert('No Financials CS Task Item issues found.');return;}snap.rows=snap.rows.map(function(r){var c={};Object.keys(r).forEach(function(k){if(k!=='items'&&k!=='meta')c[k]=r[k];});return c;});var history=loadPsHistory();if(history.length>0&&history[history.length-1].date===snap.date){if(!confirm('Replace today\'s snapshot?'))return;history[history.length-1]=snap;}else history.push(snap);savePsHistory(history);renderMain();}
 function delPsRptRow(idx){if(!confirm('Remove this row?'))return;var h=loadPsHistory();h.splice(idx,1);savePsHistory(h);renderMain();}
 function exportPsCSV(){var history=loadPsHistory(),rows=['Date,Tracking Issues,Total,Closed Approved,Closed Pending,Closed Other,Open,No Issue Raised'];history.forEach(function(row){rows.push([row.date,row.tracking,row.total,row.closedApproved||0,row.closedPending||0,row.closedOther!==undefined?row.closedOther:'NA',row.open,row.noIssue||0].join(','));});var blob=new Blob([rows.join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='financials_report.csv';a.click();}
 function clearPsHistory(){if(!confirm('Clear all report history?'))return;localStorage.removeItem(PS_REPORT_HISTORY_KEY);renderMain();}
@@ -1726,7 +1754,13 @@ function renderPsReport(){
     h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;border-bottom:1px solid #e5e7eb"><th style="padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b7280">Tracking Issue</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">Total Sub-Issues</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#059669">Closed Approved</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#0891b2">Closed Pending</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#7c3aed">Closed Other</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#d97706">Open</th><th style="padding:9px 13px;text-align:center;font-size:11px;text-transform:uppercase;color:#6b7280">No Issue</th></tr></thead><tbody>';
     snap.rows.forEach(function(r){var lh='';if(r.linked&&r.linked.length){r.linked.forEach(function(li){lh+=' <a href="'+esc(li.url)+'" target="_blank" style="color:#7c3aed;font-weight:600;white-space:nowrap" title="'+esc(li.title)+'">+#'+li.id+'</a>';});}var _dc=function(cat,n,color){var on=_psDrill&&_psDrill.id===r.id&&_psDrill.cat===cat;if(!n)return '<td style="padding:8px 13px;text-align:center;color:'+color+';font-weight:600">'+n+'</td>';return '<td style="padding:8px 13px;text-align:center"><a href="javascript:void(0)" onclick="psDrill('+r.id+',\''+cat+'\')" title="Show items" style="color:'+color+';font-weight:700;text-decoration:underline;'+(on?'background:#f3f4f6;border-radius:6px;padding:2px 8px':'')+'">'+n+'</a></td>';};
       h+='<tr style="border-bottom:1px solid #f3f4f6"><td style="padding:8px 13px"><a href="'+esc(r.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+r.id+'</a>'+lh+' <span style="color:#374151">'+esc(r.title)+'</span>'+(r.isClosed?' <span style="font-size:10px;font-weight:700;color:#6b7280;background:#f3f4f6;border-radius:4px;padding:1px 6px;text-transform:uppercase">Closed</span>':'')+'</td><td style="padding:8px 13px;text-align:center;font-weight:700">'+r.total+'</td>'+_dc('ca',r.closedApproved,'#059669')+_dc('cp',r.closedPending,'#0891b2')+_dc('co',r.closedOther||0,'#7c3aed')+_dc('o',r.open,'#d97706')+'<td style="padding:8px 13px;text-align:center;color:#6b7280">'+r.noIssue+'</td></tr>';
-      if(_psDrill&&_psDrill.id===r.id&&r.items){var _lst=(r.items[_psDrill.cat]||[]).slice().sort(function(a,b){return a.id-b.id;});var _ttl={ca:'Closed Approved',cp:'Closed Pending',co:'Closed Other (no approval, no cs in testing label)',o:'Open'}[_psDrill.cat];h+='<tr style="background:#faf5ff"><td colspan="7" style="padding:10px 13px 12px 28px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:6px">'+_ttl+' ('+_lst.length+')</div>';_lst.forEach(function(it){h+='<div style="padding:4px 0;font-size:13px"><a href="'+esc(it.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+it.id+'</a> <span style="color:#374151">'+esc(it.title)+'</span>'+(it.pipeline&&it.pipeline.pipelineName?' <span style="font-size:11px;color:#6b7280">· '+esc(it.pipeline.pipelineName)+'</span>':'')+'<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">'+(it.labels||[]).map(lblBadge).join('')+'</div></div>';});h+='</td></tr>';}});
+      if(_psDrill&&_psDrill.id===r.id&&r.items){var _raw=(r.items[_psDrill.cat]||[]).slice().sort(function(a,b){return a.id-b.id;});
+      // Order: numeric, but each sub-issue is listed directly under its parent when the parent is in the same list
+      var _inList={};_raw.forEach(function(x){_inList[x.id+'_'+x.repo]=x;});
+      var _kids={};_raw.forEach(function(x){var m=r.meta&&r.meta[x.id+'_'+x.repo];if(m&&_inList[m.parentKey]){(_kids[m.parentKey]=_kids[m.parentKey]||[]).push(x);}});
+      var _lst=[],_ind={};
+      (function place(x,lvl){_lst.push(x);_ind[x.id+'_'+x.repo]=lvl;(_kids[x.id+'_'+x.repo]||[]).forEach(function(k){place(k,lvl+1);});});
+      _raw.forEach(function(x){var m=r.meta&&r.meta[x.id+'_'+x.repo];if(!(m&&_inList[m.parentKey]))place(x,0);});var _ttl={ca:'Closed Approved',cp:'Closed Pending',co:'Closed Other (no approval, no cs in testing label)',o:'Open'}[_psDrill.cat];h+='<tr style="background:#faf5ff"><td colspan="7" style="padding:10px 13px 12px 28px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:6px">'+_ttl+' ('+_lst.length+')</div>';_lst.forEach(function(it){var _m=r.meta&&r.meta[it.id+'_'+it.repo];var _lv=_ind[it.id+'_'+it.repo]||0;var _subTag=(_m&&_m.depth>0)?' <span style="font-size:11px;color:#6b7280;background:#ede9fe;border-radius:4px;padding:1px 6px">↳ sub-issue of #'+_m.parentId+'</span>':'';h+='<div style="padding:4px 0 4px '+(_lv*22)+'px;font-size:13px"><a href="'+esc(it.url)+'" target="_blank" style="color:#7c3aed;font-weight:600">#'+it.id+'</a> <span style="color:#374151">'+esc(it.title)+'</span>'+_subTag+(it.pipeline&&it.pipeline.pipelineName?' <span style="font-size:11px;color:#6b7280">· '+esc(it.pipeline.pipelineName)+'</span>':'')+'<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">'+(it.labels||[]).map(lblBadge).join('')+'</div></div>';});h+='</td></tr>';}});
     h+='</tbody></table></div>';
   }else{h+='<div style="color:#9ca3af;font-size:13px">No Financials CS Task Item issues found. Issues need "Financials Query", "Financials Report" or "Financials Dashboard" labels AND "CS Task Item" label.</div>';}
   h+='</div>';
