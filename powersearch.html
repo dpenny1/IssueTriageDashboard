@@ -247,7 +247,7 @@ function isCsTaskItemNotTracking(i){
 }
 // Like isAssignedNotInProgress but also allows Review/QA as a valid pipeline for CS items.
 function isCsItemAssignedNotInProgress(i){return !!(S.zhToken&&i.assignees&&i.assignees.length>0&&i.pipeline&&i.pipeline.pipelineName!=='In Progress'&&i.pipeline.pipelineName!=='New Issues'&&i.pipeline.pipelineName!=='Review/QA');}
-function issueHasException(i){var ikey=i._key||i.id+'_'+i.repo;if(_warnDismissedSet.has(ikey))return false;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);if(isCsItem(i))return (isFinItem(i)&&!isReferencedInTrackingPS(i.id))||isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isCsItemAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
+function issueHasException(i){var ikey=i._key||i.id+'_'+i.repo;if(_warnDismissedSet.has(ikey))return false;if(isReviewLabelMissing(i))return true;if(isCsTaskItem(i))return isCsTaskItemNotTracking(i);if(isCsItem(i))return (isFinItem(i)&&!isReferencedInTrackingPS(i.id))||isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isCsItemAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);return isMissingParent(i)||isNIP(i)||isAssignedInNIP(i)||isAssignedNotInProgress(i)||isUnassignedNotOnDeck(i);}
 function exceptionCount(issues){return issues.filter(issueHasException).length;}
 
 // ── Exceptions ────────────────────────────────────────────────────────────────
@@ -722,6 +722,64 @@ async function applyPsRelease(){
 }
 
 async function loadClosedFinComments(){var candidates=S.closedIssues.filter(function(i){var ll=i.labels.map(function(l){return l.toLowerCase();});return SNAP_LABELS.some(function(fl){return ll.indexOf(fl)!==-1;})&&ll.indexOf('cs in testing')===-1;});await Promise.all(candidates.map(async function(i){try{var comments=await ghFetch('/repos/'+i.repo+'/issues/'+i.id+'/comments?per_page=100');i.hasApprovedComment=Array.isArray(comments)&&comments.some(function(c){return (c.body||'').toLowerCase().indexOf('cs approved')!==-1;});}catch(e){i.hasApprovedComment=false;}}));}
+// ── "Ready For CS Review" label exception ─────────────────────────────────────
+// Exception when an assignee has commented asking for review ("review" / "attached") and the
+// Ready For CS Review label is NOT on the issue. Once the label has been added and later removed,
+// only a comment made AFTER that label activity triggers the exception again.
+var REVIEW_LABEL='ready for cs review',REVIEW_CACHE_KEY='ps_review_cache_v1',_reviewScanRunning=false,_reviewRerun=false;
+function hasReviewLabel(i){return i.labels.some(function(l){return l.toLowerCase()===REVIEW_LABEL;});}
+function isReviewCandidate(i){var ll=i._labelsLower||i.labels.map(function(l){return l.toLowerCase();});return ll.indexOf('cs item')!==-1&&ll.indexOf('cs task item')===-1;} // CS Items only
+function isReviewLabelMissing(i){return !!i._reviewReq&&isReviewCandidate(i)&&!hasReviewLabel(i);}
+async function checkReviewRequest(i){
+  var comments=await ghFetchAll('/repos/'+i.repo+'/issues/'+i.id+'/comments',5);
+  var asg=i.assignees.map(function(a){return a.toLowerCase();});
+  var latest=0;
+  comments.forEach(function(c){
+    if(!c.user||asg.indexOf((c.user.login||'').toLowerCase())===-1)return;
+    if(!/review|attached/i.test(c.body||''))return;
+    var t=new Date(c.created_at).getTime();if(t>latest)latest=t;
+  });
+  if(!latest)return false;
+  var events=await ghFetchAll('/repos/'+i.repo+'/issues/'+i.id+'/events',5);
+  var lastLbl=0;
+  events.forEach(function(e){
+    if((e.event==='labeled'||e.event==='unlabeled')&&e.label&&(e.label.name||'').toLowerCase()===REVIEW_LABEL){var t=new Date(e.created_at).getTime();if(t>lastLbl)lastLbl=t;}
+  });
+  return latest>lastLbl;
+}
+function startReviewScan(){
+  var cache={};try{cache=JSON.parse(localStorage.getItem(REVIEW_CACHE_KEY)||'{}')||{};}catch(e){}
+  var todo=[];
+  S.issues.forEach(function(i){
+    i._reviewReq=false;
+    if(!isReviewCandidate(i)||!i.assignees||!i.assignees.length||hasReviewLabel(i))return;
+    var k=i._key||i.id+'_'+i.repo,c=cache[k];
+    if(c&&i.updatedAt&&c.u===i.updatedAt){i._reviewReq=!!c.v;return;}
+    todo.push(i);
+  });
+  if(_reviewScanRunning){_reviewRerun=true;return;}
+  if(!todo.length)return;
+  _reviewScanRunning=true;
+  (async function(){
+    var idx=0,changed=false,newCache={};
+    Object.keys(cache).forEach(function(k){newCache[k]=cache[k];});
+    async function worker(){
+      while(idx<todo.length){
+        var iss=todo[idx++];
+        try{
+          var v=await checkReviewRequest(iss);
+          if(iss.updatedAt)newCache[iss._key||iss.id+'_'+iss.repo]={u:iss.updatedAt,v:v?1:0};
+          if(v!==!!iss._reviewReq){iss._reviewReq=v;changed=true;}
+        }catch(e){}
+      }
+    }
+    await Promise.all([worker(),worker(),worker(),worker(),worker()]);
+    try{localStorage.setItem(REVIEW_CACHE_KEY,JSON.stringify(newCache));}catch(e){}
+    _reviewScanRunning=false;
+    if(changed){_clearExcCaches();try{buildTabs();renderMain();}catch(e){console.error('[PS] review scan re-render failed:',e);}saveCache();}
+    if(_reviewRerun){_reviewRerun=false;startReviewScan();}
+  })();
+}
 async function movePipeline(issueId,repo,pipelineId){if(!pipelineId)return;var repoId=S.repoIds[repo];if(!repoId)return;var ws=S.repoWorkspaceMap[repo]||S.zhWorkspace;if(!ws)return;try{await zhPost('/p2/workspaces/'+ws+'/repositories/'+repoId+'/issues/'+issueId+'/moves',{pipeline_id:pipelineId,position:'top'});var issue=S.issues.find(function(i){return i.id===issueId&&i.repo===repo;});if(issue){var pipes=S.zhPipelines[repo]||[],pipe=pipes.find(function(p){return p.id===pipelineId;});if(pipe)issue.pipeline={pipelineId:pipe.id,pipelineName:pipe.name};}renderMain();}catch(e){alert('Failed to move pipeline: '+e.message);}}
 var _panelStore={};var _panelIdx=0;
 function registerPanel(grp){var k='p'+(++_panelIdx);_panelStore[k]=grp;return k;}
@@ -771,7 +829,7 @@ async function loadIssues(){
         _key:iss.number+'_'+repo,
         _createdAtMs:new Date(iss.created_at).getTime(),
         assignees:iss.assignees.map(function(a){return a.login;}),
-        createdAt:iss.created_at,url:iss.html_url,state:'open',
+        createdAt:iss.created_at,updatedAt:iss.updated_at,url:iss.html_url,state:'open',
         milestone:iss.milestone?iss.milestone.title:null,
         subIssuesTotal:(iss.sub_issues_summary&&iss.sub_issues_summary.total)||0,
         parent:bodyParent,
@@ -859,6 +917,7 @@ async function connect(){
       await loadIssues();
       await loadSubIssueParents();
       await loadClosedFinComments();
+      startReviewScan();
       saveCache();populateFilters();showDash();buildTabs();renderMain();startAutoRefresh();
       setStatus('<span style="color:#a5b4fc">✓ Loaded</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
       zhLoad();
@@ -872,7 +931,7 @@ async function bgRefresh(){
   showLoadingOverlay('Refreshing...');
   try{
     S.labelColors={};S.labelNames={};S.zhIssueMap={};S.zhPipelines={};S.repoIds={};S.zhConnected=false;
-    await loadLabelColors();await loadIssues();await loadSubIssueParents();await loadClosedFinComments();
+    await loadLabelColors();await loadIssues();await loadSubIssueParents();await loadClosedFinComments();startReviewScan();
     saveCache();populateFilters();try{buildTabs();}catch(e){console.error('[PS] bgRefresh buildTabs failed:',e);}try{renderMain();}catch(e){console.error('[PS] bgRefresh renderMain failed:',e);}startAutoRefresh();setTimeout(function(){if(typeof EXC!=='undefined'&&EXC.crossRefresh)EXC.crossRefresh();},0);
     setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
     zhLoad();
@@ -887,7 +946,7 @@ async function doRefresh(){
   showLoadingOverlay('Refreshing...');
   try{
     S.labelColors={};S.labelNames={};
-    await loadLabelColors();await loadIssues();await loadSubIssueParents();await loadClosedFinComments();
+    await loadLabelColors();await loadIssues();await loadSubIssueParents();await loadClosedFinComments();startReviewScan();
     saveCache();populateFilters();buildTabs();renderMain();setTimeout(function(){if(typeof EXC!=='undefined'&&EXC.crossRefresh)EXC.crossRefresh();},0);
     if(S.zhToken&&S.zhWorkspace)zhLoad();
     else setStatus('<span style="color:#a5b4fc">✓ Refreshed</span> &nbsp;<span style="color:#c7d2fe;font-size:12px">'+new Date().toLocaleTimeString()+'</span>');
@@ -1121,6 +1180,7 @@ function issueRow(iss,showClosed,showRestore){
   // Compute inline warnings for open issues
   var warnings=[];
   if(!showClosed&&S.warnDismissed.indexOf(ikey)===-1){
+    if(isReviewLabelMissing(iss))warnings.push('⚠ Assignee requested review in a comment but "Ready For CS Review" label is missing');
     if(isCsTaskItem(iss)){
       if(isCsTaskItemNotTracking(iss))warnings.push('⚠ CS Task Item not in CS Tracking Issues pipeline');
     }else{
@@ -1173,7 +1233,7 @@ function openTable(issues,emptyMsg,showRestore,tab){
   var multiRepo=S.repos.length>1;
   var pipeMap={};S.repos.forEach(function(r){(S.zhPipelines[r]||[]).forEach(function(p){if(!pipeMap[p.id])pipeMap[p.id]=p;});});
   var spipes=Object.keys(pipeMap).map(function(k){return pipeMap[k];}).sort(function(a,b){return a.name.toLowerCase().localeCompare(b.name.toLowerCase());});
-  var tabLabels={all:'New Issues',taskitem:'CS Task Items',csitem:'CS Items',closed:'Recently Closed',ignored:'Ignored',exceptions:'Exceptions'};
+  var tabLabels={all:'New Issues',taskitem:'CS Task Items',csitem:'CS Items',closed:'Recently Closed',ignored:'Ignored',exceptions:'Exceptions',reviewexc:'Awaiting "Ready For CS Review" Label (CS Items)'};
   var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#1e1b4b,#4338ca)"><span class="gt">'+(tabLabels[tab]||'Issues')+' <span class="gc">'+issues.length+'</span></span>';
   if(S.zhToken&&tab&&tab!=='closed'&&tab!=='ignored'&&spipes.length){var _pk=registerPanel(issues);h+='<select class="ps" style="color:#374151" onchange="bulkMovePanel(\''+_pk+'\',this.value,this)"><option value="">Bulk move pipeline...</option>';spipes.forEach(function(p){h+='<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';});h+='</select>';}
   h+='</div><div class="tw2"><table><thead><tr>';
@@ -1297,13 +1357,18 @@ function csByPipelineGroupView(issues){
 
 // ── Exceptions view ───────────────────────────────────────────────────────────
 function renderPsExceptionsView(){
-  var openExc=applyFilters(getExceptions());
+  var allOpen=applyFilters(getExceptions());
+  var reviewExc=allOpen.filter(isReviewLabelMissing);   // open CS Items awaiting the Ready For CS Review label — own panel
+  var openExc=allOpen.filter(function(i){return !isReviewLabelMissing(i);});
   var closedExc=getClosedFinExceptions();
   // Default to issue-number order unless the user has clicked a column header
-  if(!S._sortClicked){var _ps=S.sortState;S.sortState={col:'id',dir:1};try{var _oh=openTable(openExc,'No open exceptions — all clear!',false,'exceptions');}finally{S.sortState=_ps;}return _oh+'<div style="margin-top:24px"></div>'+renderPsExcClosedTable(closedExc);}
-  var openH=openTable(openExc,'No open exceptions — all clear!',false,'exceptions');
+  var _ps=S.sortState;if(!S._sortClicked)S.sortState={col:'id',dir:1};
+  try{
+    var openH=openTable(openExc,'No open exceptions — all clear!',false,'exceptions');
+    var reviewH=reviewExc.length?openTable(reviewExc,'',false,'reviewexc'):'';
+  }finally{S.sortState=_ps;}
   var closedH=renderPsExcClosedTable(closedExc);
-  return openH+'<div style="margin-top:24px"></div>'+closedH;
+  return openH+(reviewH?'<div style="margin-top:24px"></div>'+reviewH:'')+'<div style="margin-top:24px"></div>'+closedH;
 }
 function renderPsExcClosedTable(issues){
   var h='<div class="rw"><div class="gh" style="background:linear-gradient(135deg,#5b21b6,#7c3aed)"><span class="gt">Closed Financials Exceptions<span class="gc">'+issues.length+'</span></span></div>';
