@@ -728,7 +728,7 @@ async function loadClosedFinComments(){var candidates=S.closedIssues.filter(func
 // only a comment made AFTER that label activity triggers the exception again.
 var REVIEW_LABEL='ready for cs review',REVIEW_CACHE_KEY='ps_review_cache_v1',_reviewScanRunning=false,_reviewRerun=false;
 function hasReviewLabel(i){return i.labels.some(function(l){return l.toLowerCase()===REVIEW_LABEL;});}
-function isReviewCandidate(i){var ll=i._labelsLower||i.labels.map(function(l){return l.toLowerCase();});return ll.indexOf('cs item')!==-1&&ll.indexOf('cs task item')===-1;} // CS Items only
+function isReviewCandidate(i){var ll=i._labelsLower||i.labels.map(function(l){return l.toLowerCase();});return ll.indexOf('cs item')!==-1&&ll.indexOf('cs task item')===-1&&ll.indexOf('cs in testing')===-1;} // CS Items only; skipped once CS In Testing is on the issue
 function isReviewLabelMissing(i){return !!i._reviewReq&&isReviewCandidate(i)&&!hasReviewLabel(i);}
 async function checkReviewRequest(i){
   var comments=await ghFetchAll('/repos/'+i.repo+'/issues/'+i.id+'/comments',5);
