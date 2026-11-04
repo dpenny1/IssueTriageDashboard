@@ -746,7 +746,7 @@ async function checkReviewRequest(i){
     var en=e.label?(e.label.name||'').toLowerCase():'';
     // Reset points: any Ready For CS Review label activity, or Failed Testing being applied.
     // Only a comment made AFTER the latest reset point can trigger the exception.
-    if(((e.event==='labeled'||e.event==='unlabeled')&&en===REVIEW_LABEL)||(e.event==='labeled'&&en==='failed testing')){var t=new Date(e.created_at).getTime();if(t>lastLbl)lastLbl=t;}
+    if(((e.event==='labeled'||e.event==='unlabeled')&&en===REVIEW_LABEL)||(e.event==='labeled'&&en==='failed testing')||e.event==='reopened'){var t=new Date(e.created_at).getTime();if(t>lastLbl)lastLbl=t;}
   });
   return latest>lastLbl;
 }
