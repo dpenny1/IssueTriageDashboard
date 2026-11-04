@@ -726,20 +726,20 @@ async function loadClosedFinComments(){var candidates=S.closedIssues.filter(func
 // Exception when an assignee has commented asking for review ("review" / "attached") and the
 // Ready For CS Review label is NOT on the issue. Once the label has been added and later removed,
 // only a comment made AFTER that label activity triggers the exception again.
-var REVIEW_LABEL='ready for cs review',REVIEW_CACHE_KEY='ps_review_cache_v1',_reviewScanRunning=false,_reviewRerun=false;
+var REVIEW_LABEL='ready for cs review',REVIEW_CACHE_KEY='ps_review_cache_v3',_reviewScanRunning=false,_reviewRerun=false;
 function hasReviewLabel(i){return i.labels.some(function(l){return l.toLowerCase()===REVIEW_LABEL;});}
 function isReviewCandidate(i){var ll=i._labelsLower||i.labels.map(function(l){return l.toLowerCase();});return ll.indexOf('cs item')!==-1&&ll.indexOf('cs task item')===-1&&ll.indexOf('cs in testing')===-1&&ll.indexOf('failed testing')===-1;} // CS Items only; skipped while CS In Testing or Failed Testing is on the issue
 function isReviewLabelMissing(i){return !!i._reviewReq&&isReviewCandidate(i)&&!hasReviewLabel(i);}
 async function checkReviewRequest(i){
   var comments=await ghFetchAll('/repos/'+i.repo+'/issues/'+i.id+'/comments',5);
   var asg=i.assignees.map(function(a){return a.toLowerCase();});
-  var latest=0;
+  var latest=0,hit=null;
   comments.forEach(function(c){
     if(!c.user||asg.indexOf((c.user.login||'').toLowerCase())===-1)return;
     if(!/review|attached/i.test(c.body||''))return;
-    var t=new Date(c.created_at).getTime();if(t>latest)latest=t;
+    var t=new Date(c.created_at).getTime();if(t>latest){latest=t;hit=c;}
   });
-  if(!latest)return false;
+  if(!latest)return null;
   var events=await ghFetchAll('/repos/'+i.repo+'/issues/'+i.id+'/events',5);
   var lastLbl=0;
   events.forEach(function(e){
@@ -748,16 +748,19 @@ async function checkReviewRequest(i){
     // Only a comment made AFTER the latest reset point can trigger the exception.
     if(((e.event==='labeled'||e.event==='unlabeled')&&en===REVIEW_LABEL)||(e.event==='labeled'&&en==='failed testing')||e.event==='reopened'){var t=new Date(e.created_at).getTime();if(t>lastLbl)lastLbl=t;}
   });
-  return latest>lastLbl;
+  if(latest<=lastLbl)return null;
+  // Short snippet around the first matching word, plus author/date/link, so the dashboard can show what triggered it
+  var body=(hit.body||'').replace(/\s+/g,' ').trim(),m=body.search(/review|attached/i),st=Math.max(0,m-60);
+  return {s:(st>0?'…':'')+body.slice(st,st+160)+(st+160<body.length?'…':''),a:hit.user.login,d:hit.created_at,u:hit.html_url};
 }
 function startReviewScan(){
   var cache={};try{cache=JSON.parse(localStorage.getItem(REVIEW_CACHE_KEY)||'{}')||{};}catch(e){}
   var todo=[];
   S.issues.forEach(function(i){
-    i._reviewReq=false;
+    i._reviewReq=false;i._reviewInfo=null;
     if(!isReviewCandidate(i)||!i.assignees||!i.assignees.length||hasReviewLabel(i))return;
     var k=i._key||i.id+'_'+i.repo,c=cache[k];
-    if(c&&i.updatedAt&&c.u===i.updatedAt){i._reviewReq=!!c.v;return;}
+    if(c&&i.updatedAt&&c.u===i.updatedAt){i._reviewReq=!!c.v;i._reviewInfo=c.i||null;return;}
     todo.push(i);
   });
   if(_reviewScanRunning){_reviewRerun=true;return;}
@@ -770,9 +773,10 @@ function startReviewScan(){
       while(idx<todo.length){
         var iss=todo[idx++];
         try{
-          var v=await checkReviewRequest(iss);
-          if(iss.updatedAt)newCache[iss._key||iss.id+'_'+iss.repo]={u:iss.updatedAt,v:v?1:0};
-          if(v!==!!iss._reviewReq){iss._reviewReq=v;changed=true;}
+          var info=await checkReviewRequest(iss),v=!!info;
+          if(iss.updatedAt)newCache[iss._key||iss.id+'_'+iss.repo]={u:iss.updatedAt,v:v?1:0,i:info||undefined};
+          if(v||v!==!!iss._reviewReq)changed=true;
+          iss._reviewReq=v;iss._reviewInfo=info;
         }catch(e){}
       }
     }
@@ -1183,7 +1187,10 @@ function issueRow(iss,showClosed,showRestore){
   // Compute inline warnings for open issues
   var warnings=[];
   if(!showClosed&&S.warnDismissed.indexOf(ikey)===-1){
-    if(isReviewLabelMissing(iss))warnings.push('⚠ Assignee requested review in a comment but "Ready For CS Review" label is missing');
+    if(isReviewLabelMissing(iss)){
+      var _ri=iss._reviewInfo;
+      warnings.push(_ri?{html:'⚠ "Ready For CS Review" label missing — '+esc(_ri.a)+' ('+new Date(_ri.d).toLocaleDateString()+'): “'+esc(_ri.s).replace(/(review|attached)/gi,'<mark>$1</mark>')+'” <a href="'+esc(_ri.u)+'" target="_blank" style="color:#991b1b;font-weight:700">view comment ↗</a>'}:'⚠ Assignee requested review in a comment but "Ready For CS Review" label is missing');
+    }
     if(isCsTaskItem(iss)){
       if(isCsTaskItemNotTracking(iss))warnings.push('⚠ CS Task Item not in CS Tracking Issues pipeline');
     }else{
@@ -1204,7 +1211,7 @@ function issueRow(iss,showClosed,showRestore){
   h+='</div><div id="lblpanel_'+iss.id+'_'+esc(iss.repo)+'" style="display:none"></div>';
   if(warnings.length){
     h+='<div style="margin-top:4px">';
-    warnings.forEach(function(w){h+='<div style="margin-top:2px"><span class="badge" style="background:#fee2e2;color:#991b1b">'+esc(w)+'</span> <button onclick="dismissWarning(\''+ikey+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:#9ca3af;padding:0 3px" title="Dismiss warning">✕ Dismiss</button></div>';});
+    warnings.forEach(function(w){h+='<div style="margin-top:2px"><span class="badge" style="background:#fee2e2;color:#991b1b'+(typeof w==='string'?'':';white-space:normal;display:inline-block;max-width:560px;line-height:1.4')+'">'+(typeof w==='string'?esc(w):w.html)+'</span> <button onclick="dismissWarning(\''+ikey+'\')" style="background:none;border:none;cursor:pointer;font-size:11px;color:#9ca3af;padding:0 3px" title="Dismiss warning">✕ Dismiss</button></div>';});
     h+='</div>';
   }
   h+='</td>';
